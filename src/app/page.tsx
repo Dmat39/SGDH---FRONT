@@ -1,65 +1,95 @@
+"use client";
+
+import Link from "next/link";
+import { SUBGERENCIAS, SubgerenciaType, MUNICIPALITY } from "@/lib/constants";
 import Image from "next/image";
 
-export default function Home() {
+export default function HomePage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      {/* Banner de imágenes de fondo */}
+      <div
+        className="relative w-full h-64 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: "url('/images/banner-header.jpg')",
+          backgroundBlendMode: "overlay",
+        }}
+      >
+        <div className="absolute inset-0 bg-white/70"></div>
+        <div className="relative z-10 h-full flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-4xl md:text-5xl font-bold text-gray-800 mb-2">BIENVENIDO</h1>
+            <p className="text-xl md:text-2xl text-gray-600">PORTAL DE INICIO DE SESIÓN</p>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </div>
+
+      {/* Contenido principal */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
+        <div className="w-full max-w-4xl">
+          {/* Botones de selección de subgerencia */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            {/* Botón Programas Sociales */}
+            <Link
+              href="/login/programas-sociales"
+              className="group relative overflow-hidden rounded-lg shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
+            >
+              <div
+                className="h-48 flex items-center justify-center text-white p-8 bg-programas-sociales hover:bg-programas-sociales-hover transition-colors"
+                style={{ backgroundColor: SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES].color }}
+              >
+                <h2 className="text-2xl md:text-3xl font-bold text-center leading-tight">
+                  SUBGERENCIA DE
+                  <br />
+                  PROGRAMAS SOCIALES
+                </h2>
+              </div>
+            </Link>
+
+            {/* Botón Servicios Sociales */}
+            <Link
+              href="/login/servicios-sociales"
+              className="group relative overflow-hidden rounded-lg shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
+            >
+              <div
+                className="h-48 flex items-center justify-center text-white p-8 bg-servicios-sociales hover:bg-servicios-sociales-hover transition-colors"
+                style={{ backgroundColor: SUBGERENCIAS[SubgerenciaType.SERVICIOS_SOCIALES].color }}
+              >
+                <h2 className="text-2xl md:text-3xl font-bold text-center leading-tight">
+                  SUBGERENCIA DE
+                  <br />
+                  SERVICIOS SOCIALES
+                </h2>
+              </div>
+            </Link>
+          </div>
+
+          {/* Texto de instrucción */}
+          <p className="text-center text-gray-600 text-lg mb-8">Selecciona tu área para iniciar sesión</p>
         </div>
-      </main>
+      </div>
+
+      {/* Footer con logo */}
+      <div className="py-8 bg-white">
+        <div className="container mx-auto px-4">
+          <div className="flex justify-center items-center">
+            <div className="text-center">
+              <h3 className="text-2xl md:text-3xl font-bold">
+                <span className="text-red-600">SAN JUAN DE </span>
+                <span className="text-cyan-600">LURIGANCHO</span>
+              </h3>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Elemento decorativo (esquina) */}
+      <div className="fixed bottom-0 right-0 w-32 h-32 opacity-30">
+        <svg viewBox="0 0 100 100" className="w-full h-full">
+          <polygon points="100,0 100,100 0,100" fill="#00a3a8" />
+          <polygon points="100,0 100,60 40,100 0,100" fill="#d81b7e" />
+        </svg>
+      </div>
     </div>
   );
 }

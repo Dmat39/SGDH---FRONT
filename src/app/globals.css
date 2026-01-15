@@ -3,6 +3,12 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Colores de las Subgerencias */
+  --programas-sociales: #d81b7e;
+  --programas-sociales-hover: #b81667;
+  --servicios-sociales: #00a3a8;
+  --servicios-sociales-hover: #008a8e;
 }
 
 @theme inline {
@@ -10,6 +16,12 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Colores personalizados para las subgerencias */
+  --color-programas-sociales: var(--programas-sociales);
+  --color-programas-sociales-hover: var(--programas-sociales-hover);
+  --color-servicios-sociales: var(--servicios-sociales);
+  --color-servicios-sociales-hover: var(--servicios-sociales-hover);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -23,4 +35,39 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Estilos globales para SweetAlert2 */
+.swal2-container {
+  z-index: 2000 !important;
+}
+
+/* Estilos para tablas */
+.table-container {
+  overflow-x: auto;
+}
+
+/* Clases utilitarias personalizadas */
+.bg-programas-sociales {
+  background-color: var(--programas-sociales);
+}
+
+.bg-programas-sociales-hover:hover {
+  background-color: var(--programas-sociales-hover);
+}
+
+.bg-servicios-sociales {
+  background-color: var(--servicios-sociales);
+}
+
+.bg-servicios-sociales-hover:hover {
+  background-color: var(--servicios-sociales-hover);
+}
+
+.text-programas-sociales {
+  color: var(--programas-sociales);
+}
+
+.text-servicios-sociales {
+  color: var(--servicios-sociales);
 }

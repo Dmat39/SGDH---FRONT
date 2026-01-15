@@ -9,12 +9,29 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.7",
+    "@mui/material": "^7.3.7",
+    "@mui/x-charts": "^8.24.0",
+    "@mui/x-date-pickers": "^8.24.0",
+    "@reduxjs/toolkit": "^2.11.2",
+    "axios": "^1.13.2",
+    "crypto-js": "^4.2.0",
+    "dayjs": "^1.11.19",
+    "formik": "^2.4.9",
     "next": "16.1.1",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-date-range": "^2.0.1",
+    "react-dom": "19.2.3",
+    "react-redux": "^9.2.0",
+    "sweetalert2": "^11.26.17",
+    "xlsx": "^0.18.5",
+    "yup": "^1.7.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/crypto-js": "^4.2.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
