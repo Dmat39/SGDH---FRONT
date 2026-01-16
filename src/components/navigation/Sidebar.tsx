@@ -1,189 +1,276 @@
 "use client";
 
-import { useRouter, usePathname } from "next/navigation";
-import {
-  Drawer,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Divider,
-  Toolbar,
-  Box,
-  Typography,
-  Collapse,
-} from "@mui/material";
-import {
-  Dashboard,
-  ExpandLess,
-  ExpandMore,
-  LocalDrink,
-  Restaurant,
-  RestaurantMenu,
-  SoupKitchen,
-  AssignmentInd,
-  Accessible,
-  Elderly,
-  Groups,
-  SportsScore,
-  HealthAndSafety,
-} from "@mui/icons-material";
 import { useState } from "react";
-import { usePermissions } from "@/lib/hooks/usePermissions";
-import type { MenuItem } from "@/lib/constants";
+import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
+import { Sidebar as ProSidebar, Menu, MenuItem, SubMenu } from "react-pro-sidebar";
+import { Avatar, Box, Button, Popover, Typography } from "@mui/material";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import LogoutIcon from "@mui/icons-material/Logout";
+import { useAppDispatch, useAppSelector } from "@/redux/hooks";
+import { logout } from "@/redux/slices/authSlice";
+import { showConfirm } from "@/lib/utils/swalConfig";
+import DynamicIcon from "./DynamicIcon";
+import type { MenuItem as MenuItemType } from "@/lib/constants";
+
+// Importar imágenes
+import logoSjlImg from "@/assets/logos/logo_sjl.png";
+import userImg from "@/assets/logos/userimg.webp";
 
 interface SidebarProps {
-  open: boolean;
-  onClose: () => void;
-  menuItems: MenuItem[];
+  toggled: boolean;
+  setToggled: (value: boolean) => void;
+  menuItems: MenuItemType[];
   color: string;
+  subgerenciaName: string;
 }
 
-const DRAWER_WIDTH = 280;
-
-// Mapeo de iconos
-const iconMap: Record<string, React.ReactNode> = {
-  Dashboard: <Dashboard />,
-  LocalDrink: <LocalDrink />,
-  Restaurant: <Restaurant />,
-  RestaurantMenu: <RestaurantMenu />,
-  SoupKitchen: <SoupKitchen />,
-  AssignmentInd: <AssignmentInd />,
-  Accessible: <Accessible />,
-  Elderly: <Elderly />,
-  Groups: <Groups />,
-  SportsScore: <SportsScore />,
-  HealthAndSafety: <HealthAndSafety />,
+const themes = {
+  light: {
+    sidebar: {
+      backgroundColor: "#ffffff",
+      color: "#607489",
+    },
+    menu: {
+      icon: "#0098e5",
+      hover: {
+        backgroundColor: "#c5e4ff",
+        color: "#44596e",
+      },
+    },
+  },
 };
 
-export default function Sidebar({ open, onClose, menuItems, color }: SidebarProps) {
+export default function Sidebar({ toggled, setToggled, menuItems, color, subgerenciaName }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
-  const { hasPermission } = usePermissions();
+  const dispatch = useAppDispatch();
+  const { user } = useAppSelector((state) => state.auth);
+  const [collapsed, setCollapsed] = useState(false);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
-  const handleSubmenuClick = (itemId: string) => {
-    setOpenSubmenu(openSubmenu === itemId ? null : itemId);
+  const handlePopoverOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
   };
 
-  const handleNavigate = (path: string) => {
-    router.push(path);
-    if (window.innerWidth < 768) {
-      onClose();
+  const handlePopoverClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleLogout = async () => {
+    handlePopoverClose();
+    const result = await showConfirm("¿Cerrar sesión?", "¿Estás seguro de que deseas cerrar sesión?");
+
+    if (result.isConfirmed) {
+      if (typeof document !== "undefined") {
+        document.cookie = "auth_token=; path=/; max-age=0";
+      }
+      dispatch(logout());
+      router.push("/");
     }
   };
 
-  const hasAccess = (item: MenuItem): boolean => {
-    if (!item.permisos || item.permisos.length === 0) {
-      return true;
-    }
-    return hasPermission(item.permisos);
+  const open = Boolean(anchorEl);
+
+  const menuItemStyles = {
+    root: {
+      fontSize: "13px",
+      fontWeight: 400,
+    },
+    icon: {
+      color: color,
+    },
+    SubMenuExpandIcon: {
+      color: "#b6b7b9",
+    },
+    subMenuContent: {
+      backgroundColor: "transparent",
+    },
+    button: {
+      "&:hover": {
+        backgroundColor: `${color}20`,
+        color: themes.light.menu.hover.color,
+      },
+    },
+    label: {
+      fontWeight: 600,
+    },
   };
 
-  const renderMenuItem = (item: MenuItem, level: number = 0) => {
-    if (!hasAccess(item)) {
-      return null;
-    }
+  const isActive = (ruta?: string) => pathname === ruta;
 
-    const hasChildren = item.children && item.children.length > 0;
-    const isActive = pathname === item.ruta;
-    const isSubmenuOpen = openSubmenu === item.id;
+  const renderMenuItem = (item: MenuItemType) => {
+    const active = isActive(item.ruta);
+
+    if (item.children && item.children.length > 0) {
+      return (
+        <SubMenu
+          key={item.id}
+          label={item.nombre}
+          icon={item.icono ? <DynamicIcon iconName={item.icono} /> : undefined}
+        >
+          {item.children.map((child) => renderMenuItem(child))}
+        </SubMenu>
+      );
+    }
 
     return (
-      <Box key={item.id}>
-        <ListItemButton
-          onClick={() => {
-            if (hasChildren) {
-              handleSubmenuClick(item.id);
-            } else if (item.ruta) {
-              handleNavigate(item.ruta);
-            }
-          }}
-          sx={{
-            pl: 2 + level * 2,
-            backgroundColor: isActive ? `${color}20` : "transparent",
-            borderLeft: isActive ? `4px solid ${color}` : "none",
-            "&:hover": {
-              backgroundColor: `${color}10`,
-            },
-          }}
-        >
-          {item.icono && (
-            <ListItemIcon sx={{ color: isActive ? color : "inherit", minWidth: 40 }}>
-              {iconMap[item.icono] || <Dashboard />}
-            </ListItemIcon>
-          )}
-          <ListItemText
-            primary={item.nombre}
-            primaryTypographyProps={{
-              fontSize: level > 0 ? "0.9rem" : "1rem",
-              fontWeight: isActive ? "bold" : "normal",
-              color: isActive ? color : "inherit",
-            }}
-          />
-          {hasChildren && (isSubmenuOpen ? <ExpandLess /> : <ExpandMore />)}
-        </ListItemButton>
-
-        {hasChildren && (
-          <Collapse in={isSubmenuOpen} timeout="auto" unmountOnExit>
-            <List component="div" disablePadding>
-              {item.children?.map((child) => renderMenuItem(child, level + 1))}
-            </List>
-          </Collapse>
-        )}
-      </Box>
+      <MenuItem
+        key={item.id}
+        component={<Link href={item.ruta || "#"} />}
+        icon={item.icono ? <DynamicIcon iconName={item.icono} /> : undefined}
+        style={{
+          backgroundColor: active ? `${color}20` : "transparent",
+          borderLeft: active ? `4px solid ${color}` : "4px solid transparent",
+        }}
+      >
+        <span style={{ color: active ? color : "inherit", fontWeight: active ? "bold" : "normal" }}>
+          {item.nombre}
+        </span>
+      </MenuItem>
     );
   };
 
-  const drawerContent = (
-    <Box>
-      <Toolbar />
-      <Box sx={{ p: 2 }}>
-        <Typography variant="h6" sx={{ color, fontWeight: "bold" }}>
-          Menú
-        </Typography>
-      </Box>
-      <Divider />
-      <List>{menuItems.map((item) => renderMenuItem(item))}</List>
-    </Box>
-  );
-
   return (
-    <>
-      {/* Sidebar permanente para pantallas grandes */}
-      <Drawer
-        variant="permanent"
-        sx={{
-          display: { xs: "none", md: "block" },
-          width: DRAWER_WIDTH,
-          flexShrink: 0,
-          "& .MuiDrawer-paper": {
-            width: DRAWER_WIDTH,
-            boxSizing: "border-box",
-          },
+    <div className="relative h-full w-max z-[1200]">
+      <ProSidebar
+        backgroundColor="#ffffff"
+        className="shadow h-full"
+        breakPoint="md"
+        collapsed={collapsed}
+        toggled={toggled}
+        onBackdropClick={() => setToggled(false)}
+        rootStyles={{
+          color: themes.light.sidebar.color,
         }}
       >
-        {drawerContent}
-      </Drawer>
+        <div className="flex flex-col h-full">
+          {/* Logo */}
+          <Link
+            href="/"
+            className="flex justify-center items-center h-[90px]"
+            style={{ marginBottom: "24px", marginTop: "16px" }}
+          >
+            <Image
+              src={logoSjlImg}
+              alt="Logo San Juan de Lurigancho"
+              width={collapsed ? 50 : 200}
+              height={collapsed ? 50 : 80}
+              className="object-contain transition-all duration-300"
+            />
+          </Link>
 
-      {/* Sidebar temporal para pantallas pequeñas */}
-      <Drawer
-        variant="temporary"
-        open={open}
-        onClose={onClose}
-        ModalProps={{
-          keepMounted: true, // Mejor rendimiento en móviles
-        }}
-        sx={{
-          display: { xs: "block", md: "none" },
-          "& .MuiDrawer-paper": {
-            width: DRAWER_WIDTH,
-            boxSizing: "border-box",
-          },
-        }}
+          {/* Nombre de la subgerencia */}
+          {!collapsed && (
+            <div className="px-6 mb-4">
+              <Typography
+                variant="body2"
+                fontWeight={600}
+                style={{ color: color, letterSpacing: "0.5px" }}
+                className="text-center"
+              >
+                {subgerenciaName}
+              </Typography>
+            </div>
+          )}
+
+          {/* Menú */}
+          <div className="flex-1 overflow-hidden overflow-y-auto">
+            <Menu menuItemStyles={menuItemStyles}>
+              {menuItems.map((item) => renderMenuItem(item))}
+            </Menu>
+          </div>
+
+          {/* Perfil de usuario */}
+          <div>
+            <div
+              className="flex items-center justify-start p-4 border-t border-gray-200 w-full cursor-pointer hover:bg-gray-50 transition-colors"
+              onClick={handlePopoverOpen}
+            >
+              <div className="min-w-12 min-h-12 flex items-center justify-center">
+                <Avatar
+                  alt={user?.fullName || "Usuario"}
+                  sx={{
+                    width: collapsed ? 40 : 50,
+                    height: collapsed ? 40 : 50,
+                    transition: "width 0.5s, height 0.5s",
+                    bgcolor: color,
+                  }}
+                >
+                  {user?.fullName?.charAt(0) || "U"}
+                </Avatar>
+              </div>
+              {!collapsed && (
+                <div className="flex flex-col ml-4 overflow-hidden">
+                  <Typography variant="body2" fontWeight="bold" noWrap>
+                    {user?.fullName || "Usuario"}
+                  </Typography>
+                  <Typography variant="caption" color="textSecondary" noWrap>
+                    {user?.email || "usuario@sjl.gob.pe"}
+                  </Typography>
+                </div>
+              )}
+            </div>
+
+            {/* Popover de usuario */}
+            <Popover
+              open={open}
+              anchorEl={anchorEl}
+              onClose={handlePopoverClose}
+              anchorOrigin={{
+                vertical: "top",
+                horizontal: "center",
+              }}
+            >
+              <Box p={2} display="flex" flexDirection="column" alignItems="center" minWidth={200}>
+                <Avatar
+                  alt={user?.fullName || "Usuario"}
+                  sx={{ width: 60, height: 60, mb: 1, bgcolor: color }}
+                >
+                  {user?.fullName?.charAt(0) || "U"}
+                </Avatar>
+                <Typography sx={{ fontSize: "0.9rem", fontWeight: "bold" }}>
+                  {user?.fullName || "Usuario"}
+                </Typography>
+                <Typography sx={{ fontSize: "0.8rem", color: "text.secondary", mb: 2 }}>
+                  {user?.email || "usuario@sjl.gob.pe"}
+                </Typography>
+                <Button
+                  variant="contained"
+                  sx={{
+                    fontSize: 12,
+                    fontWeight: "bold",
+                    textTransform: "capitalize",
+                    padding: "8px 16px",
+                    backgroundColor: color,
+                    "&:hover": {
+                      backgroundColor: color,
+                      filter: "brightness(0.9)",
+                    },
+                  }}
+                  startIcon={<LogoutIcon />}
+                  onClick={handleLogout}
+                >
+                  Cerrar Sesión
+                </Button>
+              </Box>
+            </Popover>
+          </div>
+        </div>
+      </ProSidebar>
+
+      {/* Botón de colapsar (solo desktop) */}
+      <div
+        className="justify-center items-center absolute cursor-pointer top-[100px] right-[-10px] rounded-full h-6 w-6 text-white z-10 hidden md:flex"
+        style={{ backgroundColor: color }}
+        onClick={() => setCollapsed(!collapsed)}
       >
-        {drawerContent}
-      </Drawer>
-    </>
+        <ChevronRightRoundedIcon
+          className={`transition-transform duration-300 ${collapsed ? "" : "rotate-180"}`}
+          sx={{ fontSize: 18 }}
+        />
+      </div>
+    </div>
   );
 }

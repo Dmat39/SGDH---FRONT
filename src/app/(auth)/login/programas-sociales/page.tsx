@@ -2,25 +2,31 @@
 
 import LoginForm from "@/components/forms/LoginForm";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
+import Image from "next/image";
+
+// Importar imágenes
+import fondoImg from "@/assets/logos/fondo.png";
+import logoSjlImg from "@/assets/logos/logo_sjl.png";
+import fondoSjlBottomImg from "@/assets/logos/fondo_sjl_bottom.png";
 
 export default function ProgramasSocialesLoginPage() {
   const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      {/* Banner de imágenes de fondo */}
-      <div
-        className="relative w-full h-64 bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage: "url('/images/banner-header.jpg')",
-          backgroundBlendMode: "overlay",
-        }}
-      >
-        <div className="absolute inset-0 bg-white/70"></div>
+    <div className="h-screen flex flex-col relative overflow-hidden">
+      {/* Fondo de la página */}
+      <div className="absolute inset-0 z-0">
+        <Image
+          src={fondoImg}
+          alt="Fondo"
+          fill
+          className="object-cover"
+          priority
+        />
       </div>
 
       {/* Contenido principal */}
-      <div className="flex-1 flex items-center justify-center px-4 py-12 -mt-32">
+      <div className="flex-1 flex items-center justify-center px-4 py-8 relative z-10">
         <LoginForm
           subgerencia={SubgerenciaType.PROGRAMAS_SOCIALES}
           color={subgerencia.color}
@@ -29,17 +35,26 @@ export default function ProgramasSocialesLoginPage() {
       </div>
 
       {/* Footer con logo */}
-      <div className="py-8 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="flex justify-center items-center">
-            <div className="text-center">
-              <h3 className="text-2xl md:text-3xl font-bold">
-                <span className="text-red-600">SAN JUAN DE </span>
-                <span className="text-cyan-600">LURIGANCHO</span>
-              </h3>
-            </div>
-          </div>
+      <div className="py-4 relative z-10">
+        <div className="flex justify-center items-center">
+          <Image
+            src={logoSjlImg}
+            alt="San Juan de Lurigancho - Es momento de crecer"
+            width={200}
+            height={70}
+            className="object-contain"
+          />
         </div>
+      </div>
+
+      {/* Elemento decorativo (esquina inferior derecha) */}
+      <div className="fixed bottom-0 right-0 w-36 h-36 md:w-48 md:h-48 z-20 pointer-events-none">
+        <Image
+          src={fondoSjlBottomImg}
+          alt="Decoración"
+          fill
+          className="object-contain object-right-bottom"
+        />
       </div>
     </div>
   );

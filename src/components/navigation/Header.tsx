@@ -1,145 +1,40 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  AppBar,
-  Toolbar,
-  Typography,
-  IconButton,
-  Menu,
-  MenuItem,
-  Avatar,
-  Box,
-  Divider,
-} from "@mui/material";
-import {
-  Menu as MenuIcon,
-  AccountCircle,
-  Logout,
-  Settings,
-  Notifications,
-} from "@mui/icons-material";
-import { useAppDispatch, useAppSelector } from "@/redux/hooks";
-import { logout } from "@/redux/slices/authSlice";
-import { showConfirm } from "@/lib/utils/swalConfig";
+import { AppBar, IconButton, Toolbar } from "@mui/material";
+import MenuIcon from "@mui/icons-material/Menu";
+import Image from "next/image";
+import logoSjlImg from "@/assets/logos/logo_sjl.png";
 
 interface HeaderProps {
-  onMenuClick: () => void;
-  title: string;
-  color: string;
+  toggled: boolean;
+  setToggled: (value: boolean) => void;
 }
 
-export default function Header({ onMenuClick, title, color }: HeaderProps) {
-  const router = useRouter();
-  const dispatch = useAppDispatch();
-  const { user } = useAppSelector((state) => state.auth);
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleLogout = async () => {
-    const result = await showConfirm(
-      "¿Cerrar sesión?",
-      "¿Estás seguro de que deseas cerrar sesión?"
-    );
-
-    if (result.isConfirmed) {
-      // Eliminar cookie de token
-      if (typeof document !== "undefined") {
-        document.cookie = "auth_token=; path=/; max-age=0";
-      }
-
-      dispatch(logout());
-      router.push("/");
-    }
-  };
-
+export default function Header({ toggled, setToggled }: HeaderProps) {
   return (
     <AppBar
-      position="fixed"
-      sx={{
-        backgroundColor: color,
-        boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-        zIndex: (theme) => theme.zIndex.drawer + 1,
-      }}
+      sx={{ boxShadow: "0 1px 2px 0 rgb(0 0 0 / 0.05)" }}
+      className="top-0 shadow-sm md:!hidden"
+      position="sticky"
+      color="inherit"
     >
-      <Toolbar>
-        {/* Botón de menú */}
+      <Toolbar className="flex justify-between">
+        <Image
+          src={logoSjlImg}
+          alt="Logo San Juan de Lurigancho"
+          width={150}
+          height={40}
+          className="h-10 w-auto object-contain"
+        />
         <IconButton
+          size="large"
+          edge="end"
           color="inherit"
-          aria-label="open drawer"
-          edge="start"
-          onClick={onMenuClick}
-          sx={{ mr: 2 }}
+          aria-label="menu"
+          onClick={() => setToggled(!toggled)}
         >
           <MenuIcon />
         </IconButton>
-
-        {/* Título */}
-        <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-          {title}
-        </Typography>
-
-        {/* Notificaciones */}
-        <IconButton color="inherit" sx={{ mr: 1 }}>
-          <Notifications />
-        </IconButton>
-
-        {/* Usuario */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Typography variant="body2" sx={{ display: { xs: "none", sm: "block" } }}>
-            {user?.fullName || "Usuario"}
-          </Typography>
-          <IconButton onClick={handleMenuOpen} color="inherit">
-            {user?.avatar ? (
-              <Avatar src={user.avatar} alt={user.fullName} sx={{ width: 32, height: 32 }} />
-            ) : (
-              <AccountCircle />
-            )}
-          </IconButton>
-        </Box>
-
-        {/* Menú de usuario */}
-        <Menu
-          anchorEl={anchorEl}
-          open={Boolean(anchorEl)}
-          onClose={handleMenuClose}
-          onClick={handleMenuClose}
-          transformOrigin={{ horizontal: "right", vertical: "top" }}
-          anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
-        >
-          <MenuItem disabled>
-            <Box>
-              <Typography variant="body2" fontWeight="bold">
-                {user?.fullName}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {user?.email}
-              </Typography>
-            </Box>
-          </MenuItem>
-          <Divider />
-          <MenuItem onClick={() => {}}>
-            <AccountCircle sx={{ mr: 1 }} fontSize="small" />
-            Mi Perfil
-          </MenuItem>
-          <MenuItem onClick={() => {}}>
-            <Settings sx={{ mr: 1 }} fontSize="small" />
-            Configuración
-          </MenuItem>
-          <Divider />
-          <MenuItem onClick={handleLogout}>
-            <Logout sx={{ mr: 1 }} fontSize="small" />
-            Cerrar Sesión
-          </MenuItem>
-        </Menu>
       </Toolbar>
     </AppBar>
   );
