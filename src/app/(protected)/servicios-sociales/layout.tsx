@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Box, Toolbar } from "@mui/material";
 import Header from "@/components/navigation/Header";
 import Sidebar from "@/components/navigation/Sidebar";
 import { SUBGERENCIAS, SubgerenciaType, MODULOS_SERVICIOS_SOCIALES } from "@/lib/constants";
@@ -24,34 +23,23 @@ const menuItems = [
 ];
 
 export default function ServiciosSocialesLayout({ children }: { children: React.ReactNode }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [toggled, setToggled] = useState(false);
 
   return (
-    <Box sx={{ display: "flex" }}>
-      <Header
-        onMenuClick={() => setSidebarOpen(!sidebarOpen)}
-        title={subgerencia.nombre}
-        color={subgerencia.color}
-      />
+    <div className="flex h-screen w-full">
       <Sidebar
-        open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
+        toggled={toggled}
+        setToggled={setToggled}
         menuItems={menuItems}
         color={subgerencia.color}
+        subgerenciaName={subgerencia.nombre}
       />
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          p: 3,
-          width: { xs: "100%", md: `calc(100% - 280px)` },
-          minHeight: "100vh",
-          backgroundColor: "#f5f5f5",
-        }}
-      >
-        <Toolbar />
-        {children}
-      </Box>
-    </Box>
+      <div className="w-full overflow-auto flex flex-col relative">
+        <Header toggled={toggled} setToggled={setToggled} />
+        <div className="bg-gray-100 flex-1 overflow-auto p-4 md:p-6">
+          {children}
+        </div>
+      </div>
+    </div>
   );
 }

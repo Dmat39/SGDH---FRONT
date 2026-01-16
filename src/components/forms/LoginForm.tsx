@@ -24,6 +24,25 @@ const validationSchema = Yup.object({
   password: Yup.string().required("La contraseña es requerida"),
 });
 
+// Modo demo: Cambiar a false cuando tengas un backend real
+const DEMO_MODE = true;
+
+// Credenciales de prueba para modo demo
+const DEMO_CREDENTIALS = {
+  username: "admin",
+  password: "admin",
+};
+
+// Usuario de prueba para modo demo
+const DEMO_USER = {
+  id: 1,
+  username: "admin",
+  fullName: "Administrador Demo",
+  email: "admin@sjl.gob.pe",
+  role: "admin",
+  permissions: ["all"],
+};
+
 export default function LoginForm({ subgerencia, color, subgerenciaName }: LoginFormProps) {
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -42,7 +61,37 @@ export default function LoginForm({ subgerencia, color, subgerenciaName }: Login
         setIsLoading(true);
         dispatch(setLoading(true));
 
-        // Realizar login
+        // Modo demo: Login sin backend
+        if (DEMO_MODE) {
+          // Simular delay de red
+          await new Promise((resolve) => setTimeout(resolve, 800));
+
+          // Verificar credenciales de demo
+          if (values.username === DEMO_CREDENTIALS.username && values.password === DEMO_CREDENTIALS.password) {
+            const demoToken = "demo_token_" + Date.now();
+
+            // Guardar en Redux
+            dispatch(
+              loginSuccess({
+                token: demoToken,
+                user: DEMO_USER,
+              })
+            );
+
+            // Guardar token en cookies para el middleware
+            if (typeof document !== "undefined") {
+              document.cookie = `auth_token=${demoToken}; path=/; max-age=86400; SameSite=Strict`;
+            }
+
+            showSuccess("Bienvenido", `Hola ${DEMO_USER.fullName}`);
+            router.push(`/${subgerencia}`);
+            return;
+          } else {
+            throw new Error("Usuario o contraseña incorrectos");
+          }
+        }
+
+        // Modo producción: Login con backend real
         const response: LoginResponse = await postData("/auth/login", {
           ...values,
           subgerencia,
@@ -69,7 +118,7 @@ export default function LoginForm({ subgerencia, color, subgerenciaName }: Login
         console.error("Error en login:", error);
         showError(
           "Error al iniciar sesión",
-          error.response?.data?.message || "Usuario o contraseña incorrectos"
+          error.message || error.response?.data?.message || "Usuario o contraseña incorrectos"
         );
       } finally {
         setIsLoading(false);
@@ -79,72 +128,90 @@ export default function LoginForm({ subgerencia, color, subgerenciaName }: Login
   });
 
   return (
-    <div className="w-full max-w-md bg-white rounded-lg shadow-xl p-8">
+    <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 md:p-10">
       {/* Título */}
       <h2
-        className="text-2xl md:text-3xl font-bold text-center mb-6 leading-tight"
+        className="text-xl md:text-2xl font-bold text-center mb-8 leading-tight"
         style={{ color }}
       >
         {subgerenciaName}
       </h2>
 
       {/* Formulario */}
-      <form onSubmit={formik.handleSubmit} className="space-y-4">
+      <form onSubmit={formik.handleSubmit}>
         {/* Campo Usuario */}
-        <TextField
-          fullWidth
-          id="username"
-          name="username"
-          label="Usuario"
-          variant="outlined"
-          value={formik.values.username}
-          onChange={formik.handleChange}
-          onBlur={formik.handleBlur}
-          error={formik.touched.username && Boolean(formik.errors.username)}
-          helperText={formik.touched.username && formik.errors.username}
-          disabled={isLoading}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <PersonOutline />
-              </InputAdornment>
-            ),
-          }}
-        />
+        <div className="mb-6">
+          <TextField
+            fullWidth
+            id="username"
+            name="username"
+            label="Usuario"
+            variant="outlined"
+            value={formik.values.username}
+            onChange={formik.handleChange}
+            onBlur={formik.handleBlur}
+            error={formik.touched.username && Boolean(formik.errors.username)}
+            helperText={formik.touched.username && formik.errors.username}
+            disabled={isLoading}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <PersonOutline sx={{ color: "gray" }} />
+                  </InputAdornment>
+                ),
+              },
+            }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "12px",
+              },
+            }}
+          />
+        </div>
 
         {/* Campo Contraseña */}
-        <TextField
-          fullWidth
-          id="password"
-          name="password"
-          label="Contraseña"
-          type={showPassword ? "text" : "password"}
-          variant="outlined"
-          value={formik.values.password}
-          onChange={formik.handleChange}
-          onBlur={formik.handleBlur}
-          error={formik.touched.password && Boolean(formik.errors.password)}
-          helperText={formik.touched.password && formik.errors.password}
-          disabled={isLoading}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <LockOutlined />
-              </InputAdornment>
-            ),
-            endAdornment: (
-              <InputAdornment position="end">
-                <IconButton
-                  aria-label="toggle password visibility"
-                  onClick={() => setShowPassword(!showPassword)}
-                  edge="end"
-                >
-                  {showPassword ? <VisibilityOff /> : <Visibility />}
-                </IconButton>
-              </InputAdornment>
-            ),
-          }}
-        />
+        <div className="mb-8">
+          <TextField
+            fullWidth
+            id="password"
+            name="password"
+            label="Contraseña"
+            type={showPassword ? "text" : "password"}
+            variant="outlined"
+            value={formik.values.password}
+            onChange={formik.handleChange}
+            onBlur={formik.handleBlur}
+            error={formik.touched.password && Boolean(formik.errors.password)}
+            helperText={formik.touched.password && formik.errors.password}
+            disabled={isLoading}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <LockOutlined sx={{ color: "gray" }} />
+                  </InputAdornment>
+                ),
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="toggle password visibility"
+                      onClick={() => setShowPassword(!showPassword)}
+                      edge="end"
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              },
+            }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "12px",
+              },
+            }}
+          />
+        </div>
 
         {/* Botón de submit */}
         <Button
@@ -163,6 +230,8 @@ export default function LoginForm({ subgerencia, color, subgerenciaName }: Login
             fontSize: "1.1rem",
             fontWeight: "bold",
             py: 1.5,
+            borderRadius: "12px",
+            mt: 2,
           }}
         >
           {isLoading ? <CircularProgress size={24} color="inherit" /> : "INICIAR SESIÓN"}
@@ -170,20 +239,13 @@ export default function LoginForm({ subgerencia, color, subgerenciaName }: Login
       </form>
 
       {/* Enlaces adicionales */}
-      <div className="mt-4 flex justify-between text-sm">
+      <div className="mt-6 flex justify-center gap-4 text-sm">
         <button
           type="button"
-          className="text-gray-600 hover:text-gray-800 transition-colors"
+          className="text-gray-500 hover:text-gray-700 transition-colors underline-offset-2 hover:underline"
           onClick={() => showError("Función no disponible", "Contacta al administrador del sistema")}
         >
-          Olvidé mi contraseña
-        </button>
-        <button
-          type="button"
-          className="text-gray-600 hover:text-gray-800 transition-colors"
-          onClick={() => showError("Función no disponible", "Contacta al administrador del sistema")}
-        >
-          Crear cuenta
+          ¿Olvidaste tu contraseña?
         </button>
       </div>
     </div>
