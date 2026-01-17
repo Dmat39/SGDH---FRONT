@@ -40,6 +40,10 @@ import {
   Weekend,
   BrowseGallery,
   Wc,
+  List,
+  Place,
+  Layers,
+  MyLocation,
 } from "@mui/icons-material";
 
 interface DynamicIconProps {
@@ -87,6 +91,10 @@ const iconMap: Record<string, React.ReactNode> = {
   Weekend: <Weekend />,
   BrowseGallery: <BrowseGallery />,
   Wc: <Wc />,
+  List: <List />,
+  Place: <Place />,
+  Layers: <Layers />,
+  MyLocation: <MyLocation />,
 };
 
 export default function DynamicIcon({ iconName, className }: DynamicIconProps) {

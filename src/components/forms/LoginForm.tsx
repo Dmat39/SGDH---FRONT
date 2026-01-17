@@ -37,10 +37,13 @@ const DEMO_CREDENTIALS = {
 const DEMO_USER = {
   id: 1,
   username: "admin",
+  firstName: "Administrador",
+  lastName: "Demo",
   fullName: "Administrador Demo",
   email: "admin@sjl.gob.pe",
-  role: "admin",
   permissions: ["all"],
+  subgerencia: "programas-sociales" as SubgerenciaType,
+  cargo: "Administrador del Sistema",
 };
 
 export default function LoginForm({ subgerencia, color, subgerenciaName }: LoginFormProps) {
