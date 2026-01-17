@@ -1,77 +1,149 @@
 import { useAppSelector } from "@/redux/hooks";
 import type { User } from "@/types/auth";
+import type { MenuItem } from "@/lib/constants";
 
 /**
  * Hook para verificar permisos del usuario
+ * Soporta jerarquía de permisos:
+ * - "all" = acceso total al sistema
+ * - "all_programas_sociales" = acceso a todas las áreas de Programas Sociales
+ * - "all_servicios_sociales" = acceso a todas las áreas de Servicios Sociales
+ * - "pvl", "ciam", etc. = acceso a área específica
  */
-export const usePermissions = (moduleName?: string | string[]) => {
+export const usePermissions = () => {
   const { user } = useAppSelector((state) => state.auth);
 
   /**
-   * Verifica si el usuario tiene un permiso específico
+   * Verifica si el usuario tiene al menos uno de los permisos requeridos
    */
-  const hasPermission = (permission: string | string[]): boolean => {
+  const hasPermission = (requiredPermissions: string | string[]): boolean => {
     if (!user || !user.permissions) {
       return false;
     }
 
-    const permissions = Array.isArray(permission) ? permission : [permission];
+    // Si tiene permiso "all", tiene acceso a todo
+    if (user.permissions.includes("all")) {
+      return true;
+    }
+
+    const permissions = Array.isArray(requiredPermissions) ? requiredPermissions : [requiredPermissions];
 
     return permissions.some((perm) => user.permissions.includes(perm));
   };
 
   /**
-   * Verifica si el usuario tiene permiso para crear
+   * Verifica si el usuario es administrador
    */
-  const canCreate = (): boolean => {
-    if (!moduleName) return false;
-    const modules = Array.isArray(moduleName) ? moduleName : [moduleName];
-    return modules.some((mod) => hasPermission(`create_${mod}`) || hasPermission(`all_${mod}`));
+  const isAdmin = (): boolean => {
+    return user?.permissions?.includes("all") || false;
   };
 
   /**
-   * Verifica si el usuario tiene permiso para ver/leer
+   * Verifica si el usuario es subgerente de Programas Sociales
    */
-  const canRead = (): boolean => {
-    if (!moduleName) return false;
-    const modules = Array.isArray(moduleName) ? moduleName : [moduleName];
-    return modules.some((mod) => hasPermission(`view_${mod}`) || hasPermission(`all_${mod}`));
+  const isSubgerentePS = (): boolean => {
+    return user?.permissions?.includes("all_programas_sociales") || isAdmin();
   };
 
   /**
-   * Verifica si el usuario tiene permiso para editar
+   * Verifica si el usuario es subgerente de Servicios Sociales
    */
-  const canEdit = (): boolean => {
-    if (!moduleName) return false;
-    const modules = Array.isArray(moduleName) ? moduleName : [moduleName];
-    return modules.some((mod) => hasPermission(`update_${mod}`) || hasPermission(`all_${mod}`));
+  const isSubgerenteSS = (): boolean => {
+    return user?.permissions?.includes("all_servicios_sociales") || isAdmin();
   };
 
   /**
-   * Verifica si el usuario tiene permiso para eliminar
+   * Filtra los items del menú según los permisos del usuario
    */
-  const canDelete = (): boolean => {
-    if (!moduleName) return false;
-    const modules = Array.isArray(moduleName) ? moduleName : [moduleName];
-    return modules.some((mod) => hasPermission(`delete_${mod}`) || hasPermission(`all_${mod}`));
+  const filterMenuItems = (items: MenuItem[]): MenuItem[] => {
+    if (!user || !user.permissions) {
+      return [];
+    }
+
+    // Si es admin, mostrar todo
+    if (isAdmin()) {
+      return items;
+    }
+
+    return items.reduce<MenuItem[]>((acc, item) => {
+      // Verificar si el usuario tiene permiso para este item
+      const hasAccess = !item.permisos || item.permisos.length === 0 || hasPermission(item.permisos);
+
+      if (hasAccess) {
+        // Si tiene hijos, filtrarlos recursivamente
+        if (item.children && item.children.length > 0) {
+          const filteredChildren = filterMenuItems(item.children);
+          // Solo agregar si tiene al menos un hijo visible
+          if (filteredChildren.length > 0) {
+            acc.push({
+              ...item,
+              children: filteredChildren,
+            });
+          }
+        } else {
+          // Si no tiene hijos, agregar directamente
+          acc.push(item);
+        }
+      }
+
+      return acc;
+    }, []);
   };
 
   /**
-   * Verifica si el usuario tiene acceso al módulo
+   * Verifica si el usuario tiene acceso a un módulo específico
    */
-  const hasModuleAccess = (): boolean => {
-    if (!moduleName) return false;
-    const modules = Array.isArray(moduleName) ? moduleName : [moduleName];
-    return modules.some((mod) => hasPermission(mod) || hasPermission(`all_${mod}`));
+  const hasModuleAccess = (moduleName: string): boolean => {
+    if (isAdmin()) return true;
+
+    // Mapear módulos a permisos
+    const modulePermissions: Record<string, string[]> = {
+      pvl: ["pvl", "all_programas_sociales"],
+      pantbc: ["pantbc", "all_programas_sociales"],
+      comedores: ["comedores_populares", "all_programas_sociales"],
+      ollas: ["ollas_comunes", "all_programas_sociales"],
+      ule: ["ule", "all_programas_sociales"],
+      omaped: ["omaped", "all_programas_sociales"],
+      ciam: ["ciam", "all_programas_sociales"],
+      participacion: ["participacion_ciudadana", "all_servicios_sociales"],
+      deportes: ["servicios_deporte", "all_servicios_sociales"],
+      salud: ["salud", "all_servicios_sociales"],
+    };
+
+    const permissions = modulePermissions[moduleName] || [moduleName];
+    return hasPermission(permissions);
+  };
+
+  /**
+   * Obtiene las capas del mapa que el usuario puede ver
+   */
+  const getVisibleMapLayers = (): string[] => {
+    if (isAdmin() || isSubgerentePS()) {
+      return ["jurisdicciones", "pvl", "pantbc", "comedores", "ollas", "ule", "omaped", "ciam"];
+    }
+
+    const layers = ["jurisdicciones"]; // Siempre visible
+
+    if (hasPermission(["pvl", "mapa_pvl"])) layers.push("pvl");
+    if (hasPermission(["pantbc", "mapa_pantbc"])) layers.push("pantbc");
+    if (hasPermission(["comedores_populares", "mapa_comedores"])) layers.push("comedores");
+    if (hasPermission(["ollas_comunes", "mapa_ollas"])) layers.push("ollas");
+    if (hasPermission(["ule", "mapa_ule"])) layers.push("ule");
+    if (hasPermission(["omaped", "mapa_omaped"])) layers.push("omaped");
+    if (hasPermission(["ciam", "mapa_ciam"])) layers.push("ciam");
+
+    return layers;
   };
 
   return {
+    user,
     hasPermission,
-    canCreate,
-    canRead,
-    canEdit,
-    canDelete,
+    isAdmin,
+    isSubgerentePS,
+    isSubgerenteSS,
+    filterMenuItems,
     hasModuleAccess,
+    getVisibleMapLayers,
   };
 };
 
@@ -79,11 +151,50 @@ export const usePermissions = (moduleName?: string | string[]) => {
  * Función helper para verificar permisos (sin hook)
  * Útil para usar fuera de componentes
  */
-export const hasPermissionFunction = (user: User | null, permission: string | string[]): boolean => {
+export const hasPermissionFunction = (user: User | null, requiredPermissions: string | string[]): boolean => {
   if (!user || !user.permissions) {
     return false;
   }
 
-  const permissions = Array.isArray(permission) ? permission : [permission];
+  // Si tiene permiso "all", tiene acceso a todo
+  if (user.permissions.includes("all")) {
+    return true;
+  }
+
+  const permissions = Array.isArray(requiredPermissions) ? requiredPermissions : [requiredPermissions];
   return permissions.some((perm) => user.permissions.includes(perm));
+};
+
+/**
+ * Función helper para filtrar menú items
+ */
+export const filterMenuItemsFunction = (user: User | null, items: MenuItem[]): MenuItem[] => {
+  if (!user || !user.permissions) {
+    return [];
+  }
+
+  // Si es admin, mostrar todo
+  if (user.permissions.includes("all")) {
+    return items;
+  }
+
+  return items.reduce<MenuItem[]>((acc, item) => {
+    const hasAccess = !item.permisos || item.permisos.length === 0 || hasPermissionFunction(user, item.permisos);
+
+    if (hasAccess) {
+      if (item.children && item.children.length > 0) {
+        const filteredChildren = filterMenuItemsFunction(user, item.children);
+        if (filteredChildren.length > 0) {
+          acc.push({
+            ...item,
+            children: filteredChildren,
+          });
+        }
+      } else {
+        acc.push(item);
+      }
+    }
+
+    return acc;
+  }, []);
 };
