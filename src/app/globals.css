@@ -7,6 +7,7 @@
   /* Colores de las Subgerencias */
   --programas-sociales: #d81b7e;
   --programas-sociales-hover: #b81667;
+  --programas-sociales-bg: #fdf2f8;
   --servicios-sociales: #00a3a8;
   --servicios-sociales-hover: #008a8e;
 }
@@ -14,12 +15,13 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-poppins);
+  --font-mono: var(--font-poppins);
 
   /* Colores personalizados para las subgerencias */
   --color-programas-sociales: var(--programas-sociales);
   --color-programas-sociales-hover: var(--programas-sociales-hover);
+  --color-programas-sociales-bg: var(--programas-sociales-bg);
   --color-servicios-sociales: var(--servicios-sociales);
   --color-servicios-sociales-hover: var(--servicios-sociales-hover);
 }
@@ -34,7 +36,24 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Aplicar Poppins a todos los elementos */
+* {
+  font-family: inherit;
+}
+
+h1, h2, h3, h4, h5, h6, p, span, div, a, button, input, textarea, select, label {
+  font-family: inherit;
+}
+
+/* Override MUI typography */
+.MuiTypography-root,
+.MuiButton-root,
+.MuiInputBase-root,
+.MuiMenuItem-root,
+.MuiListItemText-root {
+  font-family: inherit !important;
 }
 
 /* Estilos globales para SweetAlert2 */
@@ -70,4 +89,9 @@ body {
 
 .text-servicios-sociales {
   color: var(--servicios-sociales);
+}
+
+.bg-programas-sociales-light {
+  background: linear-gradient(to bottom, #ffffff 0%, #fdf2f8 50%, #fce7f3 100%);
+  min-height: 100%;
 }
