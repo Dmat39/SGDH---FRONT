@@ -74,7 +74,11 @@ export default function CoordenadasPage() {
   useEffect(() => {
     fetch("/data/jurisdicciones.geojson")
       .then((res) => res.json())
-      .then((data: FeatureCollection) => setJurisdiccionesData(data))
+      .then((data: FeatureCollection) => {
+        if (data?.features) {
+          setJurisdiccionesData(data);
+        }
+      })
       .catch((err) => console.error("Error cargando jurisdicciones:", err));
   }, []);
 
@@ -83,6 +87,10 @@ export default function CoordenadasPage() {
     fetch("/data/comunas.geojson")
       .then((res) => res.json())
       .then((data: FeatureCollection) => {
+        if (!data?.features) {
+          console.error("Error: comunas.geojson no tiene features válidas");
+          return;
+        }
         setComunasData(data);
         // Calcular el siguiente número de comuna disponible
         const maxNumero = data.features.reduce((max, f) => {

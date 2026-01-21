@@ -7,13 +7,15 @@ import type { PathOptions, Layer, Path } from "leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// Fix para los iconos de Leaflet en Next.js
-delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: () => string })._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-});
+// Fix para los iconos de Leaflet en Next.js - solo en cliente
+if (typeof window !== "undefined") {
+  delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: () => string })._getIconUrl;
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+    iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+    shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+  });
+}
 
 interface MapaBaseProps {
   className?: string;

@@ -7,13 +7,15 @@ import type { PathOptions, Layer, Path, LeafletMouseEvent, DragEndEvent } from "
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// Fix para los iconos de Leaflet en Next.js
-delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: () => string })._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-});
+// Fix para los iconos de Leaflet en Next.js - solo en cliente
+if (typeof window !== "undefined") {
+  delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: () => string })._getIconUrl;
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+    iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+    shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+  });
+}
 
 // Iconos personalizados para los puntos - más pequeños
 const createPointIcon = (color: string, size: number = 8) => {
@@ -33,8 +35,8 @@ const createPointIcon = (color: string, size: number = 8) => {
   });
 };
 
-// Icono para puntos intermedios (para agregar nuevos puntos)
-const midpointIcon = L.divIcon({
+// Icono para puntos intermedios (para agregar nuevos puntos) - creado dinámicamente
+const getMidpointIcon = () => L.divIcon({
   className: "midpoint-icon",
   html: `<div style="
     width: 6px;
@@ -195,7 +197,7 @@ function MidPoint({
   return (
     <Marker
       position={position}
-      icon={midpointIcon}
+      icon={getMidpointIcon()}
       eventHandlers={{
         click: () => {
           onInsert(afterIndex, position[0], position[1]);
