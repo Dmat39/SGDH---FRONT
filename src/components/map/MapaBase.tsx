@@ -38,7 +38,7 @@ export default function MapaBase({ className = "", showJurisdicciones = true, ch
   // Cargar GeoJSON de jurisdicciones
   useEffect(() => {
     if (showJurisdicciones) {
-      fetch("/data/jurisdicciones.geojson")
+      fetch("/data/comunas.geojson")
         .then((res) => res.json())
         .then((data: FeatureCollection) => setJurisdiccionesData(data))
         .catch((err) => console.error("Error cargando jurisdicciones:", err));
