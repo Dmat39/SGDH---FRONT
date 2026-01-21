@@ -2,10 +2,10 @@
 
 import { Box, Card, CardContent, Typography, Paper } from "@mui/material";
 import {
-  People,
-  Restaurant,
-  TrendingUp,
-  Assessment,
+  Groups,
+  Diversity3,
+  VolunteerActivism,
+  Description,
 } from "@mui/icons-material";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 
@@ -16,25 +16,25 @@ const statsCards = [
   {
     title: "Total Beneficiarios",
     value: "12,345",
-    icon: <People fontSize="large" />,
+    icon: <Groups sx={{ fontSize: 32 }} />,
     color: "#3f51b5",
   },
   {
     title: "Programas Activos",
     value: "7",
-    icon: <Restaurant fontSize="large" />,
+    icon: <Diversity3 sx={{ fontSize: 32 }} />,
     color: "#4caf50",
   },
   {
     title: "Atenciones del Mes",
     value: "1,234",
-    icon: <TrendingUp fontSize="large" />,
+    icon: <VolunteerActivism sx={{ fontSize: 32 }} />,
     color: "#ff9800",
   },
   {
     title: "Reportes Generados",
     value: "45",
-    icon: <Assessment fontSize="large" />,
+    icon: <Description sx={{ fontSize: 32 }} />,
     color: "#f44336",
   },
 ];
@@ -62,26 +62,69 @@ export default function ProgramasSocialesDashboard() {
         }}
       >
         {statsCards.map((card, index) => (
-          <Card
+          <Box
             key={index}
             sx={{
+              position: "relative",
               height: "100%",
-              transition: "transform 0.2s",
-              "&:hover": {
-                transform: "translateY(-4px)",
-                boxShadow: 4,
-              },
             }}
           >
+            {/* Sombra rosa difuminada debajo */}
+            <Box
+              sx={{
+                position: "absolute",
+                bottom: "-15px",
+                left: "10%",
+                right: "10%",
+                height: "30px",
+                background: "linear-gradient(to bottom, rgba(216, 27, 126, 0.3), rgba(216, 27, 126, 0))",
+                borderRadius: "50%",
+                filter: "blur(12px)",
+                zIndex: 0,
+              }}
+            />
+            <Card
+              sx={{
+                height: "100%",
+                borderRadius: "24px",
+                boxShadow: "0 4px 15px rgba(0, 0, 0, 0.05)",
+                border: "none",
+                transition: "transform 0.2s, box-shadow 0.2s",
+                position: "relative",
+                overflow: "visible",
+                zIndex: 1,
+                "&:hover": {
+                  transform: "translateY(-4px)",
+                },
+                "&::after": {
+                  content: '""',
+                  position: "absolute",
+                  right: "-6px",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  width: "12px",
+                  height: "60%",
+                  background: "linear-gradient(to bottom, #f472b6, #d81b7e, #be185d)",
+                  borderRadius: "12px",
+                  boxShadow: "0 4px 10px rgba(216, 27, 126, 0.35)",
+                },
+              }}
+            >
             <CardContent>
               <Box display="flex" alignItems="center" mb={2}>
                 <Box
                   sx={{
-                    backgroundColor: `${card.color}20`,
+                    background: `linear-gradient(135deg, ${card.color}15 0%, ${card.color}30 100%)`,
                     color: card.color,
-                    p: 1.5,
-                    borderRadius: 2,
+                    width: 56,
+                    height: 56,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: "16px",
                     mr: 2,
+                    boxShadow: `0 4px 12px ${card.color}25`,
+                    border: `1px solid ${card.color}20`,
                   }}
                 >
                   {card.icon}
@@ -94,7 +137,8 @@ export default function ProgramasSocialesDashboard() {
                 {card.title}
               </Typography>
             </CardContent>
-          </Card>
+            </Card>
+          </Box>
         ))}
       </Box>
 
@@ -106,7 +150,7 @@ export default function ProgramasSocialesDashboard() {
           gap: 3,
         }}
       >
-        <Paper sx={{ p: 3, height: "400px" }}>
+        <Paper sx={{ p: 3, height: "400px", borderRadius: "20px", boxShadow: "0 8px 20px rgba(216, 27, 126, 0.15), 0 4px 8px rgba(0, 0, 0, 0.08)" }}>
           <Typography variant="h6" gutterBottom fontWeight="bold">
             Actividad Reciente
           </Typography>
@@ -128,7 +172,7 @@ export default function ProgramasSocialesDashboard() {
           </Box>
         </Paper>
 
-        <Paper sx={{ p: 3, height: "400px" }}>
+        <Paper sx={{ p: 3, height: "400px", borderRadius: "20px", boxShadow: "0 8px 20px rgba(216, 27, 126, 0.15), 0 4px 8px rgba(0, 0, 0, 0.08)" }}>
           <Typography variant="h6" gutterBottom fontWeight="bold">
             Distribución por Programa
           </Typography>
