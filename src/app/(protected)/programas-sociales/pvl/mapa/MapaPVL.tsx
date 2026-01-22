@@ -89,6 +89,28 @@ const borderColor = isSelected ? "#0F172A" : "#ffffffff";
 const MAP_CENTER: [number, number] = [-11.9699, -76.998];
 const MAP_ZOOM = 13;
 
+// Lista de sectores para la leyenda
+const SECTORES_LEYENDA = [
+  { name: "ZARATE", color: "#9f004c" },
+  { name: "CAMPOY", color: "#52f9eb" },
+  { name: "MANGOMARCA", color: "#54cdd3" },
+  { name: "SAUCES", color: "#6119f9" },
+  { name: "HUAYRONA", color: "#d16567" },
+  { name: "CANTO REY", color: "#ac9da9" },
+  { name: "HUANCARAY", color: "#ecc20f" },
+  { name: "MARISCAL CACERES", color: "#72427c" },
+  { name: "MOTUPE", color: "#eb147c" },
+  { name: "JICAMARCA", color: "#db63b2" },
+  { name: "MARIATEGUI", color: "#d6a59c" },
+  { name: "CASA BLANCA", color: "#fdd15d" },
+  { name: "BAYOVAR", color: "#5c335d" },
+  { name: "HUASCAR", color: "#efaeac" },
+  { name: "CANTO GRANDE", color: "#8768c9" },
+  { name: "SAN HILARION", color: "#73165f" },
+  { name: "LAS FLORES", color: "#ab83cf" },
+  { name: "CAJA DE AGUA", color: "#72cfdf" },
+];
+
 // Componente para centrar el mapa en un comité seleccionado
 function CentrarMapa({ comite }: { comite: Comite | null }) {
   const map = useMap();
@@ -135,8 +157,17 @@ function ZoomControlPosition({ filterOpen }: { filterOpen: boolean }) {
   return null;
 }
 
+// Interfaz para las propiedades del sector
+interface SectorProperties {
+  id: number;
+  name: string;
+  numero: number;
+  color: string;
+}
+
 export default function MapaPVL({ comites, comiteSeleccionado, onComiteClick, limiteVisible, filterOpen = false }: MapaPVLProps) {
   const [jurisdiccionesData, setJurisdiccionesData] = useState<FeatureCollection | null>(null);
+  const [sectoresData, setSectoresData] = useState<FeatureCollection | null>(null);
 
   // Cargar GeoJSON de jurisdicciones
   useEffect(() => {
@@ -150,6 +181,18 @@ export default function MapaPVL({ comites, comiteSeleccionado, onComiteClick, li
       .catch((err) => console.error("Error cargando jurisdicciones:", err));
   }, []);
 
+  // Cargar GeoJSON de sectores/comunas
+  useEffect(() => {
+    fetch("/data/sectores-pvl.geojson")
+      .then((res) => res.json())
+      .then((data: FeatureCollection) => {
+        if (data?.features) {
+          setSectoresData(data);
+        }
+      })
+      .catch((err) => console.error("Error cargando sectores:", err));
+  }, []);
+
   // Estilo para las jurisdicciones
   const estiloJurisdiccion = (): PathOptions => ({
     color: "#34b429",
@@ -157,6 +200,48 @@ export default function MapaPVL({ comites, comiteSeleccionado, onComiteClick, li
     fillOpacity: 0.1,
     interactive: false,
   });
+
+  // Estilo para cada sector basado en su color definido
+  const estiloSector = (feature: Feature | undefined): PathOptions => {
+    const props = feature?.properties as SectorProperties | undefined;
+    const color = props?.color || "#888888";
+    return {
+      color: color,
+      weight: 2,
+      fillColor: color,
+      fillOpacity: 0.35,
+      interactive: true,
+    };
+  };
+
+  // Función para manejar eventos de cada sector
+  const onEachSector = (feature: Feature, layer: Layer) => {
+    const props = feature.properties as SectorProperties;
+    if (props?.name) {
+      layer.bindTooltip(props.name, {
+        permanent: false,
+        direction: "center",
+        className: "sector-tooltip",
+      });
+
+      // Efecto hover
+      const pathLayer = layer as Path;
+      layer.on({
+        mouseover: () => {
+          pathLayer.setStyle({
+            fillOpacity: 0.6,
+            weight: 3,
+          });
+        },
+        mouseout: () => {
+          pathLayer.setStyle({
+            fillOpacity: 0.35,
+            weight: 2,
+          });
+        },
+      });
+    }
+  };
 
   // Limitar los comités mostrados
   const comitesMostrados = comites.slice(0, limiteVisible);
@@ -174,9 +259,20 @@ export default function MapaPVL({ comites, comiteSeleccionado, onComiteClick, li
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
-      {/* Jurisdicciones */}
+      {/* Sectores/Comunas con colores */}
+      {sectoresData && (
+        <GeoJSON
+          key="sectores"
+          data={sectoresData}
+          style={estiloSector}
+          onEachFeature={onEachSector}
+        />
+      )}
+
+      {/* Jurisdicciones (límite exterior) */}
       {jurisdiccionesData && (
         <GeoJSON
+          key="jurisdicciones"
           data={jurisdiccionesData}
           style={estiloJurisdiccion}
         />
@@ -205,6 +301,50 @@ export default function MapaPVL({ comites, comiteSeleccionado, onComiteClick, li
 
       {/* Controlar posición del zoom */}
       <ZoomControlPosition filterOpen={filterOpen} />
+
+      {/* Leyenda de sectores */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: "20px",
+          left: "10px",
+          backgroundColor: "white",
+          padding: "10px 12px",
+          borderRadius: "8px",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+          zIndex: 1000,
+          maxHeight: "280px",
+          overflowY: "auto",
+          fontSize: "11px",
+        }}
+      >
+        <div style={{ fontWeight: "bold", marginBottom: "8px", fontSize: "12px", color: "#1E293B" }}>
+          Comunas / Sectores
+        </div>
+        {SECTORES_LEYENDA.map((sector) => (
+          <div
+            key={sector.name}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              marginBottom: "4px",
+            }}
+          >
+            <div
+              style={{
+                width: "16px",
+                height: "16px",
+                backgroundColor: sector.color,
+                borderRadius: "3px",
+                border: "1px solid rgba(0,0,0,0.2)",
+                flexShrink: 0,
+              }}
+            />
+            <span style={{ color: "#334155", whiteSpace: "nowrap" }}>{sector.name}</span>
+          </div>
+        ))}
+      </div>
     </MapContainer>
   );
 }
