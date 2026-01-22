@@ -109,3 +109,19 @@ label {
   background: linear-gradient(to bottom, #ffffff 0%, #fdf2f8 50%, #fce7f3 100%);
   min-height: 100%;
 }
+
+/* Estilos para tooltips de sectores en el mapa */
+.sector-tooltip {
+  background-color: #1E293B !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 4px !important;
+  padding: 6px 10px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+.sector-tooltip::before {
+  border-top-color: #1E293B !important;
+}
