@@ -144,7 +144,7 @@
         "id": 2,
         "name": "CAMPOY",
         "numero": 2,
-        "color": "#52f9eb"
+        "color": "#F59E0B"
       },
       "geometry": {
         "type": "Polygon",
@@ -529,7 +529,7 @@
         "id": 4,
         "name": "SAUCES",
         "numero": 4,
-        "color": "#6119f9"
+        "color": "#C026D3"
       },
       "geometry": {
         "type": "Polygon",
@@ -749,7 +749,7 @@
         "id": 5,
         "name": "HUAYRONA",
         "numero": 5,
-        "color": "#d16567"
+        "color": "#2563EB"
       },
       "geometry": {
         "type": "Polygon",
@@ -883,7 +883,7 @@
         "id": 6,
         "name": "CANTO REY",
         "numero": 6,
-        "color": "#ac9da9"
+        "color": "#7C2D12"
       },
       "geometry": {
         "type": "Polygon",
@@ -1022,7 +1022,7 @@
         "id": 7,
         "name": "HUANCARAY",
         "numero": 7,
-        "color": "#ecc20f"
+        "color": "#EA580C"
       },
       "geometry": {
         "type": "Polygon",
@@ -1127,7 +1127,7 @@
         "id": 8,
         "name": "MARISCAL CACERES",
         "numero": 8,
-        "color": "#72427c"
+        "color": "#1D4ED8"
       },
       "geometry": {
         "type": "Polygon",
@@ -1209,7 +1209,7 @@
         "id": 9,
         "name": "MOTUPE",
         "numero": 9,
-        "color": "#eb147c"
+        "color": "#9333EA"
       },
       "geometry": {
         "type": "Polygon",
@@ -1533,7 +1533,7 @@
         "id": 11,
         "name": "MARIATEGUI",
         "numero": 11,
-        "color": "#d6a59c"
+        "color": "#B91C1C"
       },
       "geometry": {
         "type": "Polygon",
@@ -1662,7 +1662,7 @@
         "id": 12,
         "name": "CASA BLANCA",
         "numero": 12,
-        "color": "#fdd15d"
+        "color": "#CA8A04"
       },
       "geometry": {
         "type": "Polygon",
@@ -1734,7 +1734,7 @@
         "id": 13,
         "name": "BAYOVAR",
         "numero": 13,
-        "color": "#5c335d"
+        "color": "#4C1D95"
       },
       "geometry": {
         "type": "Polygon",
@@ -1788,7 +1788,7 @@
         "id": 14,
         "name": "HUASCAR",
         "numero": 14,
-        "color": "#efaeac"
+        "color": "#0284C7"
       },
       "geometry": {
         "type": "Polygon",
@@ -1868,7 +1868,7 @@
         "id": 15,
         "name": "CANTO GRANDE",
         "numero": 15,
-        "color": "#8768c9"
+        "color": "#15803D"
       },
       "geometry": {
         "type": "Polygon",
@@ -1941,7 +1941,7 @@
         "id": 16,
         "name": "SAN HILARION",
         "numero": 16,
-        "color": "#73165f"
+        "color": "#BE123C"
       },
       "geometry": {
         "type": "Polygon",
@@ -2035,7 +2035,7 @@
         "id": 17,
         "name": "LAS FLORES",
         "numero": 17,
-        "color": "#ab83cf"
+        "color": "#374151"
       },
       "geometry": {
         "type": "Polygon",
@@ -2112,7 +2112,7 @@
         "id": 18,
         "name": "CAJA DE AGUA",
         "numero": 18,
-        "color": "#72cfdf"
+        "color": "#854D0E"
       },
       "geometry": {
         "type": "Polygon",

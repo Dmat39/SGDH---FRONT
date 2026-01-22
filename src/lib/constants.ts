@@ -146,7 +146,7 @@ export const MODULOS_PROGRAMAS_SOCIALES: MenuItem[] = [
   {
     id: "pvl",
     nombre: "PVL - Vaso de Leche",
-    icono: "LocalDrink",
+    icono: "FreeBreakfast",
     descripcion: "Gestión del Programa de Vaso de Leche",
     permisos: ["pvl", "all_programas_sociales", "all"],
     children: [
@@ -154,21 +154,21 @@ export const MODULOS_PROGRAMAS_SOCIALES: MenuItem[] = [
         id: "pvl-dashboard",
         nombre: "Dashboard",
         ruta: "/programas-sociales/pvl",
-        icono: "Dashboard",
+        icono: "SpaceDashboard",
         permisos: ["pvl", "all_programas_sociales", "all"],
       },
       {
         id: "pvl-beneficiarios",
         nombre: "Beneficiarios",
         ruta: "/programas-sociales/pvl/beneficiarios",
-        icono: "People",
+        icono: "Diversity1",
         permisos: ["pvl", "all_programas_sociales", "all"],
       },
       {
         id: "pvl-mapa",
         nombre: "Mapa",
         ruta: "/programas-sociales/pvl/mapa",
-        icono: "Map",
+        icono: "Explore",
         permisos: ["pvl", "mapa_pvl", "all_programas_sociales", "all"],
       },
     ],
