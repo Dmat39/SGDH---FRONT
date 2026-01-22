@@ -20,7 +20,10 @@ import {
   IconButton,
   Tooltip,
 } from "@mui/material";
-import { Search, Visibility, Edit, Delete } from "@mui/icons-material";
+import { Search, Visibility, Edit, Delete, People } from "@mui/icons-material";
+import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
+
+const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 
 // Datos de ejemplo
 const beneficiariosData = [
@@ -101,97 +104,225 @@ export default function PVLBeneficiariosPage() {
   };
 
   return (
-    <div>
-      <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
-        PVL - Beneficiarios
-      </Typography>
-      <Typography variant="body1" color="text.secondary" mb={4}>
-        Listado de beneficiarios del Programa de Vaso de Leche
-      </Typography>
-
-      <Card>
-        <CardContent>
-          <Box mb={3}>
-            <TextField
-              fullWidth
-              placeholder="Buscar por nombre, DNI o jurisdicción..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search />
-                  </InputAdornment>
-                ),
-              }}
-              size="small"
-            />
+    <Box>
+      {/* Encabezado */}
+      <Box mb={4}>
+        <Box display="flex" alignItems="center" gap={2} mb={1}>
+          <Box
+            sx={{
+              background: `linear-gradient(135deg, ${subgerencia.color}15 0%, ${subgerencia.color}30 100%)`,
+              color: subgerencia.color,
+              width: 48,
+              height: 48,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "12px",
+              boxShadow: `0 4px 12px ${subgerencia.color}25`,
+            }}
+          >
+            <People sx={{ fontSize: 28 }} />
           </Box>
+          <Typography variant="h4" fontWeight="bold" sx={{ color: subgerencia.color }}>
+            PVL - Beneficiarios
+          </Typography>
+        </Box>
+        <Typography variant="body1" color="text.secondary" sx={{ ml: 7.5 }}>
+          Listado de beneficiarios del Programa de Vaso de Leche
+        </Typography>
+      </Box>
 
-          <TableContainer component={Paper} variant="outlined">
-            <Table>
-              <TableHead>
-                <TableRow sx={{ bgcolor: "grey.100" }}>
-                  <TableCell>DNI</TableCell>
-                  <TableCell>Nombres</TableCell>
-                  <TableCell>Jurisdicción</TableCell>
-                  <TableCell>Comité</TableCell>
-                  <TableCell align="center">Estado</TableCell>
-                  <TableCell align="center">Acciones</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredData
-                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                  .map((row) => (
-                    <TableRow key={row.id} hover>
-                      <TableCell>{row.dni}</TableCell>
-                      <TableCell>{row.nombres}</TableCell>
-                      <TableCell>{row.jurisdiccion}</TableCell>
-                      <TableCell>{row.comite}</TableCell>
-                      <TableCell align="center">
-                        <Chip
-                          label={row.estado}
-                          color={getEstadoColor(row.estado) as "success" | "warning" | "error" | "default"}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell align="center">
-                        <Tooltip title="Ver detalles">
-                          <IconButton size="small" color="primary">
-                            <Visibility fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Editar">
-                          <IconButton size="small" color="info">
-                            <Edit fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Eliminar">
-                          <IconButton size="small" color="error">
-                            <Delete fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+      {/* Tarjeta principal */}
+      <Box sx={{ position: "relative" }}>
+        {/* Sombra rosa difuminada debajo */}
+        <Box
+          sx={{
+            position: "absolute",
+            bottom: "-15px",
+            left: "5%",
+            right: "5%",
+            height: "30px",
+            background: "linear-gradient(to bottom, rgba(216, 27, 126, 0.2), rgba(216, 27, 126, 0))",
+            borderRadius: "50%",
+            filter: "blur(15px)",
+            zIndex: 0,
+          }}
+        />
+        <Card
+          sx={{
+            borderRadius: "24px",
+            boxShadow: "0 8px 20px rgba(216, 27, 126, 0.15), 0 4px 8px rgba(0, 0, 0, 0.08)",
+            position: "relative",
+            zIndex: 1,
+            overflow: "visible",
+            "&::after": {
+              content: '""',
+              position: "absolute",
+              right: "-6px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              width: "12px",
+              height: "40%",
+              background: "linear-gradient(to bottom, #f472b6, #d81b7e, #be185d)",
+              borderRadius: "12px",
+              boxShadow: "0 4px 10px rgba(216, 27, 126, 0.35)",
+            },
+          }}
+        >
+          <CardContent sx={{ p: 3 }}>
+            {/* Buscador */}
+            <Box mb={3}>
+              <TextField
+                fullWidth
+                placeholder="Buscar por nombre, DNI o jurisdicción..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search sx={{ color: subgerencia.color }} />
+                    </InputAdornment>
+                  ),
+                }}
+                size="small"
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "12px",
+                    backgroundColor: "#fdf2f8",
+                    "&:hover fieldset": {
+                      borderColor: subgerencia.color,
+                    },
+                    "&.Mui-focused fieldset": {
+                      borderColor: subgerencia.color,
+                    },
+                  },
+                }}
+              />
+            </Box>
 
-          <TablePagination
-            component="div"
-            count={filteredData.length}
-            page={page}
-            onPageChange={handleChangePage}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-            rowsPerPageOptions={[5, 10, 25, 50]}
-            labelRowsPerPage="Filas por página:"
-            labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
-          />
-        </CardContent>
-      </Card>
-    </div>
+            {/* Tabla */}
+            <TableContainer
+              component={Paper}
+              sx={{
+                borderRadius: "16px",
+                boxShadow: "none",
+                border: "1px solid rgba(216, 27, 126, 0.1)",
+                overflow: "hidden",
+              }}
+            >
+              <Table>
+                <TableHead>
+                  <TableRow
+                    sx={{
+                      background: "linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)",
+                    }}
+                  >
+                    <TableCell sx={{ fontWeight: 600, color: "#831843" }}>DNI</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#831843" }}>Nombres</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#831843" }}>Jurisdicción</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#831843" }}>Comité</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 600, color: "#831843" }}>Estado</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 600, color: "#831843" }}>Acciones</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredData
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((row, index) => (
+                      <TableRow
+                        key={row.id}
+                        sx={{
+                          backgroundColor: index % 2 === 0 ? "white" : "rgba(253, 242, 248, 0.5)",
+                          "&:hover": {
+                            backgroundColor: "rgba(216, 27, 126, 0.08)",
+                          },
+                          transition: "background-color 0.2s",
+                        }}
+                      >
+                        <TableCell sx={{ fontWeight: 500 }}>{row.dni}</TableCell>
+                        <TableCell>{row.nombres}</TableCell>
+                        <TableCell>{row.jurisdiccion}</TableCell>
+                        <TableCell>{row.comite}</TableCell>
+                        <TableCell align="center">
+                          <Chip
+                            label={row.estado}
+                            color={getEstadoColor(row.estado) as "success" | "warning" | "error" | "default"}
+                            size="small"
+                            sx={{
+                              fontWeight: 500,
+                              borderRadius: "8px",
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell align="center">
+                          <Tooltip title="Ver detalles">
+                            <IconButton
+                              size="small"
+                              sx={{
+                                color: subgerencia.color,
+                                "&:hover": {
+                                  backgroundColor: "rgba(216, 27, 126, 0.1)",
+                                },
+                              }}
+                            >
+                              <Visibility fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Editar">
+                            <IconButton
+                              size="small"
+                              sx={{
+                                color: "#0891b2",
+                                "&:hover": {
+                                  backgroundColor: "rgba(8, 145, 178, 0.1)",
+                                },
+                              }}
+                            >
+                              <Edit fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Eliminar">
+                            <IconButton
+                              size="small"
+                              sx={{
+                                color: "#dc2626",
+                                "&:hover": {
+                                  backgroundColor: "rgba(220, 38, 38, 0.1)",
+                                },
+                              }}
+                            >
+                              <Delete fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            {/* Paginación */}
+            <TablePagination
+              component="div"
+              count={filteredData.length}
+              page={page}
+              onPageChange={handleChangePage}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+              rowsPerPageOptions={[5, 10, 25, 50]}
+              labelRowsPerPage="Filas por página:"
+              labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
+              sx={{
+                borderTop: "1px solid rgba(216, 27, 126, 0.1)",
+                mt: 2,
+                "& .MuiTablePagination-selectIcon": {
+                  color: subgerencia.color,
+                },
+              }}
+            />
+          </CardContent>
+        </Card>
+      </Box>
+    </Box>
   );
 }
