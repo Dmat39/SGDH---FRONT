@@ -449,7 +449,7 @@ export default function PVLMapaPage() {
             {/* Header del panel */}
             <Box
               sx={{
-                bgcolor: "#1E293B",
+                bgcolor: "#a62651",
                 color: "white",
                 p: 2,
                 display: "flex",

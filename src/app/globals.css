@@ -125,3 +125,8 @@ label {
 .sector-tooltip::before {
   border-top-color: #1E293B !important;
 }
+
+/* Quitar el rectángulo negro al hacer click en sectores (Leaflet focus) */
+.leaflet-interactive:focus {
+  outline: none !important;
+}

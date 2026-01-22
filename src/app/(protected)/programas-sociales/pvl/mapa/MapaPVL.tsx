@@ -94,21 +94,22 @@ const SECTORES_LEYENDA = [
   { name: "ZARATE", color: "#9f004c" },
   { name: "CAMPOY", color: "#52f9eb" },
   { name: "MANGOMARCA", color: "#54cdd3" },
-  { name: "SAUCES", color: "#6119f9" },
+  { name: "SALSAS", color: "#6119f9" },
   { name: "HUAYRONA", color: "#d16567" },
   { name: "CANTO REY", color: "#ac9da9" },
   { name: "HUANCARAY", color: "#ecc20f" },
   { name: "MARISCAL CACERES", color: "#72427c" },
   { name: "MOTUPE", color: "#eb147c" },
   { name: "JICAMARCA", color: "#db63b2" },
-  { name: "MARIATEGUI", color: "#d6a59c" },
-  { name: "CASA BLANCA", color: "#fdd15d" },
+  { name: "MARIATEGUI", color: "#d6a59c"},
+  { name: "CASA BLANCA", color: "#fdd15d"},
   { name: "BAYOVAR", color: "#5c335d" },
   { name: "HUASCAR", color: "#efaeac" },
   { name: "CANTO GRANDE", color: "#8768c9" },
   { name: "SAN HILARION", color: "#73165f" },
-  { name: "LAS FLORES", color: "#ab83cf" },
+  { name: "LAS FLORES", color: "#ab83cf"},
   { name: "CAJA DE AGUA", color: "#72cfdf" },
+  
 ];
 
 // Componente para centrar el mapa en un comité seleccionado
@@ -302,49 +303,8 @@ export default function MapaPVL({ comites, comiteSeleccionado, onComiteClick, li
       {/* Controlar posición del zoom */}
       <ZoomControlPosition filterOpen={filterOpen} />
 
-      {/* Leyenda de sectores */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: "20px",
-          left: "10px",
-          backgroundColor: "white",
-          padding: "10px 12px",
-          borderRadius: "8px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-          zIndex: 1000,
-          maxHeight: "280px",
-          overflowY: "auto",
-          fontSize: "11px",
-        }}
-      >
-        <div style={{ fontWeight: "bold", marginBottom: "8px", fontSize: "12px", color: "#1E293B" }}>
-          Comunas / Sectores
-        </div>
-        {SECTORES_LEYENDA.map((sector) => (
-          <div
-            key={sector.name}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              marginBottom: "4px",
-            }}
-          >
-            <div
-              style={{
-                width: "16px",
-                height: "16px",
-                backgroundColor: sector.color,
-                borderRadius: "3px",
-                border: "1px solid rgba(0,0,0,0.2)",
-                flexShrink: 0,
-              }}
-            />
-            <span style={{ color: "#334155", whiteSpace: "nowrap" }}>{sector.name}</span>
-          </div>
-        ))}
-      </div>
+      
+      {/* aqui iba la tarjeta de las leyendas de los sectores pero se quito */}
     </MapContainer>
   );
 }
