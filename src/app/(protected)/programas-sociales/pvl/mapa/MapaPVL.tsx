@@ -19,8 +19,8 @@ if (typeof window !== "undefined") {
 
 // Tipo para los comités
 export interface Comite {
-  id: number;
-  codigo: number;
+  id: string;
+  codigo: string;
   ruta: string;
   centroAcopio: string;
   comite: string;
@@ -35,13 +35,20 @@ export interface Comite {
   comuna: number;
   coordinadora: {
     nombre: string;
-    dni: number;
-    celular: number;
+    dni: string;
+    celular: string;
+    fechaNacimiento?: string;
   };
   beneficiariosExtranjeros: number;
   discapacitados: number;
   direccion: string;
   observacion: string | null;
+}
+
+interface CapasVisibles {
+  sectores: boolean;
+  jurisdicciones: boolean;
+  comites: boolean;
 }
 
 interface MapaPVLProps {
@@ -50,6 +57,7 @@ interface MapaPVLProps {
   onComiteClick: (comite: Comite) => void;
   limiteVisible: number;
   filterOpen?: boolean;
+  capasVisibles?: CapasVisibles;
 }
 
 // Icono personalizado para los marcadores - Vaso de Leche (estilo gubernamental)
@@ -89,8 +97,8 @@ const borderColor = isSelected ? "#0F172A" : "#ffffffff";
 const MAP_CENTER: [number, number] = [-11.9699, -76.998];
 const MAP_ZOOM = 13;
 
-// Lista de sectores para la leyenda
-const SECTORES_LEYENDA = [
+// Lista de comunas para la leyenda
+const COMUNAS_LEYENDA = [
   { name: "ZARATE", color: "#9f004c" },
   { name: "CAMPOY", color: "#52f9eb" },
   { name: "MANGOMARCA", color: "#54cdd3" },
@@ -166,13 +174,28 @@ interface SectorProperties {
   color: string;
 }
 
-export default function MapaPVL({ comites, comiteSeleccionado, onComiteClick, limiteVisible, filterOpen = false }: MapaPVLProps) {
+// Interfaz para las propiedades de jurisdicción
+interface JurisdiccionProperties {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+}
+
+export default function MapaPVL({
+  comites,
+  comiteSeleccionado,
+  onComiteClick,
+  limiteVisible,
+  filterOpen = false,
+  capasVisibles = { sectores: true, jurisdicciones: true, comites: true }
+}: MapaPVLProps) {
   const [jurisdiccionesData, setJurisdiccionesData] = useState<FeatureCollection | null>(null);
   const [sectoresData, setSectoresData] = useState<FeatureCollection | null>(null);
 
   // Cargar GeoJSON de jurisdicciones
   useEffect(() => {
-    fetch("/data/comunas.geojson")
+    fetch("/data/jurisdicciones.geojson")
       .then((res) => res.json())
       .then((data: FeatureCollection) => {
         if (data?.features) {
@@ -194,13 +217,47 @@ export default function MapaPVL({ comites, comiteSeleccionado, onComiteClick, li
       .catch((err) => console.error("Error cargando sectores:", err));
   }, []);
 
-  // Estilo para las jurisdicciones
-  const estiloJurisdiccion = (): PathOptions => ({
-    color: "#34b429",
-    weight: 2,
-    fillOpacity: 0.1,
-    interactive: false,
-  });
+  // Estilo para las jurisdicciones basado en su color definido
+  const estiloJurisdiccion = (feature: Feature | undefined): PathOptions => {
+    const props = feature?.properties as JurisdiccionProperties | undefined;
+    const color = props?.color || "#34b429";
+    return {
+      color: color,
+      weight: 2,
+      fillColor: color,
+      fillOpacity: 0.35,
+      interactive: true,
+    };
+  };
+
+  // Función para manejar eventos de cada jurisdicción
+  const onEachJurisdiccion = (feature: Feature, layer: Layer) => {
+    const props = feature.properties as JurisdiccionProperties;
+    if (props?.name) {
+      layer.bindTooltip(props.name, {
+        permanent: false,
+        direction: "center",
+        className: "jurisdiccion-tooltip",
+      });
+
+      // Efecto hover
+      const pathLayer = layer as Path;
+      layer.on({
+        mouseover: () => {
+          pathLayer.setStyle({
+            fillOpacity: 0.6,
+            weight: 3,
+          });
+        },
+        mouseout: () => {
+          pathLayer.setStyle({
+            fillOpacity: 0.35,
+            weight: 2,
+          });
+        },
+      });
+    }
+  };
 
   // Estilo para cada sector basado en su color definido
   const estiloSector = (feature: Feature | undefined): PathOptions => {
@@ -261,7 +318,7 @@ export default function MapaPVL({ comites, comiteSeleccionado, onComiteClick, li
       />
 
       {/* Sectores/Comunas con colores */}
-      {sectoresData && (
+      {sectoresData && capasVisibles.sectores && (
         <GeoJSON
           key="sectores"
           data={sectoresData}
@@ -271,16 +328,17 @@ export default function MapaPVL({ comites, comiteSeleccionado, onComiteClick, li
       )}
 
       {/* Jurisdicciones (límite exterior) */}
-      {jurisdiccionesData && (
+      {jurisdiccionesData && capasVisibles.jurisdicciones && (
         <GeoJSON
           key="jurisdicciones"
           data={jurisdiccionesData}
           style={estiloJurisdiccion}
+          onEachFeature={onEachJurisdiccion}
         />
       )}
 
       {/* Marcadores de comités */}
-      {comitesMostrados.map((comite) => (
+      {capasVisibles.comites && comitesMostrados.map((comite) => (
         <Marker
           key={comite.id}
           position={[comite.coordenadas.latitud, comite.coordenadas.longitud]}

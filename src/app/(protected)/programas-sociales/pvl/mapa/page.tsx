@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import {
   Box,
@@ -22,6 +22,7 @@ import {
   Chip,
   Paper,
   Avatar,
+  Switch,
 } from "@mui/material";
 import {
   FilterList,
@@ -30,7 +31,7 @@ import {
   ExpandMore,
   Close,
   Map as MapIcon,
-  Visibility,
+  Layers,
   MyLocation,
   TuneRounded,
   Place,
@@ -43,8 +44,33 @@ import {
   MoreVert,
   LocalShipping,
   AssignmentInd,
+  Visibility,
+  VisibilityOff,
 } from "@mui/icons-material";
 import type { Comite } from "./MapaPVL";
+import { useFetch } from "@/lib/hooks/useFetch";
+import { Cake } from "@mui/icons-material";
+
+// Función para calcular edad desde fecha de nacimiento
+const calcularEdad = (fechaNacimiento: string): number => {
+  const hoy = new Date();
+  const nacimiento = new Date(fechaNacimiento);
+  let edad = hoy.getFullYear() - nacimiento.getFullYear();
+  const mes = hoy.getMonth() - nacimiento.getMonth();
+  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) {
+    edad--;
+  }
+  return edad;
+};
+
+// Función para formatear fecha a DD/MM/YYYY
+const formatearFecha = (fecha: string): string => {
+  const date = new Date(fecha);
+  const dia = date.getDate().toString().padStart(2, "0");
+  const mes = (date.getMonth() + 1).toString().padStart(2, "0");
+  const anio = date.getFullYear();
+  return `${dia}/${mes}/${anio}`;
+};
 
 // Importar el mapa dinámicamente para evitar SSR
 const MapaPVL = dynamic(() => import("./MapaPVL"), {
@@ -110,36 +136,106 @@ interface RangoEdadState {
 // Opciones preestablecidas para el límite
 const LIMITE_OPCIONES = [100, 300, 500, 1000];
 
-// Interface para los datos del JSON
-interface PVLData {
-  metadata: {
-    total: number;
-    generado: string;
-    fuente: string;
-    version: string;
-  };
-  comites: Comite[];
+// Interface para los datos del backend
+interface CommitteeBackend {
+  id: string;
+  code: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  beneficiaries: number;
+  beneficiaries_foreign: number;
+  members: number;
+  handicappeds: number;
+  commune: number;
+  observation: string | null;
+  route: string;
+  couple: { id: string; name: string } | null;
+  town: { id: string; name: string } | null;
+  coordinator: {
+    id: string;
+    name: string;
+    lastname: string;
+    dni: string;
+    phone: string;
+    birthday?: string;
+  } | null;
 }
+
+interface BackendResponse {
+  message: string;
+  data: {
+    data: CommitteeBackend[];
+    currentPage: number;
+    pageCount: number;
+    totalCount: number;
+    totalPages: number;
+  };
+}
+
+// Función para mapear datos del backend al formato del frontend
+const mapBackendToComite = (item: CommitteeBackend): Comite => ({
+  id: item.id,
+  codigo: item.code,
+  ruta: item.route || "",
+  centroAcopio: item.couple?.name || "",
+  comite: item.name,
+  pueblo: item.town?.name || "",
+  coordenadas: {
+    latitud: item.latitude,
+    longitud: item.longitude,
+  },
+  inspector: "",
+  beneficiarios: item.beneficiaries,
+  socios: item.members,
+  comuna: item.commune,
+  coordinadora: {
+    nombre: item.coordinator ? `${item.coordinator.name} ${item.coordinator.lastname}` : "",
+    dni: item.coordinator?.dni || "",
+    celular: item.coordinator?.phone || "",
+    fechaNacimiento: item.coordinator?.birthday || undefined,
+  },
+  beneficiariosExtranjeros: item.beneficiaries_foreign,
+  discapacitados: item.handicappeds,
+  direccion: item.address,
+  observacion: item.observation,
+});
 
 export default function PVLMapaPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [filtrosSeleccionados, setFiltrosSeleccionados] = useState<Record<string, string[]>>({});
   const [expandedAccordion, setExpandedAccordion] = useState<string | false>("estado");
 
-  // Control de rango de edad (general)
+  // Control de rango de edad de coordinadora (dentro de Tipo de Beneficiario)
   const [rangoEdad, setRangoEdad] = useState<RangoEdadState>({
     activo: false,
-    min: 0,
-    max: 18,
+    min: 18,
+    max: 80,
+  });
+
+  // Control de rango de edad de coordinadora
+  const [rangoEdadCoordinadora, setRangoEdadCoordinadora] = useState<RangoEdadState>({
+    activo: false,
+    min: 18,
+    max: 80,
   });
 
   // Control de límite de visualización
   const [limiteVisible, setLimiteVisible] = useState(300);
   const [limiteAnchorEl, setLimiteAnchorEl] = useState<HTMLElement | null>(null);
 
+  // Control de capas
+  const [capasAnchorEl, setCapasAnchorEl] = useState<HTMLElement | null>(null);
+  const [capasVisibles, setCapasVisibles] = useState({
+    sectores: true,
+    jurisdicciones: false,
+    comites: true,
+  });
+  const capasPopoverOpen = Boolean(capasAnchorEl);
+
   // Datos de comités
   const [comites, setComites] = useState<Comite[]>([]);
-  const [totalComites, setTotalComites] = useState(0);
   const [loading, setLoading] = useState(true);
 
   // Comité seleccionado para el panel de información
@@ -147,32 +243,64 @@ export default function PVLMapaPage() {
 
   const limitePopoverOpen = Boolean(limiteAnchorEl);
 
-  // Cargar datos del GeoJSON
+  // Hook para peticiones al backend
+  const { getData } = useFetch();
+
+  // Cargar datos del backend
+  const cargarComites = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await getData<BackendResponse>("pvl/committee?page=0");
+      if (response?.data?.data) {
+        const comitesMapeados = response.data.data.map(mapBackendToComite);
+        setComites(comitesMapeados);
+      }
+    } catch (err) {
+      console.error("Error cargando comités:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [getData]);
+
   useEffect(() => {
-    fetch("/data/pvlprueba.geojson")
-      .then((res) => res.json())
-      .then((data: PVLData) => {
-        if (data?.comites) {
-          setComites(data.comites);
-          setTotalComites(data.metadata?.total || data.comites.length);
-        }
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Error cargando comités:", err);
-        setLoading(false);
-      });
-  }, []);
+    cargarComites();
+  }, [cargarComites]);
+
+  // Filtrar comités por edad de coordinadora
+  const comitesFiltrados = comites.filter((comite) => {
+    // Filtro por rango de edad (dentro de Tipo de Beneficiario) - ahora filtra por coordinadora
+    if (rangoEdad.activo) {
+      if (!comite.coordinadora.fechaNacimiento) {
+        return false;
+      }
+      const edadCoord = calcularEdad(comite.coordinadora.fechaNacimiento);
+      if (edadCoord < rangoEdad.min || edadCoord > rangoEdad.max) {
+        return false;
+      }
+    }
+    // Filtro por edad de coordinadora (acordeón separado)
+    if (rangoEdadCoordinadora.activo) {
+      if (!comite.coordinadora.fechaNacimiento) {
+        return false;
+      }
+      const edadCoord = calcularEdad(comite.coordinadora.fechaNacimiento);
+      if (edadCoord < rangoEdadCoordinadora.min || edadCoord > rangoEdadCoordinadora.max) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   // Calcular valores
-  const totalFiltrados = comites.length; // En producción, filtrar según criterios
+  const totalFiltrados = comitesFiltrados.length;
   const comitesMostrados = Math.min(limiteVisible, totalFiltrados);
 
   // Contar filtros activos (incluyendo rango de edad)
   const contarFiltrosActivos = () => {
     const filtrosBasicos = Object.values(filtrosSeleccionados).reduce((acc, arr) => acc + arr.length, 0);
     const filtroEdad = rangoEdad.activo ? 1 : 0;
-    return filtrosBasicos + filtroEdad;
+    const filtroEdadCoordinadora = rangoEdadCoordinadora.activo ? 1 : 0;
+    return filtrosBasicos + filtroEdad + filtroEdadCoordinadora;
   };
 
   // Verificar si hay filtros activos
@@ -195,7 +323,8 @@ export default function PVLMapaPage() {
   // Limpiar todos los filtros
   const limpiarFiltros = () => {
     setFiltrosSeleccionados({});
-    setRangoEdad({ activo: false, min: 0, max: 18 });
+    setRangoEdad({ activo: false, min: 18, max: 80 });
+    setRangoEdadCoordinadora({ activo: false, min: 18, max: 80 });
   };
 
   // Aplicar filtros
@@ -274,9 +403,9 @@ export default function PVLMapaPage() {
           >
             <Typography variant="body2" color="text.secondary">
               Mostrando <strong>{comitesMostrados}</strong> de <strong>{totalFiltrados}</strong> comités
-              {hayFiltrosActivos() && totalFiltrados < totalComites && (
+              {hayFiltrosActivos() && totalFiltrados < comites.length && (
                 <Typography component="span" variant="caption" sx={{ ml: 1, color: "#d81b7e" }}>
-                  (filtrado de {totalComites})
+                  (filtrado de {comites.length})
                 </Typography>
               )}
             </Typography>
@@ -322,7 +451,7 @@ export default function PVLMapaPage() {
               {hayFiltrosActivos() && (
                 <Box sx={{ mb: 2, p: 1, bgcolor: "#fce4ec", borderRadius: 1 }}>
                   <Typography variant="caption" color="#d81b7e">
-                    Filtros activos: {totalFiltrados} comités coinciden de {totalComites} total
+                    Filtros activos: {totalFiltrados} comités coinciden de {comites.length} total
                   </Typography>
                 </Box>
               )}
@@ -391,18 +520,8 @@ export default function PVLMapaPage() {
         {/* Lado derecho - Iconos de acción */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
           <Tooltip title="Actualizar">
-            <IconButton size="small">
+            <IconButton size="small" onClick={cargarComites}>
               <Refresh />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Mi ubicación">
-            <IconButton size="small">
-              <MyLocation />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Buscar">
-            <IconButton size="small">
-              <Search />
             </IconButton>
           </Tooltip>
           <Tooltip title="Filtros">
@@ -421,10 +540,263 @@ export default function PVLMapaPage() {
             </IconButton>
           </Tooltip>
           <Tooltip title="Capas">
-            <IconButton size="small">
-              <Visibility />
+            <IconButton
+              size="small"
+              onClick={(e) => setCapasAnchorEl(e.currentTarget)}
+              sx={{
+                bgcolor: capasPopoverOpen ? "grey.200" : "transparent",
+              }}
+            >
+              <Layers />
             </IconButton>
           </Tooltip>
+
+          {/* Popover de capas */}
+          <Popover
+            open={capasPopoverOpen}
+            anchorEl={capasAnchorEl}
+            onClose={() => setCapasAnchorEl(null)}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            transformOrigin={{ vertical: "top", horizontal: "right" }}
+            PaperProps={{
+              sx: {
+                borderRadius: 2,
+                boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+                overflow: "hidden",
+              }
+            }}
+          >
+            <Box sx={{ width: 280 }}>
+              {/* Header del popover */}
+              <Box
+                sx={{
+                  bgcolor: "#1E293B",
+                  color: "white",
+                  px: 2,
+                  py: 1.5,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                }}
+              >
+                <Layers fontSize="small" />
+                <Typography variant="subtitle2" fontWeight="bold">
+                  Control de Capas
+                </Typography>
+              </Box>
+
+              {/* Lista de capas */}
+              <Box sx={{ p: 1 }}>
+                {/* Capa de Comunas */}
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    p: 1.5,
+                    borderRadius: 1,
+                    bgcolor: capasVisibles.sectores ? "rgba(216, 27, 126, 0.08)" : "transparent",
+                    transition: "background-color 0.2s",
+                    "&:hover": { bgcolor: capasVisibles.sectores ? "rgba(216, 27, 126, 0.12)" : "grey.50" },
+                  }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                    <Box
+                      sx={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 1,
+                        bgcolor: "#d81b7e",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        opacity: capasVisibles.sectores ? 1 : 0.4,
+                        transition: "opacity 0.2s",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 16,
+                          height: 16,
+                          bgcolor: "rgba(255,255,255,0.9)",
+                          borderRadius: 0.5,
+                        }}
+                      />
+                    </Box>
+                    <Box>
+                      <Typography variant="body2" fontWeight="medium">
+                        Comunas
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Zonas del distrito
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Switch
+                    size="small"
+                    checked={capasVisibles.sectores}
+                    onChange={(e) => setCapasVisibles(prev => ({ ...prev, sectores: e.target.checked }))}
+                    sx={{
+                      "& .MuiSwitch-switchBase.Mui-checked": {
+                        color: "#d81b7e",
+                      },
+                      "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
+                        backgroundColor: "#d81b7e",
+                      },
+                    }}
+                  />
+                </Box>
+
+                {/* Capa de Jurisdicciones */}
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    p: 1.5,
+                    borderRadius: 1,
+                    bgcolor: capasVisibles.jurisdicciones ? "rgba(52, 180, 41, 0.08)" : "transparent",
+                    transition: "background-color 0.2s",
+                    "&:hover": { bgcolor: capasVisibles.jurisdicciones ? "rgba(52, 180, 41, 0.12)" : "grey.50" },
+                  }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                    <Box
+                      sx={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 1,
+                        bgcolor: "#34b429",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        opacity: capasVisibles.jurisdicciones ? 1 : 0.4,
+                        transition: "opacity 0.2s",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 18,
+                          height: 18,
+                          border: "2px solid rgba(255,255,255,0.9)",
+                          borderRadius: 0.5,
+                        }}
+                      />
+                    </Box>
+                    <Box>
+                      <Typography variant="body2" fontWeight="medium">
+                        Jurisdicciones
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Límites del distrito
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Switch
+                    size="small"
+                    checked={capasVisibles.jurisdicciones}
+                    onChange={(e) => setCapasVisibles(prev => ({ ...prev, jurisdicciones: e.target.checked }))}
+                    sx={{
+                      "& .MuiSwitch-switchBase.Mui-checked": {
+                        color: "#34b429",
+                      },
+                      "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
+                        backgroundColor: "#34b429",
+                      },
+                    }}
+                  />
+                </Box>
+
+                {/* Capa de Comités */}
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    p: 1.5,
+                    borderRadius: 1,
+                    bgcolor: capasVisibles.comites ? "rgba(30, 41, 59, 0.08)" : "transparent",
+                    transition: "background-color 0.2s",
+                    "&:hover": { bgcolor: capasVisibles.comites ? "rgba(30, 41, 59, 0.12)" : "grey.50" },
+                  }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                    <Box
+                      sx={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: "50%",
+                        bgcolor: "#1E293B",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        opacity: capasVisibles.comites ? 1 : 0.4,
+                        transition: "opacity 0.2s",
+                      }}
+                    >
+                      <Place sx={{ fontSize: 18, color: "white" }} />
+                    </Box>
+                    <Box>
+                      <Typography variant="body2" fontWeight="medium">
+                        Comités
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Marcadores de ubicación
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Switch
+                    size="small"
+                    checked={capasVisibles.comites}
+                    onChange={(e) => setCapasVisibles(prev => ({ ...prev, comites: e.target.checked }))}
+                    sx={{
+                      "& .MuiSwitch-switchBase.Mui-checked": {
+                        color: "#1E293B",
+                      },
+                      "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
+                        backgroundColor: "#1E293B",
+                      },
+                    }}
+                  />
+                </Box>
+              </Box>
+
+              {/* Footer con acciones rápidas */}
+              <Divider />
+              <Box sx={{ p: 1.5, display: "flex", gap: 1 }}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  fullWidth
+                  onClick={() => setCapasVisibles({ sectores: true, jurisdicciones: true, comites: true })}
+                  startIcon={<Visibility sx={{ fontSize: 16 }} />}
+                  sx={{
+                    textTransform: "none",
+                    borderColor: "grey.300",
+                    color: "text.secondary",
+                    "&:hover": { borderColor: "grey.400", bgcolor: "grey.50" },
+                  }}
+                >
+                  Mostrar todas
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  fullWidth
+                  onClick={() => setCapasVisibles({ sectores: false, jurisdicciones: false, comites: false })}
+                  startIcon={<VisibilityOff sx={{ fontSize: 16 }} />}
+                  sx={{
+                    textTransform: "none",
+                    borderColor: "grey.300",
+                    color: "text.secondary",
+                    "&:hover": { borderColor: "grey.400", bgcolor: "grey.50" },
+                  }}
+                >
+                  Ocultar todas
+                </Button>
+              </Box>
+            </Box>
+          </Popover>
         </Box>
       </Box>
 
@@ -523,6 +895,14 @@ export default function PVLMapaPage() {
                         {comiteSeleccionado.coordinadora.celular}
                       </Typography>
                     </Box>
+                    {comiteSeleccionado.coordinadora.fechaNacimiento && (
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                        <Cake fontSize="inherit" sx={{ color: "text.secondary", fontSize: 14 }} />
+                        <Typography variant="caption" color="text.secondary">
+                          {formatearFecha(comiteSeleccionado.coordinadora.fechaNacimiento)} ({calcularEdad(comiteSeleccionado.coordinadora.fechaNacimiento)} años)
+                        </Typography>
+                      </Box>
+                    )}
                   </Box>
                 </Box>
               </Box>
@@ -607,11 +987,12 @@ export default function PVLMapaPage() {
             </Box>
           ) : (
             <MapaPVL
-              comites={comites}
+              comites={comitesFiltrados}
               comiteSeleccionado={comiteSeleccionado}
               onComiteClick={handleComiteClick}
               limiteVisible={limiteVisible}
               filterOpen={filterOpen}
+              capasVisibles={capasVisibles}
             />
           )}
         </Box>
@@ -710,7 +1091,7 @@ export default function PVLMapaPage() {
                         }
                         label={
                           <Typography variant="body2">
-                            Rango de edad: <strong>{rangoEdad.min} - {rangoEdad.max} años</strong>
+                            Edad coordinadora: <strong>{rangoEdad.min} - {rangoEdad.max} años</strong>
                           </Typography>
                         }
                       />
@@ -722,14 +1103,14 @@ export default function PVLMapaPage() {
                               const [min, max] = value as number[];
                               setRangoEdad((prev) => ({ ...prev, min, max }));
                             }}
-                            min={0}
+                            min={18}
                             max={100}
                             valueLabelDisplay="auto"
                             marks={[
-                              { value: 0, label: "0" },
                               { value: 18, label: "18" },
                               { value: 40, label: "40" },
                               { value: 60, label: "60" },
+                              { value: 80, label: "80" },
                               { value: 100, label: "100" },
                             ]}
                             sx={{
@@ -766,6 +1147,84 @@ export default function PVLMapaPage() {
               </Accordion>
             );
           })}
+
+          {/* Filtro de Edad de Coordinadora */}
+          <Accordion
+            expanded={expandedAccordion === "edad_coordinadora"}
+            onChange={(_, isExpanded) => setExpandedAccordion(isExpanded ? "edad_coordinadora" : false)}
+            disableGutters
+            elevation={0}
+            sx={{ "&:before": { display: "none" }, borderBottom: "1px solid", borderColor: "divider" }}
+          >
+            <AccordionSummary expandIcon={<ExpandMore />} sx={{ minHeight: 48, "& .MuiAccordionSummary-content": { my: 0 } }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Typography fontWeight="medium">Edad Coordinadora</Typography>
+                {rangoEdadCoordinadora.activo && (
+                  <Box
+                    sx={{
+                      bgcolor: "#d81b7e",
+                      color: "white",
+                      borderRadius: "50%",
+                      width: 20,
+                      height: 20,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 12,
+                    }}
+                  >
+                    1
+                  </Box>
+                )}
+              </Box>
+            </AccordionSummary>
+            <AccordionDetails sx={{ pt: 0 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={rangoEdadCoordinadora.activo}
+                    onChange={() => setRangoEdadCoordinadora((prev) => ({ ...prev, activo: !prev.activo }))}
+                    sx={{ color: "#d81b7e", "&.Mui-checked": { color: "#d81b7e" } }}
+                  />
+                }
+                label={
+                  <Typography variant="body2">
+                    Rango de edad: <strong>{rangoEdadCoordinadora.min} - {rangoEdadCoordinadora.max} años</strong>
+                  </Typography>
+                }
+              />
+              {rangoEdadCoordinadora.activo && (
+                <Box sx={{ px: 2, mt: 1 }}>
+                  <Slider
+                    value={[rangoEdadCoordinadora.min, rangoEdadCoordinadora.max]}
+                    onChange={(_, value) => {
+                      const [min, max] = value as number[];
+                      setRangoEdadCoordinadora((prev) => ({ ...prev, min, max }));
+                    }}
+                    min={18}
+                    max={100}
+                    valueLabelDisplay="auto"
+                    marks={[
+                      { value: 18, label: "18" },
+                      { value: 40, label: "40" },
+                      { value: 60, label: "60" },
+                      { value: 80, label: "80" },
+                      { value: 100, label: "100" },
+                    ]}
+                    sx={{
+                      color: "#d81b7e",
+                      "& .MuiSlider-thumb": {
+                        "&:hover, &.Mui-focusVisible": {
+                          boxShadow: "0 0 0 8px rgba(216, 27, 126, 0.16)",
+                        },
+                      },
+                    }}
+                  />
+                </Box>
+              )}
+            </AccordionDetails>
+          </Accordion>
         </Box>
       </Drawer>
     </Box>

@@ -157,11 +157,20 @@ export const MODULOS_PROGRAMAS_SOCIALES: MenuItem[] = [
         icono: "SpaceDashboard",
         permisos: ["pvl", "all_programas_sociales", "all"],
       },
+      /*
       {
         id: "pvl-beneficiarios",
         nombre: "Beneficiarios",
         ruta: "/programas-sociales/pvl/beneficiarios",
         icono: "Diversity1",
+        permisos: ["pvl", "all_programas_sociales", "all"],
+      },
+      */
+      {
+        id: "pvl-comites",
+        nombre: "Comités",
+        ruta: "/programas-sociales/pvl/comites",
+        icono: "Groups",
         permisos: ["pvl", "all_programas_sociales", "all"],
       },
       {
