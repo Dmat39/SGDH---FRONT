@@ -16,6 +16,8 @@
     "@mui/x-charts": "^8.24.0",
     "@mui/x-date-pickers": "^8.24.0",
     "@reduxjs/toolkit": "^2.11.2",
+    "@turf/boolean-point-in-polygon": "^7.3.2",
+    "@turf/helpers": "^7.3.2",
     "axios": "^1.13.2",
     "crypto-js": "^4.2.0",
     "dayjs": "^1.11.19",
