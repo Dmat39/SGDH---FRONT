@@ -60,38 +60,102 @@ interface MapaPVLProps {
   capasVisibles?: CapasVisibles;
 }
 
-// Icono personalizado para los marcadores - Vaso de Leche con imagen
+// Icono personalizado para los marcadores - Vaquita estilo 3D cartoon
 const createCustomIcon = (isSelected: boolean) => {
-  const size = isSelected ? 36 : 28;
+  const size = isSelected ? 38 : 30;
 
-  // Borde solo cuando está seleccionado
-  const borderStyle = isSelected ? "3px solid #d81b7e" : "none";
+  // SVG de vaquita estilo 3D cute similar a la imagen de referencia
+  const cowSvg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${size}" height="${size}">
+      <defs>
+        <!-- Gradientes para efecto 3D -->
+        <radialGradient id="faceGrad" cx="30%" cy="30%" r="70%">
+          <stop offset="0%" style="stop-color:#ffffff"/>
+          <stop offset="100%" style="stop-color:#e8e8e8"/>
+        </radialGradient>
+        <radialGradient id="snoutGrad" cx="30%" cy="30%" r="70%">
+          <stop offset="0%" style="stop-color:#ffd4cc"/>
+          <stop offset="100%" style="stop-color:#f5b5a8"/>
+        </radialGradient>
+        <radialGradient id="earGrad" cx="30%" cy="30%" r="70%">
+          <stop offset="0%" style="stop-color:#ffb8b0"/>
+          <stop offset="100%" style="stop-color:#e89990"/>
+        </radialGradient>
+        <radialGradient id="hornGrad" cx="30%" cy="30%" r="70%">
+          <stop offset="0%" style="stop-color:#4a4a4a"/>
+          <stop offset="100%" style="stop-color:#1a1a1a"/>
+        </radialGradient>
+        <radialGradient id="spotGrad" cx="40%" cy="40%" r="60%">
+          <stop offset="0%" style="stop-color:#3d3d3d"/>
+          <stop offset="100%" style="stop-color:#1a1a1a"/>
+        </radialGradient>
+      </defs>
+
+      <!-- Orejas (detrás) -->
+      <ellipse cx="18" cy="38" rx="14" ry="10" fill="#2a2a2a" transform="rotate(-25 18 38)"/>
+      <ellipse cx="18" cy="38" rx="10" ry="7" fill="url(#earGrad)" transform="rotate(-25 18 38)"/>
+      <ellipse cx="82" cy="38" rx="14" ry="10" fill="#2a2a2a" transform="rotate(25 82 38)"/>
+      <ellipse cx="82" cy="38" rx="10" ry="7" fill="url(#earGrad)" transform="rotate(25 82 38)"/>
+
+      <!-- Cuernos -->
+      <ellipse cx="28" cy="18" rx="6" ry="10" fill="url(#hornGrad)" transform="rotate(-15 28 18)"/>
+      <ellipse cx="72" cy="18" rx="6" ry="10" fill="url(#hornGrad)" transform="rotate(15 72 18)"/>
+
+      <!-- Cabeza principal (forma de huevo) -->
+      <ellipse cx="50" cy="52" rx="38" ry="42" fill="url(#faceGrad)"/>
+
+      <!-- Mancha negra grande lado derecho -->
+      <path d="M55 25 Q80 30 78 55 Q75 70 60 65 Q50 55 55 35 Z" fill="url(#spotGrad)"/>
+
+      <!-- Mancha pequeña lado izquierdo -->
+      <ellipse cx="32" cy="40" rx="8" ry="10" fill="url(#spotGrad)" transform="rotate(-10 32 40)"/>
+
+      <!-- Hocico/nariz grande rosado -->
+      <ellipse cx="50" cy="72" rx="22" ry="16" fill="url(#snoutGrad)"/>
+
+      <!-- Fosas nasales -->
+      <ellipse cx="42" cy="72" rx="4" ry="5" fill="#4a4a4a"/>
+      <ellipse cx="58" cy="72" rx="4" ry="5" fill="#4a4a4a"/>
+
+      <!-- Boca sonriente -->
+      <path d="M42 82 Q50 88 58 82" stroke="#4a4a4a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+
+      <!-- Lengua -->
+      <ellipse cx="50" cy="86" rx="4" ry="3" fill="#e85050"/>
+
+      <!-- Ojos - fondo blanco -->
+      <ellipse cx="35" cy="48" rx="10" ry="11" fill="white"/>
+      <ellipse cx="65" cy="48" rx="10" ry="11" fill="white"/>
+
+      <!-- Ojos - iris marrón -->
+      <circle cx="36" cy="50" r="6" fill="#5c4033"/>
+      <circle cx="64" cy="50" r="6" fill="#5c4033"/>
+
+      <!-- Ojos - pupila -->
+      <circle cx="37" cy="51" r="3.5" fill="#1a1a1a"/>
+      <circle cx="63" cy="51" r="3.5" fill="#1a1a1a"/>
+
+      <!-- Ojos - brillo -->
+      <circle cx="34" cy="47" r="2.5" fill="white"/>
+      <circle cx="62" cy="47" r="2.5" fill="white"/>
+      <circle cx="38" cy="52" r="1.2" fill="white"/>
+      <circle cx="64" cy="52" r="1.2" fill="white"/>
+    </svg>
+  `;
 
   return L.divIcon({
     className: "custom-marker-pvl",
     html: `<div style="
       width: ${size}px;
       height: ${size}px;
-      background-color: transparent;
-      border: ${borderStyle};
-      border-radius: 50%;
-      box-shadow: ${isSelected ? "0 2px 6px rgba(0,0,0,0.35)" : "none"};
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all 0.15s ease;
-      overflow: hidden;
+      cursor: pointer;
+      filter: drop-shadow(0 3px 6px rgba(0,0,0,0.3));
+      ${isSelected ? "transform: scale(1.1); filter: drop-shadow(0 4px 8px rgba(216, 27, 126, 0.5));" : ""}
     ">
-      <img
-        src="/vaca.jpg"
-        alt="PVL"
-        style="
-          width: ${size}px;
-          height: ${size}px;
-          border-radius: 50%;
-          object-fit: cover;
-        "
-      />
+      ${cowSvg}
     </div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
