@@ -19,8 +19,11 @@ import {
   Chip,
   IconButton,
   Tooltip,
+  Popover,
+  Slider,
+  Button,
 } from "@mui/material";
-import { Search, Visibility, Edit, Delete, People } from "@mui/icons-material";
+import { Search, Visibility, Edit, Delete, People, FilterList } from "@mui/icons-material";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
@@ -73,6 +76,22 @@ export default function PVLBeneficiariosPage() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState("");
+  const [ageRange, setAgeRange] = useState<number[]>([0, 100]);
+  const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
+
+  const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setFilterAnchor(event.currentTarget);
+  };
+
+  const handleFilterClose = () => {
+    setFilterAnchor(null);
+  };
+
+  const handleAgeChange = (_event: Event, newValue: number | number[]) => {
+    setAgeRange(newValue as number[]);
+  };
+
+  const filterOpen = Boolean(filterAnchor);
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);
@@ -134,79 +153,143 @@ export default function PVLBeneficiariosPage() {
 
       {/* Tarjeta principal */}
       <Box sx={{ position: "relative" }}>
-        {/* Sombra rosa difuminada debajo */}
-        <Box
-          sx={{
-            position: "absolute",
-            bottom: "-15px",
-            left: "5%",
-            right: "5%",
-            height: "30px",
-            background: "linear-gradient(to bottom, rgba(216, 27, 126, 0.2), rgba(216, 27, 126, 0))",
-            borderRadius: "50%",
-            filter: "blur(15px)",
-            zIndex: 0,
-          }}
-        />
         <Card
           sx={{
-            borderRadius: "24px",
-            boxShadow: "0 8px 20px rgba(216, 27, 126, 0.15), 0 4px 8px rgba(0, 0, 0, 0.08)",
+            borderRadius: "16px",
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
             position: "relative",
             zIndex: 1,
-            overflow: "visible",
-            "&::after": {
-              content: '""',
-              position: "absolute",
-              right: "-6px",
-              top: "50%",
-              transform: "translateY(-50%)",
-              width: "12px",
-              height: "40%",
-              background: "linear-gradient(to bottom, #f472b6, #d81b7e, #be185d)",
-              borderRadius: "12px",
-              boxShadow: "0 4px 10px rgba(216, 27, 126, 0.35)",
-            },
+            overflow: "hidden",
           }}
         >
           <CardContent sx={{ p: 3 }}>
-            {/* Buscador */}
-            <Box mb={3}>
+            {/* Buscador y Filtros */}
+            <Box mb={3} display="flex" gap={1.5} alignItems="center">
               <TextField
-                fullWidth
                 placeholder="Buscar por nombre, DNI o jurisdicción..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <Search sx={{ color: subgerencia.color }} />
+                      <Search sx={{ color: "#64748b", fontSize: 20 }} />
                     </InputAdornment>
                   ),
                 }}
                 size="small"
                 sx={{
+                  width: 320,
                   "& .MuiOutlinedInput-root": {
-                    borderRadius: "12px",
-                    backgroundColor: "#fdf2f8",
+                    borderRadius: "8px",
+                    backgroundColor: "#f8fafc",
                     "&:hover fieldset": {
-                      borderColor: subgerencia.color,
+                      borderColor: "#64748b",
                     },
                     "&.Mui-focused fieldset": {
-                      borderColor: subgerencia.color,
+                      borderColor: "#475569",
                     },
                   },
                 }}
               />
+              <Tooltip title="Filtrar por edad">
+                <IconButton
+                  onClick={handleFilterClick}
+                  sx={{
+                    backgroundColor: filterOpen ? "#e2e8f0" : "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "8px",
+                    "&:hover": {
+                      backgroundColor: "#e2e8f0",
+                    },
+                  }}
+                >
+                  <FilterList sx={{ color: "#64748b", fontSize: 20 }} />
+                </IconButton>
+              </Tooltip>
+              {(ageRange[0] > 0 || ageRange[1] < 100) && (
+                <Chip
+                  label={`Edad: ${ageRange[0]} - ${ageRange[1]}`}
+                  size="small"
+                  onDelete={() => setAgeRange([0, 100])}
+                  sx={{ backgroundColor: "#e2e8f0" }}
+                />
+              )}
             </Box>
+
+            {/* Popover de filtro por edad */}
+            <Popover
+              open={filterOpen}
+              anchorEl={filterAnchor}
+              onClose={handleFilterClose}
+              anchorOrigin={{
+                vertical: "bottom",
+                horizontal: "left",
+              }}
+              transformOrigin={{
+                vertical: "top",
+                horizontal: "left",
+              }}
+              sx={{ mt: 1 }}
+            >
+              <Box sx={{ p: 2.5, width: 280 }}>
+                <Typography variant="subtitle2" fontWeight={600} color="#334155" mb={2}>
+                  Filtrar por rango de edad
+                </Typography>
+                <Slider
+                  value={ageRange}
+                  onChange={handleAgeChange}
+                  valueLabelDisplay="auto"
+                  min={0}
+                  max={100}
+                  sx={{
+                    color: "#64748b",
+                    "& .MuiSlider-thumb": {
+                      backgroundColor: "#475569",
+                    },
+                    "& .MuiSlider-track": {
+                      backgroundColor: "#64748b",
+                    },
+                  }}
+                />
+                <Box display="flex" justifyContent="space-between" mt={1}>
+                  <Typography variant="caption" color="text.secondary">
+                    {ageRange[0]} años
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {ageRange[1]} años
+                  </Typography>
+                </Box>
+                <Box display="flex" justifyContent="flex-end" mt={2} gap={1}>
+                  <Button
+                    size="small"
+                    onClick={() => setAgeRange([0, 100])}
+                    sx={{ color: "#64748b", textTransform: "none" }}
+                  >
+                    Limpiar
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={handleFilterClose}
+                    sx={{
+                      backgroundColor: "#475569",
+                      textTransform: "none",
+                      "&:hover": { backgroundColor: "#334155" },
+                    }}
+                  >
+                    Aplicar
+                  </Button>
+                </Box>
+              </Box>
+            </Popover>
 
             {/* Tabla */}
             <TableContainer
               component={Paper}
               sx={{
-                borderRadius: "16px",
+                borderRadius: "12px",
                 boxShadow: "none",
-                border: "1px solid rgba(216, 27, 126, 0.1)",
+                border: "1px solid #e2e8f0",
                 overflow: "hidden",
               }}
             >
@@ -214,15 +297,15 @@ export default function PVLBeneficiariosPage() {
                 <TableHead>
                   <TableRow
                     sx={{
-                      background: "linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)",
+                      backgroundColor: "#f8fafc",
                     }}
                   >
-                    <TableCell sx={{ fontWeight: 600, color: "#831843" }}>DNI</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#831843" }}>Nombres</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#831843" }}>Jurisdicción</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#831843" }}>Comité</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 600, color: "#831843" }}>Estado</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 600, color: "#831843" }}>Acciones</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>DNI</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Nombres</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Jurisdicción</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Comité</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Estado</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -232,9 +315,9 @@ export default function PVLBeneficiariosPage() {
                       <TableRow
                         key={row.id}
                         sx={{
-                          backgroundColor: index % 2 === 0 ? "white" : "rgba(253, 242, 248, 0.5)",
+                          backgroundColor: index % 2 === 0 ? "white" : "#f8fafc",
                           "&:hover": {
-                            backgroundColor: "rgba(216, 27, 126, 0.08)",
+                            backgroundColor: "#f1f5f9",
                           },
                           transition: "background-color 0.2s",
                         }}
@@ -259,9 +342,9 @@ export default function PVLBeneficiariosPage() {
                             <IconButton
                               size="small"
                               sx={{
-                                color: subgerencia.color,
+                                color: "#64748b",
                                 "&:hover": {
-                                  backgroundColor: "rgba(216, 27, 126, 0.1)",
+                                  backgroundColor: "#f1f5f9",
                                 },
                               }}
                             >
@@ -313,10 +396,10 @@ export default function PVLBeneficiariosPage() {
               labelRowsPerPage="Filas por página:"
               labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
               sx={{
-                borderTop: "1px solid rgba(216, 27, 126, 0.1)",
+                borderTop: "1px solid #e2e8f0",
                 mt: 2,
                 "& .MuiTablePagination-selectIcon": {
-                  color: subgerencia.color,
+                  color: "#64748b",
                 },
               }}
             />
