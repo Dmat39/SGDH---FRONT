@@ -82,6 +82,28 @@ const MapaPVL = dynamic(() => import("./MapaPVL"), {
   ),
 });
 
+// Lista de comunas basada en el GeoJSON sectores-pvl
+const COMUNAS_MAPA = [
+  { id: 1, name: "ZARATE" },
+  { id: 2, name: "CAMPOY" },
+  { id: 3, name: "MANGOMARCA" },
+  { id: 4, name: "SAUCES" },
+  { id: 5, name: "HUAYRONA" },
+  { id: 6, name: "CANTO REY" },
+  { id: 7, name: "HUANCARAY" },
+  { id: 8, name: "MARISCAL CACERES" },
+  { id: 9, name: "MOTUPE" },
+  { id: 10, name: "JICAMARCA" },
+  { id: 11, name: "MARIATEGUI" },
+  { id: 12, name: "CASA BLANCA" },
+  { id: 13, name: "BAYOVAR" },
+  { id: 14, name: "HUASCAR" },
+  { id: 15, name: "CANTO GRANDE" },
+  { id: 16, name: "SAN HILARION" },
+  { id: 17, name: "LAS FLORES" },
+  { id: 18, name: "CAJA DE AGUA" },
+];
+
 // Configuración de filtros
 const FILTROS_CONFIG = [
   {
@@ -100,7 +122,7 @@ const FILTROS_CONFIG = [
       { id: "gestante", label: "Gestante" },
       { id: "lactante", label: "Madre Lactante" },
       { id: "adulto_mayor", label: "Adulto Mayor" },
-      
+
     ],
   },
   {
@@ -111,17 +133,6 @@ const FILTROS_CONFIG = [
       { id: "B", label: "Ruta B" },
       { id: "C", label: "Ruta C" },
       { id: "D", label: "Ruta D" },
-    ],
-  },
-  {
-    id: "comuna",
-    label: "Comuna",
-    opciones: [
-      { id: "1", label: "Comuna 1" },
-      { id: "2", label: "Comuna 2" },
-      { id: "3", label: "Comuna 3" },
-      { id: "10", label: "Comuna 10" },
-      { id: "12", label: "Comuna 12" },
     ],
   },
 ];
@@ -221,6 +232,9 @@ export default function PVLMapaPage() {
     max: 80,
   });
 
+  // Control de comunas seleccionadas
+  const [comunasSeleccionadas, setComunasSeleccionadas] = useState<number[]>([]);
+
   // Control de límite de visualización
   const [limiteVisible, setLimiteVisible] = useState(300);
   const [limiteAnchorEl, setLimiteAnchorEl] = useState<HTMLElement | null>(null);
@@ -266,7 +280,7 @@ export default function PVLMapaPage() {
     cargarComites();
   }, [cargarComites]);
 
-  // Filtrar comités por edad de coordinadora
+  // Filtrar comités por edad de coordinadora y comuna
   const comitesFiltrados = comites.filter((comite) => {
     // Filtro por rango de edad (dentro de Tipo de Beneficiario) - ahora filtra por coordinadora
     if (rangoEdad.activo) {
@@ -288,6 +302,12 @@ export default function PVLMapaPage() {
         return false;
       }
     }
+    // Filtro por comuna
+    if (comunasSeleccionadas.length > 0) {
+      if (!comunasSeleccionadas.includes(comite.comuna)) {
+        return false;
+      }
+    }
     return true;
   });
 
@@ -295,12 +315,13 @@ export default function PVLMapaPage() {
   const totalFiltrados = comitesFiltrados.length;
   const comitesMostrados = Math.min(limiteVisible, totalFiltrados);
 
-  // Contar filtros activos (incluyendo rango de edad)
+  // Contar filtros activos (incluyendo rango de edad y comunas)
   const contarFiltrosActivos = () => {
     const filtrosBasicos = Object.values(filtrosSeleccionados).reduce((acc, arr) => acc + arr.length, 0);
     const filtroEdad = rangoEdad.activo ? 1 : 0;
     const filtroEdadCoordinadora = rangoEdadCoordinadora.activo ? 1 : 0;
-    return filtrosBasicos + filtroEdad + filtroEdadCoordinadora;
+    const filtroComunas = comunasSeleccionadas.length > 0 ? 1 : 0;
+    return filtrosBasicos + filtroEdad + filtroEdadCoordinadora + filtroComunas;
   };
 
   // Verificar si hay filtros activos
@@ -325,6 +346,14 @@ export default function PVLMapaPage() {
     setFiltrosSeleccionados({});
     setRangoEdad({ activo: false, min: 18, max: 80 });
     setRangoEdadCoordinadora({ activo: false, min: 18, max: 80 });
+    setComunasSeleccionadas([]);
+  };
+
+  // Manejar toggle de comuna
+  const handleComunaToggle = (comunaId: number) => {
+    setComunasSeleccionadas((prev) =>
+      prev.includes(comunaId) ? prev.filter((c) => c !== comunaId) : [...prev, comunaId]
+    );
   };
 
   // Aplicar filtros
