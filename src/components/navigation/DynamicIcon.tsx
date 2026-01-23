@@ -44,6 +44,14 @@ import {
   Place,
   Layers,
   MyLocation,
+  FreeBreakfast,
+  SpaceDashboard,
+  Diversity1,
+  PinDrop,
+  ChildCare,
+  FamilyRestroom,
+  GridView,
+  Explore,
 } from "@mui/icons-material";
 
 interface DynamicIconProps {
@@ -95,6 +103,14 @@ const iconMap: Record<string, React.ReactNode> = {
   Place: <Place />,
   Layers: <Layers />,
   MyLocation: <MyLocation />,
+  FreeBreakfast: <FreeBreakfast />,
+  SpaceDashboard: <SpaceDashboard />,
+  Diversity1: <Diversity1 />,
+  PinDrop: <PinDrop />,
+  ChildCare: <ChildCare />,
+  FamilyRestroom: <FamilyRestroom />,
+  GridView: <GridView />,
+  Explore: <Explore />,
 };
 
 export default function DynamicIcon({ iconName, className }: DynamicIconProps) {

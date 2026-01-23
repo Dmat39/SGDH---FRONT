@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import { logout, setLoading } from "@/redux/slices/authSlice";
 import { showError } from "@/lib/utils/swalConfig";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const API_URL = process.env.NEXT_PUBLIC_PVL_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 interface FetchOptions extends AxiosRequestConfig {
   showErrorAlert?: boolean;
