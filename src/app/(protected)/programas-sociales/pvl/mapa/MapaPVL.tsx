@@ -60,34 +60,38 @@ interface MapaPVLProps {
   capasVisibles?: CapasVisibles;
 }
 
-// Icono personalizado para los marcadores - Vaso de Leche (estilo gubernamental)
+// Icono personalizado para los marcadores - Vaso de Leche con imagen
 const createCustomIcon = (isSelected: boolean) => {
-  const size = isSelected ? 28 : 22;
-  const iconSvg = isSelected ? 16 : 12;
+  const size = isSelected ? 36 : 28;
 
-  // Colores institucionales/gubernamentales
-  const bgColor = isSelected ? "#1E293B" : "#334155";
-const borderColor = isSelected ? "#0F172A" : "#ffffffff";
+  // Borde solo cuando está seleccionado
+  const borderStyle = isSelected ? "3px solid #d81b7e" : "none";
 
   return L.divIcon({
     className: "custom-marker-pvl",
     html: `<div style="
       width: ${size}px;
       height: ${size}px;
-      background-color: ${bgColor};
-      border: 2px solid ${borderColor};
+      background-color: transparent;
+      border: ${borderStyle};
       border-radius: 50%;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      box-shadow: ${isSelected ? "0 2px 6px rgba(0,0,0,0.35)" : "none"};
       display: flex;
       align-items: center;
       justify-content: center;
       transition: all 0.15s ease;
+      overflow: hidden;
     ">
-      <svg width="${iconSvg}" height="${iconSvg}" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M5 6h14l-1.5 12a2 2 0 0 1-2 2H8.5a2 2 0 0 1-2-2L5 6z"/>
-        <path d="M6.5 10h11" stroke-width="1.5"/>
-        <path d="M4 6h16" stroke-width="2.5"/>
-      </svg>
+      <img
+        src="/vaca.jpg"
+        alt="PVL"
+        style="
+          width: ${size}px;
+          height: ${size}px;
+          border-radius: 50%;
+          object-fit: cover;
+        "
+      />
     </div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
