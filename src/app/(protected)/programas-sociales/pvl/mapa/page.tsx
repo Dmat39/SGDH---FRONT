@@ -268,6 +268,11 @@ export default function PVLMapaPage() {
       if (response?.data?.data) {
         const comitesMapeados = response.data.data.map(mapBackendToComite);
         setComites(comitesMapeados);
+
+        // Debug: Ver qué valores de comuna hay en los datos
+        const comunasUnicas = [...new Set(response.data.data.map(c => c.commune))].sort((a, b) => a - b);
+        console.log("Comunas únicas en el backend:", comunasUnicas);
+        console.log("Ejemplo de datos:", response.data.data.slice(0, 5).map(c => ({ name: c.name, commune: c.commune })));
       }
     } catch (err) {
       console.error("Error cargando comités:", err);
