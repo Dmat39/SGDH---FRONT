@@ -27,23 +27,49 @@ const validationSchema = Yup.object({
 // Modo demo: Cambiar a false cuando tengas un backend real
 const DEMO_MODE = true;
 
-// Credenciales de prueba para modo demo
-const DEMO_CREDENTIALS = {
-  username: "admin",
-  password: "admin",
-};
+// Tipo para usuario demo
+interface DemoUserData {
+  id: number;
+  username: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  email: string;
+  permissions: string[];
+  subgerencia: SubgerenciaType;
+  cargo: string;
+}
 
-// Usuario de prueba para modo demo
-const DEMO_USER = {
-  id: 1,
-  username: "admin",
-  firstName: "Administrador",
-  lastName: "Demo",
-  fullName: "Administrador Demo",
-  email: "admin@sjl.gob.pe",
-  permissions: ["all"],
-  subgerencia: "programas-sociales" as SubgerenciaType,
-  cargo: "Administrador del Sistema",
+// Usuarios de prueba para modo demo
+const DEMO_USERS: Record<string, { password: string; user: DemoUserData }> = {
+  admin: {
+    password: "admin",
+    user: {
+      id: 1,
+      username: "admin",
+      firstName: "Administrador",
+      lastName: "Demo",
+      fullName: "Administrador Demo",
+      email: "admin@sjl.gob.pe",
+      permissions: ["all"],
+      subgerencia: "programas-sociales" as SubgerenciaType,
+      cargo: "Administrador del Sistema",
+    },
+  },
+  pvl: {
+    password: "pvl123",
+    user: {
+      id: 2,
+      username: "pvl",
+      firstName: "Usuario",
+      lastName: "PVL",
+      fullName: "Usuario PVL",
+      email: "pvl@sjl.gob.pe",
+      permissions: ["pvl", "mapa_pvl"],
+      subgerencia: "programas-sociales" as SubgerenciaType,
+      cargo: "Operador PVL",
+    },
+  },
 };
 
 export default function LoginForm({ subgerencia, color, subgerenciaName }: LoginFormProps) {
@@ -69,15 +95,19 @@ export default function LoginForm({ subgerencia, color, subgerenciaName }: Login
           // Simular delay de red
           await new Promise((resolve) => setTimeout(resolve, 800));
 
+          // Buscar usuario en la lista de demo
+          const demoAccount = DEMO_USERS[values.username];
+
           // Verificar credenciales de demo
-          if (values.username === DEMO_CREDENTIALS.username && values.password === DEMO_CREDENTIALS.password) {
+          if (demoAccount && values.password === demoAccount.password) {
             const demoToken = "demo_token_" + Date.now();
+            const demoUser = demoAccount.user;
 
             // Guardar en Redux
             dispatch(
               loginSuccess({
                 token: demoToken,
-                user: DEMO_USER,
+                user: demoUser,
               })
             );
 
@@ -86,8 +116,28 @@ export default function LoginForm({ subgerencia, color, subgerenciaName }: Login
               document.cookie = `auth_token=${demoToken}; path=/; max-age=86400; SameSite=Strict`;
             }
 
-            showSuccess("Bienvenido", `Hola ${DEMO_USER.fullName}`);
-            router.push(`/${subgerencia}`);
+            showSuccess("Bienvenido", `Hola ${demoUser.fullName}`);
+
+            // Redirigir según permisos del usuario
+            if (demoUser.permissions.includes("all") || demoUser.permissions.includes("all_programas_sociales")) {
+              router.push(`/${subgerencia}`);
+            } else if (demoUser.permissions.includes("pvl")) {
+              router.push(`/${subgerencia}/pvl`);
+            } else if (demoUser.permissions.includes("pantbc")) {
+              router.push(`/${subgerencia}/pantbc`);
+            } else if (demoUser.permissions.includes("comedores_populares")) {
+              router.push(`/${subgerencia}/comedores-populares`);
+            } else if (demoUser.permissions.includes("ollas_comunes")) {
+              router.push(`/${subgerencia}/ollas-comunes`);
+            } else if (demoUser.permissions.includes("ule")) {
+              router.push(`/${subgerencia}/ule`);
+            } else if (demoUser.permissions.includes("omaped")) {
+              router.push(`/${subgerencia}/omaped`);
+            } else if (demoUser.permissions.includes("ciam")) {
+              router.push(`/${subgerencia}/ciam`);
+            } else {
+              router.push(`/${subgerencia}`);
+            }
             return;
           } else {
             throw new Error("Usuario o contraseña incorrectos");
