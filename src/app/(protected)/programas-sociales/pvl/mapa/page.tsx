@@ -1254,6 +1254,74 @@ export default function PVLMapaPage() {
               )}
             </AccordionDetails>
           </Accordion>
+
+          {/* Filtro de Comunas */}
+          <Accordion
+            expanded={expandedAccordion === "comunas"}
+            onChange={(_, isExpanded) => setExpandedAccordion(isExpanded ? "comunas" : false)}
+            disableGutters
+            elevation={0}
+            sx={{ "&:before": { display: "none" }, borderBottom: "1px solid", borderColor: "divider" }}
+          >
+            <AccordionSummary expandIcon={<ExpandMore />} sx={{ minHeight: 48, "& .MuiAccordionSummary-content": { my: 0 } }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Typography fontWeight="medium">Comunas</Typography>
+                {comunasSeleccionadas.length > 0 && (
+                  <Box
+                    sx={{
+                      bgcolor: "#0369a1",
+                      color: "white",
+                      borderRadius: "50%",
+                      width: 20,
+                      height: 20,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 12,
+                    }}
+                  >
+                    {comunasSeleccionadas.length}
+                  </Box>
+                )}
+              </Box>
+            </AccordionSummary>
+            <AccordionDetails sx={{ pt: 0 }}>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 0.5,
+                  maxHeight: 280,
+                  overflowY: "auto",
+                }}
+              >
+                {COMUNAS_MAPA.map((comuna) => (
+                  <FormControlLabel
+                    key={comuna.id}
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={comunasSeleccionadas.includes(comuna.id)}
+                        onChange={() => handleComunaToggle(comuna.id)}
+                        sx={{ color: "#0369a1", "&.Mui-checked": { color: "#0369a1" }, py: 0.25 }}
+                      />
+                    }
+                    label={
+                      <Typography variant="caption" sx={{ fontSize: "0.7rem" }}>
+                        {comuna.id}. {comuna.name}
+                      </Typography>
+                    }
+                    sx={{ mr: 0 }}
+                  />
+                ))}
+              </Box>
+              {comunasSeleccionadas.length > 0 && (
+                <Typography variant="caption" color="#0369a1" sx={{ mt: 1, display: "block" }}>
+                  {comunasSeleccionadas.length} comuna(s) seleccionada(s)
+                </Typography>
+              )}
+            </AccordionDetails>
+          </Accordion>
         </Box>
       </Drawer>
     </Box>

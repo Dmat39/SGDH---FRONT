@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   Dashboard,
   LocalDrink,
@@ -59,6 +60,11 @@ interface DynamicIconProps {
   className?: string;
 }
 
+// Mapa de imágenes personalizadas para íconos
+const imageIconMap: Record<string, string> = {
+  "img:pvl": "/vaca.jpg",
+};
+
 const iconMap: Record<string, React.ReactNode> = {
   Dashboard: <Dashboard />,
   LocalDrink: <LocalDrink />,
@@ -115,5 +121,24 @@ const iconMap: Record<string, React.ReactNode> = {
 
 export default function DynamicIcon({ iconName, className }: DynamicIconProps) {
   if (!iconName) return null;
+
+  // Si el ícono es una imagen personalizada (empieza con "img:")
+  if (iconName.startsWith("img:")) {
+    const imageSrc = imageIconMap[iconName];
+    if (imageSrc) {
+      return (
+        <span className={className} style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Image
+            src={imageSrc}
+            alt={iconName.replace("img:", "")}
+            width={24}
+            height={24}
+            style={{ borderRadius: "4px", objectFit: "cover" }}
+          />
+        </span>
+      );
+    }
+  }
+
   return <span className={className}>{iconMap[iconName] || <Dashboard />}</span>;
 }
