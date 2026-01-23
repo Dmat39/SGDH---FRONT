@@ -165,13 +165,38 @@ const mapBackendToFrontend = (item: CommitteeBackend): ComiteFrontend => ({
   fechaCreacion: item.created_at,
 });
 
-type FilterType = "beneficiarios" | "edad" | "cumpleanos";
+type FilterType = "beneficiarios" | "edad" | "cumpleanos" | "comuna";
 
 // Nombres de los meses en español
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
 ];
+
+// Lista de comunas basada en el GeoJSON de sectores PVL
+const COMUNAS = [
+  { id: 1, name: "ZARATE" },
+  { id: 2, name: "CAMPOY" },
+  { id: 3, name: "MANGOMARCA" },
+  { id: 4, name: "SALSAS" },
+  { id: 5, name: "HUAYRONA" },
+  { id: 6, name: "CANTO REY" },
+  { id: 7, name: "HUANCARAY" },
+  { id: 8, name: "MARISCAL CACERES" },
+  { id: 9, name: "MOTUPE" },
+  { id: 10, name: "JICAMARCA" },
+  { id: 11, name: "MARIATEGUI" },
+  { id: 12, name: "CASA BLANCA" },
+  { id: 13, name: "BAYOVAR" },
+  { id: 14, name: "HUASCAR" },
+  { id: 15, name: "CANTO GRANDE" },
+  { id: 16, name: "SAN HILARION" },
+  { id: 17, name: "LAS FLORES" },
+  { id: 18, name: "CAJA DE AGUA" },
+];
+
+// Tipo de filtro de cumpleaños
+type CumpleanosModo = "mes" | "dia";
 
 export default function PVLComitesPage() {
   const { getData } = useFetch();
@@ -190,6 +215,9 @@ export default function PVLComitesPage() {
   const [beneficiariosRange, setBeneficiariosRange] = useState<number[]>([0, 200]);
   const [edadRange, setEdadRange] = useState<number[]>([0, 100]);
   const [mesesCumpleanos, setMesesCumpleanos] = useState<number[]>([]);
+  const [cumpleanosModo, setCumpleanosModo] = useState<CumpleanosModo>("mes");
+  const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
+  const [comunasSeleccionadas, setComunasSeleccionadas] = useState<number[]>([]);
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
 
   // Estados para detalle
@@ -257,11 +285,18 @@ export default function PVLComitesPage() {
     );
   };
 
+  const handleComunaToggle = (comunaId: number) => {
+    setComunasSeleccionadas((prev) =>
+      prev.includes(comunaId) ? prev.filter((c) => c !== comunaId) : [...prev, comunaId]
+    );
+  };
+
   const filterOpen = Boolean(filterAnchor);
 
   const isBeneficiariosFiltered = beneficiariosRange[0] > 0 || beneficiariosRange[1] < 100;
   const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 100;
-  const isCumpleanosFiltered = mesesCumpleanos.length > 0;
+  const isCumpleanosFiltered = cumpleanosModo === "mes" ? mesesCumpleanos.length > 0 : diaCumpleanos !== "";
+  const isComunaFiltered = comunasSeleccionadas.length > 0;
 
   const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
@@ -297,22 +332,38 @@ export default function PVLComitesPage() {
     const matchesEdad =
       edadCoordinadora >= edadRange[0] && edadCoordinadora <= edadRange[1];
 
-    // Filtro por mes de cumpleaños
+    // Filtro por cumpleaños (mes o día específico)
     let matchesCumpleanos = true;
-    if (mesesCumpleanos.length > 0 && c.fechaNacimientoCoordinadora) {
-      const mesCumple = new Date(c.fechaNacimientoCoordinadora).getMonth();
-      matchesCumpleanos = mesesCumpleanos.includes(mesCumple);
-    } else if (mesesCumpleanos.length > 0 && !c.fechaNacimientoCoordinadora) {
-      matchesCumpleanos = false;
+    if (cumpleanosModo === "mes" && mesesCumpleanos.length > 0) {
+      if (c.fechaNacimientoCoordinadora) {
+        const mesCumple = new Date(c.fechaNacimientoCoordinadora).getMonth();
+        matchesCumpleanos = mesesCumpleanos.includes(mesCumple);
+      } else {
+        matchesCumpleanos = false;
+      }
+    } else if (cumpleanosModo === "dia" && diaCumpleanos) {
+      if (c.fechaNacimientoCoordinadora) {
+        const fechaNac = new Date(c.fechaNacimientoCoordinadora);
+        const [, mes, dia] = diaCumpleanos.split("-").map(Number);
+        matchesCumpleanos = fechaNac.getMonth() + 1 === mes && fechaNac.getDate() === dia;
+      } else {
+        matchesCumpleanos = false;
+      }
     }
 
-    return matchesSearch && matchesBeneficiarios && matchesEdad && matchesCumpleanos;
+    // Filtro por comuna
+    let matchesComuna = true;
+    if (comunasSeleccionadas.length > 0) {
+      matchesComuna = comunasSeleccionadas.includes(c.comuna);
+    }
+
+    return matchesSearch && matchesBeneficiarios && matchesEdad && matchesCumpleanos && matchesComuna;
   });
 
   // Resetear página cuando cambian los filtros
   useEffect(() => {
     setPage(0);
-  }, [searchTerm, beneficiariosRange, edadRange, mesesCumpleanos]);
+  }, [searchTerm, beneficiariosRange, edadRange, mesesCumpleanos, cumpleanosModo, diaCumpleanos, comunasSeleccionadas]);
 
   // Datos paginados para mostrar en la tabla
   const paginatedData = filteredData.slice(
@@ -515,14 +566,43 @@ export default function PVLComitesPage() {
                 >
                   <Cake sx={{ fontSize: 14, color: "#be185d" }} />
                   <Typography variant="caption" color="#be185d">
-                    {mesesCumpleanos.map((m) => MESES[m].slice(0, 3)).join(", ")}
+                    {cumpleanosModo === "mes"
+                      ? mesesCumpleanos.map((m) => MESES[m].slice(0, 3)).join(", ")
+                      : diaCumpleanos.split("-").slice(1).reverse().join("/")}
                   </Typography>
                   <IconButton
                     size="small"
-                    onClick={() => setMesesCumpleanos([])}
+                    onClick={() => {
+                      setMesesCumpleanos([]);
+                      setDiaCumpleanos("");
+                    }}
                     sx={{ p: 0.25 }}
                   >
                     <Close sx={{ fontSize: 14, color: "#be185d" }} />
+                  </IconButton>
+                </Box>
+              )}
+              {isComunaFiltered && (
+                <Box
+                  sx={{
+                    backgroundColor: "#e0f2fe",
+                    borderRadius: "16px",
+                    px: 1.5,
+                    py: 0.5,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 0.5,
+                  }}
+                >
+                  <Typography variant="caption" color="#0369a1">
+                    Comunas: {comunasSeleccionadas.length}
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    onClick={() => setComunasSeleccionadas([])}
+                    sx={{ p: 0.25 }}
+                  >
+                    <Close sx={{ fontSize: 14, color: "#0369a1" }} />
                   </IconButton>
                 </Box>
               )}
@@ -563,7 +643,7 @@ export default function PVLComitesPage() {
                     value="beneficiarios"
                     sx={{
                       textTransform: "none",
-                      fontSize: "0.75rem",
+                      fontSize: "0.7rem",
                       "&.Mui-selected": {
                         backgroundColor: "#e2e8f0",
                         color: "#334155",
@@ -571,13 +651,13 @@ export default function PVLComitesPage() {
                       },
                     }}
                   >
-                    Beneficiarios
+                    Benef.
                   </ToggleButton>
                   <ToggleButton
                     value="edad"
                     sx={{
                       textTransform: "none",
-                      fontSize: "0.75rem",
+                      fontSize: "0.7rem",
                       "&.Mui-selected": {
                         backgroundColor: "#dbeafe",
                         color: "#1e40af",
@@ -591,7 +671,7 @@ export default function PVLComitesPage() {
                     value="cumpleanos"
                     sx={{
                       textTransform: "none",
-                      fontSize: "0.75rem",
+                      fontSize: "0.7rem",
                       "&.Mui-selected": {
                         backgroundColor: "#fce7f3",
                         color: "#be185d",
@@ -599,7 +679,21 @@ export default function PVLComitesPage() {
                       },
                     }}
                   >
-                    Cumpleaños
+                    Cumple
+                  </ToggleButton>
+                  <ToggleButton
+                    value="comuna"
+                    sx={{
+                      textTransform: "none",
+                      fontSize: "0.7rem",
+                      "&.Mui-selected": {
+                        backgroundColor: "#e0f2fe",
+                        color: "#0369a1",
+                        "&:hover": { backgroundColor: "#bae6fd" },
+                      },
+                    }}
+                  >
+                    Comuna
                   </ToggleButton>
                 </ToggleButtonGroup>
 
@@ -671,47 +765,157 @@ export default function PVLComitesPage() {
                   </>
                 )}
 
-                {/* Filtro por mes de cumpleaños */}
+                {/* Filtro por cumpleaños (mes o día específico) */}
                 {filterType === "cumpleanos" && (
                   <>
                     <Typography variant="body2" color="#475569" mb={1.5}>
-                      Mes de cumpleaños de la coordinadora
+                      Cumpleaños de la coordinadora
+                    </Typography>
+
+                    {/* Selector de modo */}
+                    <ToggleButtonGroup
+                      value={cumpleanosModo}
+                      exclusive
+                      onChange={(_, value) => value && setCumpleanosModo(value)}
+                      size="small"
+                      fullWidth
+                      sx={{ mb: 2 }}
+                    >
+                      <ToggleButton
+                        value="mes"
+                        sx={{
+                          textTransform: "none",
+                          fontSize: "0.75rem",
+                          "&.Mui-selected": {
+                            backgroundColor: "#fce7f3",
+                            color: "#be185d",
+                            "&:hover": { backgroundColor: "#fbcfe8" },
+                          },
+                        }}
+                      >
+                        Por mes
+                      </ToggleButton>
+                      <ToggleButton
+                        value="dia"
+                        sx={{
+                          textTransform: "none",
+                          fontSize: "0.75rem",
+                          "&.Mui-selected": {
+                            backgroundColor: "#fce7f3",
+                            color: "#be185d",
+                            "&:hover": { backgroundColor: "#fbcfe8" },
+                          },
+                        }}
+                      >
+                        Día específico
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+
+                    {cumpleanosModo === "mes" ? (
+                      <>
+                        <Box
+                          sx={{
+                            display: "grid",
+                            gridTemplateColumns: "repeat(3, 1fr)",
+                            gap: 0.75,
+                          }}
+                        >
+                          {MESES.map((mes, index) => (
+                            <Button
+                              key={mes}
+                              size="small"
+                              variant={mesesCumpleanos.includes(index) ? "contained" : "outlined"}
+                              onClick={() => handleMesToggle(index)}
+                              sx={{
+                                textTransform: "none",
+                                fontSize: "0.7rem",
+                                py: 0.5,
+                                px: 1,
+                                minWidth: 0,
+                                borderColor: mesesCumpleanos.includes(index) ? "#be185d" : "#e2e8f0",
+                                backgroundColor: mesesCumpleanos.includes(index) ? "#be185d" : "transparent",
+                                color: mesesCumpleanos.includes(index) ? "white" : "#64748b",
+                                "&:hover": {
+                                  backgroundColor: mesesCumpleanos.includes(index) ? "#9d174d" : "#fce7f3",
+                                  borderColor: "#be185d",
+                                },
+                              }}
+                            >
+                              {mes.slice(0, 3)}
+                            </Button>
+                          ))}
+                        </Box>
+                        {mesesCumpleanos.length > 0 && (
+                          <Typography variant="caption" color="#be185d" sx={{ mt: 1, display: "block" }}>
+                            {mesesCumpleanos.length} mes(es) seleccionado(s)
+                          </Typography>
+                        )}
+                      </>
+                    ) : (
+                      <TextField
+                        type="date"
+                        value={diaCumpleanos}
+                        onChange={(e) => setDiaCumpleanos(e.target.value)}
+                        fullWidth
+                        size="small"
+                        helperText="Selecciona una fecha para filtrar por día y mes"
+                        sx={{
+                          "& .MuiOutlinedInput-root": {
+                            borderRadius: "8px",
+                            "&.Mui-focused fieldset": {
+                              borderColor: "#be185d",
+                            },
+                          },
+                        }}
+                      />
+                    )}
+                  </>
+                )}
+
+                {/* Filtro por comuna */}
+                {filterType === "comuna" && (
+                  <>
+                    <Typography variant="body2" color="#475569" mb={1.5}>
+                      Selecciona las comunas
                     </Typography>
                     <Box
                       sx={{
                         display: "grid",
-                        gridTemplateColumns: "repeat(3, 1fr)",
+                        gridTemplateColumns: "repeat(2, 1fr)",
                         gap: 0.75,
+                        maxHeight: 250,
+                        overflowY: "auto",
                       }}
                     >
-                      {MESES.map((mes, index) => (
+                      {COMUNAS.map((comuna) => (
                         <Button
-                          key={mes}
+                          key={comuna.id}
                           size="small"
-                          variant={mesesCumpleanos.includes(index) ? "contained" : "outlined"}
-                          onClick={() => handleMesToggle(index)}
+                          variant={comunasSeleccionadas.includes(comuna.id) ? "contained" : "outlined"}
+                          onClick={() => handleComunaToggle(comuna.id)}
                           sx={{
                             textTransform: "none",
-                            fontSize: "0.7rem",
+                            fontSize: "0.65rem",
                             py: 0.5,
-                            px: 1,
+                            px: 0.75,
                             minWidth: 0,
-                            borderColor: mesesCumpleanos.includes(index) ? "#be185d" : "#e2e8f0",
-                            backgroundColor: mesesCumpleanos.includes(index) ? "#be185d" : "transparent",
-                            color: mesesCumpleanos.includes(index) ? "white" : "#64748b",
+                            justifyContent: "flex-start",
+                            borderColor: comunasSeleccionadas.includes(comuna.id) ? "#0369a1" : "#e2e8f0",
+                            backgroundColor: comunasSeleccionadas.includes(comuna.id) ? "#0369a1" : "transparent",
+                            color: comunasSeleccionadas.includes(comuna.id) ? "white" : "#64748b",
                             "&:hover": {
-                              backgroundColor: mesesCumpleanos.includes(index) ? "#9d174d" : "#fce7f3",
-                              borderColor: "#be185d",
+                              backgroundColor: comunasSeleccionadas.includes(comuna.id) ? "#075985" : "#e0f2fe",
+                              borderColor: "#0369a1",
                             },
                           }}
                         >
-                          {mes.slice(0, 3)}
+                          {comuna.id}. {comuna.name}
                         </Button>
                       ))}
                     </Box>
-                    {mesesCumpleanos.length > 0 && (
-                      <Typography variant="caption" color="#be185d" sx={{ mt: 1, display: "block" }}>
-                        {mesesCumpleanos.length} mes(es) seleccionado(s)
+                    {comunasSeleccionadas.length > 0 && (
+                      <Typography variant="caption" color="#0369a1" sx={{ mt: 1, display: "block" }}>
+                        {comunasSeleccionadas.length} comuna(s) seleccionada(s)
                       </Typography>
                     )}
                   </>
@@ -724,6 +928,9 @@ export default function PVLComitesPage() {
                       setBeneficiariosRange([0, 100]);
                       setEdadRange([0, 100]);
                       setMesesCumpleanos([]);
+                      setCumpleanosModo("mes");
+                      setDiaCumpleanos("");
+                      setComunasSeleccionadas([]);
                     }}
                     sx={{ color: "#64748b", textTransform: "none" }}
                   >
