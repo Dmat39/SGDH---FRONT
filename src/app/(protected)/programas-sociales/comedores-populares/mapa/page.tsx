@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import {
   Box,
@@ -41,9 +41,9 @@ import {
   MoreVert,
   Visibility,
   VisibilityOff,
-  LocalDining,
 } from "@mui/icons-material";
 import type { Comedor } from "./MapaComedores";
+import { useFetch } from "@/lib/hooks/useFetch";
 
 // Importar el mapa dinámicamente para evitar SSR
 const MapaComedores = dynamic(() => import("./MapaComedores"), {
@@ -74,88 +74,55 @@ const JURISDICCIONES_MAPA = [
 // Configuración de filtros
 const FILTROS_CONFIG = [
   {
-    id: "estado",
-    label: "Estado",
+    id: "situacion",
+    label: "Situación",
     opciones: [
-      { id: "activo", label: "Activo" },
-      { id: "inactivo", label: "Inactivo" },
-    ],
-  },
-  {
-    id: "raciones",
-    label: "Raciones Diarias",
-    opciones: [
-      { id: "menos50", label: "Menos de 50" },
-      { id: "50-100", label: "50 - 100" },
-      { id: "100-150", label: "100 - 150" },
-      { id: "mas150", label: "Más de 150" },
+      { id: "Transitado", label: "Transitado" },
+      { id: "Pendiente", label: "Pendiente" },
     ],
   },
 ];
 
-// Datos de ejemplo estáticos
-const COMEDORES_EJEMPLO: Comedor[] = [
-  {
-    id: "1",
-    codigo: "CP-001",
-    nombre: "Comedor Popular San Martín",
-    direccion: "Av. Los Pinos 123, Zarate",
-    jurisdiccion: "ZARATE",
-    coordenadas: { latitud: -11.9650, longitud: -76.9950 },
-    beneficiarios: 85,
-    racionesDiarias: 120,
-    responsable: { nombre: "María García López", telefono: "987654321" },
-    estado: "activo",
-  },
-  {
-    id: "2",
-    codigo: "CP-002",
-    nombre: "Comedor Señor de los Milagros",
-    direccion: "Jr. Las Flores 456, Campoy",
-    jurisdiccion: "CAMPOY",
-    coordenadas: { latitud: -11.9720, longitud: -76.9900 },
-    beneficiarios: 65,
-    racionesDiarias: 90,
-    responsable: { nombre: "Rosa Mendoza Quispe", telefono: "912345678" },
-    estado: "activo",
-  },
-  {
-    id: "3",
-    codigo: "CP-003",
-    nombre: "Comedor Virgen del Carmen",
-    direccion: "Calle Principal 789, Mangomarca",
-    jurisdiccion: "MANGOMARCA",
-    coordenadas: { latitud: -11.9680, longitud: -77.0020 },
-    beneficiarios: 92,
-    racionesDiarias: 130,
-    responsable: { nombre: "Carmen Huamán Torres", telefono: "945678123" },
-    estado: "activo",
-  },
-  {
-    id: "4",
-    codigo: "CP-004",
-    nombre: "Comedor Santa Rosa de Lima",
-    direccion: "Av. Central 321, Canto Rey",
-    jurisdiccion: "CANTO REY",
-    coordenadas: { latitud: -11.9750, longitud: -76.9850 },
-    beneficiarios: 78,
-    racionesDiarias: 110,
-    responsable: { nombre: "Juana Pérez Sánchez", telefono: "956789234" },
-    estado: "activo",
-  },
-  {
-    id: "5",
-    codigo: "CP-005",
-    nombre: "Comedor Sagrado Corazón",
-    direccion: "Jr. Los Cedros 654, Huayrona",
-    jurisdiccion: "HUAYRONA",
-    coordenadas: { latitud: -11.9630, longitud: -77.0080 },
-    beneficiarios: 55,
-    racionesDiarias: 75,
-    responsable: { nombre: "Ana Castillo Ramos", telefono: "967890345" },
-    estado: "inactivo",
-  },
-];
+// Interface para los datos del backend de comedores populares
+interface ComedorBackend {
+  id: string;
+  code: string;
+  name: string;
+  address: string;
+  members: number;
+  members_male: number;
+  members_female: number;
+  situation: string | null;
+  latitude: number;
+  longitude: number;
+  modality: string;
+  president_id: string;
+  directive_id: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  directive: {
+    id: string;
+    resolution: string;
+    start_at: string;
+    end_at: string;
+    created_at: string;
+    updated_at: string;
+    deleted_at: string | null;
+  } | null;
+  president: {
+    id: string;
+    name: string;
+    lastname: string;
+    dni: string;
+    phone: string;
+    birthday: string;
+    sex: "MALE" | "FEMALE";
+    created_at: string;
+    updated_at: string;
+    deleted_at: string | null;
+  } | null;
+}
 
 // Opciones de límite
 const LIMITE_OPCIONES = [50, 100, 200, 500];
@@ -186,25 +153,50 @@ export default function ComedoresMapaPage() {
 
   const limitePopoverOpen = Boolean(limiteAnchorEl);
 
-  // Datos de comedores (estáticos por ahora)
-  const comedores = COMEDORES_EJEMPLO;
-  const loading = false;
+  // Datos de comedores del backend
+  const [comedores, setComedores] = useState<Comedor[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Filtrar comedores
   const comedoresFiltrados = comedores.filter((comedor) => {
-    // Filtro por jurisdicción
-    if (jurisdiccionesSeleccionadas.length > 0) {
-      const jurisdiccionId = JURISDICCIONES_MAPA.find(j => j.name === comedor.jurisdiccion)?.id;
-      if (!jurisdiccionId || !jurisdiccionesSeleccionadas.includes(jurisdiccionId)) {
-        return false;
-      }
-    }
-    // Filtro por estado
-    const estadosFiltro = filtrosSeleccionados["estado"] || [];
-    if (estadosFiltro.length > 0 && !estadosFiltro.includes(comedor.estado)) {
+    // Filtro por situación
+    const situacionesFiltro = filtrosSeleccionados["situacion"] || [];
+    if (situacionesFiltro.length > 0 && !situacionesFiltro.includes(comedor.situacion)) {
       return false;
     }
     return true;
+  });
+
+  // Función para mapear datos del backend al formato del frontend
+  const mapBackendToComedor = (item: ComedorBackend): Comedor => ({
+    id: item.id,
+    codigo: item.code,
+    nombre: item.name,
+    direccion: item.address,
+    coordenadas: {
+      latitud: item.latitude,
+      longitud: item.longitude,
+    },
+    socios: item.members,
+    sociosHombres: item.members_male,
+    sociosMujeres: item.members_female,
+    situacion: item.situation || "Sin información",
+    presidenta: {
+      nombre: item.president
+        ? `${item.president.name} ${item.president.lastname}`
+        : "",
+      dni: item.president?.dni || "",
+      celular: item.president?.phone || "",
+      fechaNacimiento: item.president?.birthday || undefined,
+      sexo: item.president?.sex || undefined,
+    },
+    resolucion: item.directive?.resolution || "",
+    vigencia: item.directive
+      ? {
+          inicio: item.directive.start_at,
+          fin: item.directive.end_at,
+        }
+      : undefined,
   });
 
   // Calcular valores
@@ -261,6 +253,44 @@ export default function ComedoresMapaPage() {
   };
 
   const filtrosActivos = contarFiltrosActivos();
+
+  // Hook para peticiones al backend
+  const { getData } = useFetch();
+
+  // Interface para la respuesta del backend
+  interface BackendResponse {
+    message: string;
+    data: {
+      data: ComedorBackend[];
+      currentPage: number;
+      pageCount: number;
+      totalCount: number;
+      totalPages: number;
+    };
+  }
+
+  // Cargar datos del backend
+  const cargarComedores = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await getData<BackendResponse>("pca/center?page=0&modality=EATER");
+      if (response?.data?.data) {
+        // Mapear datos del backend al formato del frontend
+        const comedoresMapeados = response.data.data.map((item) => mapBackendToComedor(item));
+        setComedores(comedoresMapeados);
+        console.log("Comedores populares cargados:", comedoresMapeados.length);
+      }
+    } catch (err) {
+      console.error("Error cargando comedores populares:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [getData]);
+
+  // Cargar comedores al montar el componente
+  useEffect(() => {
+    cargarComedores();
+  }, [cargarComedores]);
 
   return (
     <Box
@@ -436,7 +466,7 @@ export default function ComedoresMapaPage() {
         {/* Lado derecho - Iconos de acción */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
           <Tooltip title="Actualizar">
-            <IconButton size="small">
+            <IconButton size="small" onClick={cargarComedores}>
               <Refresh />
             </IconButton>
           </Tooltip>
@@ -768,7 +798,7 @@ export default function ComedoresMapaPage() {
 
             {/* Contenido del panel */}
             <Box sx={{ flex: 1, overflow: "auto", p: 2 }}>
-              {/* Estado */}
+              {/* Situación */}
               <Box sx={{ mb: 2 }}>
                 <Box
                   sx={{
@@ -776,13 +806,13 @@ export default function ComedoresMapaPage() {
                     px: 1.5,
                     py: 0.5,
                     borderRadius: "12px",
-                    backgroundColor: comedorSeleccionado.estado === "activo" ? "#dcfce7" : "#fee2e2",
-                    color: comedorSeleccionado.estado === "activo" ? "#166534" : "#991b1b",
+                    backgroundColor: comedorSeleccionado.situacion === "Transitado" ? "#dcfce7" : "#fef3c7",
+                    color: comedorSeleccionado.situacion === "Transitado" ? "#166534" : "#92400e",
                     fontSize: "0.75rem",
                     fontWeight: 600,
                   }}
                 >
-                  {comedorSeleccionado.estado === "activo" ? "ACTIVO" : "INACTIVO"}
+                  {comedorSeleccionado.situacion}
                 </Box>
               </Box>
 
@@ -797,17 +827,14 @@ export default function ComedoresMapaPage() {
                     {comedorSeleccionado.direccion}
                   </Typography>
                 </Box>
-                <Typography variant="caption" color="text.secondary" sx={{ ml: 3.5 }}>
-                  Jurisdicción: {comedorSeleccionado.jurisdiccion}
-                </Typography>
               </Box>
 
               <Divider sx={{ mb: 2 }} />
 
-              {/* Responsable */}
+              {/* Presidenta */}
               <Box sx={{ mb: 3 }}>
                 <Typography variant="overline" color="text.secondary" fontWeight="bold">
-                  Responsable
+                  Presidenta
                 </Typography>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 2, mt: 1 }}>
                   <Avatar sx={{ bgcolor: "#1E293B", width: 40, height: 40 }}>
@@ -815,45 +842,78 @@ export default function ComedoresMapaPage() {
                   </Avatar>
                   <Box>
                     <Typography variant="body2" fontWeight="medium">
-                      {comedorSeleccionado.responsable.nombre}
+                      {comedorSeleccionado.presidenta.nombre}
                     </Typography>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                      <Phone fontSize="inherit" sx={{ color: "text.secondary", fontSize: 14 }} />
-                      <Typography variant="caption" color="text.secondary">
-                        {comedorSeleccionado.responsable.telefono}
+                    {comedorSeleccionado.presidenta.dni && (
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        DNI: {comedorSeleccionado.presidenta.dni}
                       </Typography>
-                    </Box>
+                    )}
+                    {comedorSeleccionado.presidenta.celular && (
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                        <Phone fontSize="inherit" sx={{ color: "text.secondary", fontSize: 14 }} />
+                        <Typography variant="caption" color="text.secondary">
+                          {comedorSeleccionado.presidenta.celular}
+                        </Typography>
+                      </Box>
+                    )}
                   </Box>
                 </Box>
               </Box>
 
               <Divider sx={{ mb: 2 }} />
 
-              {/* Estadísticas */}
+              {/* Estadísticas de Socios */}
               <Box sx={{ mb: 3 }}>
                 <Typography variant="overline" color="text.secondary" fontWeight="bold">
-                  Estadísticas
+                  Socios
                 </Typography>
-                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, mt: 1 }}>
-                  <Box sx={{ bgcolor: "#fce4ec", p: 1.5, borderRadius: 1, textAlign: "center" }}>
-                    <Group sx={{ color: "#d81b7e", mb: 0.5 }} />
-                    <Typography variant="h5" fontWeight="bold" color="#d81b7e">
-                      {comedorSeleccionado.beneficiarios}
+                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 1, mt: 1 }}>
+                  <Box sx={{ bgcolor: "#e0f2fe", p: 1.5, borderRadius: 1, textAlign: "center" }}>
+                    <Group sx={{ color: "#0284c7", mb: 0.5, fontSize: 20 }} />
+                    <Typography variant="h6" fontWeight="bold" color="#0284c7">
+                      {comedorSeleccionado.socios}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Beneficiarios
+                      Total
                     </Typography>
                   </Box>
-                  <Box sx={{ bgcolor: "#fff3e0", p: 1.5, borderRadius: 1, textAlign: "center" }}>
-                    <LocalDining sx={{ color: "#ff9800", mb: 0.5 }} />
-                    <Typography variant="h5" fontWeight="bold" color="#ff9800">
-                      {comedorSeleccionado.racionesDiarias}
+                  <Box sx={{ bgcolor: "#dbeafe", p: 1.5, borderRadius: 1, textAlign: "center" }}>
+                    <Typography variant="h6" fontWeight="bold" color="#2563eb">
+                      {comedorSeleccionado.sociosHombres}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Raciones/día
+                      Hombres
+                    </Typography>
+                  </Box>
+                  <Box sx={{ bgcolor: "#fce7f3", p: 1.5, borderRadius: 1, textAlign: "center" }}>
+                    <Typography variant="h6" fontWeight="bold" color="#db2777">
+                      {comedorSeleccionado.sociosMujeres}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Mujeres
                     </Typography>
                   </Box>
                 </Box>
+              </Box>
+
+              <Divider sx={{ mb: 2 }} />
+
+              {/* Resolución y Vigencia */}
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="overline" color="text.secondary" fontWeight="bold">
+                  Resolución
+                </Typography>
+                <Typography variant="body2" sx={{ mt: 0.5 }}>
+                  {comedorSeleccionado.resolucion || "Sin resolución"}
+                </Typography>
+                {comedorSeleccionado.vigencia && (
+                  <Box sx={{ mt: 1, bgcolor: "grey.50", p: 1, borderRadius: 1 }}>
+                    <Typography variant="caption" color="text.secondary">
+                      <strong>Vigencia:</strong> {new Date(comedorSeleccionado.vigencia.inicio).toLocaleDateString()} - {new Date(comedorSeleccionado.vigencia.fin).toLocaleDateString()}
+                    </Typography>
+                  </Box>
+                )}
               </Box>
 
               {/* Coordenadas */}
