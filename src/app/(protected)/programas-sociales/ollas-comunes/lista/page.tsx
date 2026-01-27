@@ -31,7 +31,7 @@ import {
 } from "@mui/material";
 import {
   Search,
-  Restaurant,
+  SoupKitchen,
   FilterList,
   FileDownload,
   Close,
@@ -66,8 +66,8 @@ interface Directive {
   end_at: string;
 }
 
-// Interface para el comedor (API)
-interface ComedorAPI {
+// Interface para la olla (API)
+interface OllaAPI {
   id: string;
   code: string;
   name: string;
@@ -87,7 +87,7 @@ interface ComedorAPI {
 interface APIResponse {
   message: string;
   data: {
-    data: ComedorAPI[];
+    data: OllaAPI[];
     currentPage: number;
     pageCount: number;
     totalCount: number;
@@ -95,11 +95,11 @@ interface APIResponse {
   };
 }
 
-export default function ComedoresListaPage() {
+export default function OllasListaPage() {
   const { getData } = useFetch();
 
   // Estados para datos
-  const [comedores, setComedores] = useState<ComedorAPI[]>([]);
+  const [ollas, setOllas] = useState<OllaAPI[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -114,31 +114,31 @@ export default function ComedoresListaPage() {
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
 
   // Estados para detalle
-  const [selectedComedor, setSelectedComedor] = useState<ComedorAPI | null>(null);
+  const [selectedOlla, setSelectedOlla] = useState<OllaAPI | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
-   // Función para obtener ollas de la API
-    const fetchComedores = useCallback(async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await getData<APIResponse>(
-          `pca/center?page=${page + 1}&limit=${rowsPerPage}&modality=EATER`,
-          { showErrorAlert: false }
-        );
-  
-        setComedores(data.data.data);
-        setTotalCount(data.data.totalCount); // si el backend lo envía
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Error desconocido");
-      } finally {
-        setLoading(false);
-      }
-    }, [page, rowsPerPage, getData]);
+  // Función para obtener ollas de la API
+  const fetchOllas = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getData<APIResponse>(
+        `pca/center?page=${page + 1}&limit=${rowsPerPage}&modality=CPOT`,
+        { showErrorAlert: false }
+      );
+
+      setOllas(data.data.data);
+      setTotalCount(data.data.totalCount); // si el backend lo envía
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error desconocido");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, rowsPerPage, getData]);
 
   useEffect(() => {
-    fetchComedores();
-  }, [fetchComedores]);
+    fetchOllas();
+  }, [fetchOllas]);
 
   const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setFilterAnchor(event.currentTarget);
@@ -165,14 +165,14 @@ export default function ComedoresListaPage() {
     setPage(0);
   };
 
-  const handleRowClick = (comedor: ComedorAPI) => {
-    setSelectedComedor(comedor);
+  const handleRowClick = (olla: OllaAPI) => {
+    setSelectedOlla(olla);
     setDetailOpen(true);
   };
 
   const handleDetailClose = () => {
     setDetailOpen(false);
-    setSelectedComedor(null);
+    setSelectedOlla(null);
   };
 
   // Formatear fecha
@@ -187,7 +187,7 @@ export default function ComedoresListaPage() {
   };
 
   // Filtrar datos localmente (búsqueda y filtros adicionales)
-  const filteredData = comedores.filter((c: ComedorAPI) => {
+  const filteredData = ollas.filter((c: OllaAPI) => {
     const matchesSearch =
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -203,7 +203,7 @@ export default function ComedoresListaPage() {
 
   // Exportar a Excel (placeholder)
   const handleExport = () => {
-    console.log("Exportar comedores");
+    console.log("Exportar ollas");
   };
 
   return (
@@ -224,7 +224,7 @@ export default function ComedoresListaPage() {
               boxShadow: `0 4px 12px ${subgerencia.color}25`,
             }}
           >
-            <Restaurant sx={{ fontSize: 28 }} />
+            <SoupKitchen sx={{ fontSize: 28 }} />
           </Box>
           <Typography
             variant="h4"
@@ -234,7 +234,7 @@ export default function ComedoresListaPage() {
               fontFamily: "'Poppins', 'Roboto', sans-serif",
             }}
           >
-            Lista de Comedores
+            Lista de Ollas Comunes
           </Typography>
         </Box>
         <Typography
@@ -245,7 +245,7 @@ export default function ComedoresListaPage() {
             fontFamily: "'Inter', 'Roboto', sans-serif",
           }}
         >
-          Listado de comedores populares registrados
+          Listado de ollas comunes registradas
         </Typography>
       </Box>
 
@@ -357,7 +357,7 @@ export default function ComedoresListaPage() {
                   fontFamily: "'Inter', 'Roboto', sans-serif",
                 }}
               >
-                {filteredData.length} de {totalCount} comedor(es)
+                {filteredData.length} de {totalCount} olla(s)
               </Typography>
             </Box>
 
@@ -501,7 +501,7 @@ export default function ComedoresListaPage() {
                       <TableCell colSpan={10} align="center" sx={{ py: 6 }}>
                         <CircularProgress size={40} sx={{ color: subgerencia.color }} />
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                          Cargando comedores...
+                          Cargando ollas comunes...
                         </Typography>
                       </TableCell>
                     </TableRow>
@@ -513,7 +513,7 @@ export default function ComedoresListaPage() {
                         </Typography>
                         <Button
                           size="small"
-                          onClick={fetchComedores}
+                          onClick={fetchOllas}
                           sx={{ mt: 1, textTransform: "none" }}
                         >
                           Reintentar
@@ -524,12 +524,12 @@ export default function ComedoresListaPage() {
                     <TableRow>
                       <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">
-                          No se encontraron comedores
+                          No se encontraron ollas comunes
                         </Typography>
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredData.map((row: ComedorAPI, index: number) => (
+                    filteredData.map((row: OllaAPI, index: number) => (
                       <TableRow
                         key={row.id}
                         onClick={() => handleRowClick(row)}
@@ -702,7 +702,7 @@ export default function ComedoresListaPage() {
           }}
         >
           <Box display="flex" alignItems="center" gap={1.5}>
-            <Restaurant sx={{ color: subgerencia.color }} />
+            <SoupKitchen sx={{ color: subgerencia.color }} />
             <Typography
               variant="h6"
               sx={{
@@ -711,7 +711,7 @@ export default function ComedoresListaPage() {
                 fontFamily: "'Poppins', 'Roboto', sans-serif",
               }}
             >
-              Detalles del Comedor
+              Detalles de la Olla Común
             </Typography>
           </Box>
           <IconButton onClick={handleDetailClose} size="small">
@@ -719,7 +719,7 @@ export default function ComedoresListaPage() {
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ p: 3, mt: 1 }}>
-          {selectedComedor && (
+          {selectedOlla && (
             <Grid container spacing={3}>
               {/* Información General */}
               <Grid size={12}>
@@ -738,11 +738,11 @@ export default function ComedoresListaPage() {
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                 <Typography variant="caption" color="text.secondary">Código</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedComedor.code}</Typography>
+                <Typography variant="body2" fontWeight={500}>{selectedOlla.code}</Typography>
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                 <Typography variant="caption" color="text.secondary">Nombre</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedComedor.name}</Typography>
+                <Typography variant="body2" fontWeight={500}>{selectedOlla.name}</Typography>
               </Grid>
 
               {/* Ubicación */}
@@ -763,21 +763,21 @@ export default function ComedoresListaPage() {
               </Grid>
               <Grid size={{ xs: 12 }}>
                 <Typography variant="caption" color="text.secondary">Dirección</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedComedor.address}</Typography>
+                <Typography variant="body2" fontWeight={500}>{selectedOlla.address}</Typography>
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <Typography variant="caption" color="text.secondary">
                   <LocationOn sx={{ fontSize: 14, mr: 0.5, verticalAlign: "middle" }} />
                   Latitud
                 </Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedComedor.latitude}</Typography>
+                <Typography variant="body2" fontWeight={500}>{selectedOlla.latitude}</Typography>
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <Typography variant="caption" color="text.secondary">
                   <LocationOn sx={{ fontSize: 14, mr: 0.5, verticalAlign: "middle" }} />
                   Longitud
                 </Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedComedor.longitude}</Typography>
+                <Typography variant="body2" fontWeight={500}>{selectedOlla.longitude}</Typography>
               </Grid>
 
               {/* Miembros */}
@@ -798,21 +798,21 @@ export default function ComedoresListaPage() {
               </Grid>
               <Grid size={{ xs: 12, sm: 4 }}>
                 <Typography variant="caption" color="text.secondary">Total Miembros</Typography>
-                <Typography variant="body2" fontWeight={600} fontSize="1.1rem">{selectedComedor.members}</Typography>
+                <Typography variant="body2" fontWeight={600} fontSize="1.1rem">{selectedOlla.members}</Typography>
               </Grid>
               <Grid size={{ xs: 12, sm: 4 }}>
                 <Typography variant="caption" color="text.secondary">
                   <Female sx={{ fontSize: 14, mr: 0.5, verticalAlign: "middle", color: "#ec4899" }} />
                   Mujeres
                 </Typography>
-                <Typography variant="body2" fontWeight={500} color="#be185d">{selectedComedor.members_female}</Typography>
+                <Typography variant="body2" fontWeight={500} color="#be185d">{selectedOlla.members_female}</Typography>
               </Grid>
               <Grid size={{ xs: 12, sm: 4 }}>
                 <Typography variant="caption" color="text.secondary">
                   <Male sx={{ fontSize: 14, mr: 0.5, verticalAlign: "middle", color: "#3b82f6" }} />
                   Varones
                 </Typography>
-                <Typography variant="body2" fontWeight={500} color="#1e40af">{selectedComedor.members_male}</Typography>
+                <Typography variant="body2" fontWeight={500} color="#1e40af">{selectedOlla.members_male}</Typography>
               </Grid>
 
               {/* Directiva */}
@@ -833,15 +833,15 @@ export default function ComedoresListaPage() {
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <Typography variant="caption" color="text.secondary">Resolución</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedComedor.directive?.resolution || "-"}</Typography>
+                <Typography variant="body2" fontWeight={500}>{selectedOlla.directive?.resolution || "-"}</Typography>
               </Grid>
               <Grid size={{ xs: 12, sm: 3 }}>
                 <Typography variant="caption" color="text.secondary">Fecha Inicio</Typography>
-                <Typography variant="body2" fontWeight={500}>{formatDate(selectedComedor.directive?.start_at)}</Typography>
+                <Typography variant="body2" fontWeight={500}>{formatDate(selectedOlla.directive?.start_at)}</Typography>
               </Grid>
               <Grid size={{ xs: 12, sm: 3 }}>
                 <Typography variant="caption" color="text.secondary">Fecha Fin</Typography>
-                <Typography variant="body2" fontWeight={500}>{formatDate(selectedComedor.directive?.end_at)}</Typography>
+                <Typography variant="body2" fontWeight={500}>{formatDate(selectedOlla.directive?.end_at)}</Typography>
               </Grid>
 
               {/* Presidente */}
@@ -860,36 +860,36 @@ export default function ComedoresListaPage() {
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
               </Grid>
-              {selectedComedor.president ? (
+              {selectedOlla.president ? (
                 <>
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <Typography variant="caption" color="text.secondary">Nombre Completo</Typography>
                     <Typography variant="body2" fontWeight={500}>
-                      {selectedComedor.president.name} {selectedComedor.president.lastname}
+                      {selectedOlla.president.name} {selectedOlla.president.lastname}
                     </Typography>
                   </Grid>
                   <Grid size={{ xs: 12, sm: 3 }}>
                     <Typography variant="caption" color="text.secondary">DNI</Typography>
-                    <Typography variant="body2" fontWeight={500}>{selectedComedor.president.dni}</Typography>
+                    <Typography variant="body2" fontWeight={500}>{selectedOlla.president.dni}</Typography>
                   </Grid>
                   <Grid size={{ xs: 12, sm: 3 }}>
                     <Typography variant="caption" color="text.secondary">Teléfono</Typography>
-                    <Typography variant="body2" fontWeight={500}>{selectedComedor.president.phone}</Typography>
+                    <Typography variant="body2" fontWeight={500}>{selectedOlla.president.phone}</Typography>
                   </Grid>
                   <Grid size={{ xs: 12, sm: 6 }}>
                     <Typography variant="caption" color="text.secondary">Fecha de Cumpleaños</Typography>
                     <Typography variant="body2" fontWeight={500}>
-                      {selectedComedor.president.birthday
+                      {selectedOlla.president.birthday
                         ? (() => {
-                            const birthDate = new Date(selectedComedor.president.birthday);
-                            const today = new Date();
-                            let age = today.getFullYear() - birthDate.getFullYear();
-                            const monthDiff = today.getMonth() - birthDate.getMonth();
-                            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-                              age--;
-                            }
-                            return `${formatDate(selectedComedor.president.birthday)} (${age} años)`;
-                          })()
+                          const birthDate = new Date(selectedOlla.president.birthday);
+                          const today = new Date();
+                          let age = today.getFullYear() - birthDate.getFullYear();
+                          const monthDiff = today.getMonth() - birthDate.getMonth();
+                          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                            age--;
+                          }
+                          return `${formatDate(selectedOlla.president.birthday)} (${age} años)`;
+                        })()
                         : "-"}
                     </Typography>
                   </Grid>
