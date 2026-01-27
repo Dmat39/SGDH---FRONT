@@ -50,6 +50,9 @@ import {
 import type { Comite } from "./MapaPVL";
 import { useFetch } from "@/lib/hooks/useFetch";
 import { Cake } from "@mui/icons-material";
+import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
+import { point as turfPoint } from "@turf/helpers";
+import type { Feature, Polygon, MultiPolygon, FeatureCollection } from "geojson";
 
 // Función para calcular edad desde fecha de nacimiento
 const calcularEdad = (fechaNacimiento: string): number => {
@@ -185,6 +188,40 @@ interface BackendResponse {
   };
 }
 
+// Interface para las propiedades del sector en el GeoJSON
+interface SectorProperties {
+  id: number;
+  name: string;
+  numero: number;
+  color: string;
+}
+
+// Tipo para el GeoJSON de sectores
+type SectoresGeoJSON = FeatureCollection<Polygon | MultiPolygon, SectorProperties>;
+
+// Función para determinar la comuna de un punto usando point-in-polygon
+const determinarComunaDesdeCoordenadas = (
+  lat: number,
+  lng: number,
+  sectoresGeoJSON: SectoresGeoJSON | null
+): number => {
+  if (!sectoresGeoJSON || !sectoresGeoJSON.features) {
+    return 0; // Retornar 0 si no hay datos de sectores
+  }
+
+  // Crear punto con turf (lng, lat - orden GeoJSON)
+  const punto = turfPoint([lng, lat]);
+
+  // Buscar en qué polígono cae el punto
+  for (const feature of sectoresGeoJSON.features) {
+    if (booleanPointInPolygon(punto, feature as Feature<Polygon | MultiPolygon>)) {
+      return feature.properties.id || feature.properties.numero || 0;
+    }
+  }
+
+  return 0; // Retornar 0 si no se encontró en ningún sector
+};
+
 // Función para mapear datos del backend al formato del frontend
 const mapBackendToComite = (item: CommitteeBackend): Comite => ({
   id: item.id,
@@ -257,33 +294,89 @@ export default function PVLMapaPage() {
 
   const limitePopoverOpen = Boolean(limiteAnchorEl);
 
+  // GeoJSON de sectores para point-in-polygon
+  const [sectoresGeoJSON, setSectoresGeoJSON] = useState<SectoresGeoJSON | null>(null);
+
   // Hook para peticiones al backend
   const { getData } = useFetch();
 
+  // Cargar GeoJSON de sectores al montar el componente
+  useEffect(() => {
+    const cargarSectoresGeoJSON = async () => {
+      try {
+        const response = await fetch("/data/sectores-pvl.geojson");
+        const data = await response.json();
+        setSectoresGeoJSON(data as SectoresGeoJSON);
+        console.log("GeoJSON de sectores cargado:", data.features?.length, "sectores");
+      } catch (error) {
+        console.error("Error cargando GeoJSON de sectores:", error);
+      }
+    };
+    cargarSectoresGeoJSON();
+  }, []);
+
   // Cargar datos del backend
   const cargarComites = useCallback(async () => {
+    // Esperar a que el GeoJSON esté cargado
+    if (!sectoresGeoJSON) {
+      console.log("Esperando carga del GeoJSON de sectores...");
+      return;
+    }
+
     try {
       setLoading(true);
       const response = await getData<BackendResponse>("pvl/committee?page=0");
       if (response?.data?.data) {
-        const comitesMapeados = response.data.data.map(mapBackendToComite);
+        // Mapear datos y calcular comuna usando point-in-polygon
+        const comitesMapeados = response.data.data.map((item) => {
+          const comiteBase = mapBackendToComite(item);
+
+          // Calcular la comuna usando las coordenadas y el GeoJSON de sectores
+          const comunaCalculada = determinarComunaDesdeCoordenadas(
+            item.latitude,
+            item.longitude,
+            sectoresGeoJSON
+          );
+
+          // Usar la comuna calculada si se encontró, si no usar la del backend
+          return {
+            ...comiteBase,
+            comuna: comunaCalculada > 0 ? comunaCalculada : comiteBase.comuna,
+          };
+        });
+
         setComites(comitesMapeados);
 
-        // Debug: Ver qué valores de comuna hay en los datos
-        const comunasUnicas = [...new Set(response.data.data.map(c => c.commune))].sort((a, b) => a - b);
-        console.log("Comunas únicas en el backend:", comunasUnicas);
-        console.log("Ejemplo de datos:", response.data.data.slice(0, 5).map(c => ({ name: c.name, commune: c.commune })));
+        // Debug: Ver comparación de comunas
+        const comparacion = response.data.data.slice(0, 10).map((c) => {
+          const comunaCalculada = determinarComunaDesdeCoordenadas(
+            c.latitude,
+            c.longitude,
+            sectoresGeoJSON
+          );
+          return {
+            name: c.name,
+            comunaBackend: c.commune,
+            comunaCalculada,
+            lat: c.latitude,
+            lng: c.longitude,
+          };
+        });
+        console.log("Comparación de comunas (backend vs calculada):", comparacion);
       }
     } catch (err) {
       console.error("Error cargando comités:", err);
     } finally {
       setLoading(false);
     }
-  }, [getData]);
+  }, [getData, sectoresGeoJSON]);
 
+  // Cargar comités cuando el GeoJSON esté listo
   useEffect(() => {
-    cargarComites();
-  }, [cargarComites]);
+    if (sectoresGeoJSON) {
+      cargarComites();
+    }
+  }, [sectoresGeoJSON, cargarComites]);
 
   // Filtrar comités por edad de coordinadora y comuna
   const comitesFiltrados = comites.filter((comite) => {
