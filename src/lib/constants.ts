@@ -143,6 +143,15 @@ export interface MenuItem {
 // MÓDULOS DE PROGRAMAS SOCIALES
 // ============================================
 export const MODULOS_PROGRAMAS_SOCIALES: MenuItem[] = [
+  // Lista General (para búsqueda unificada y cumpleaños)
+  {
+    id: "lista-general",
+    nombre: "Lista General",
+    ruta: "/programas-sociales/lista-general",
+    icono: "ListAlt",
+    descripcion: "Lista unificada de PVL, Ollas Comunes y Comedores Populares",
+    permisos: ["pvl", "ollas_comunes", "comedores_populares", "all_programas_sociales", "all"],
+  },
   {
     id: "pvl",
     nombre: "PVL - Vaso de Leche",
