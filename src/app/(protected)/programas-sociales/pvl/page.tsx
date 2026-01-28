@@ -5,30 +5,30 @@ import { Box, Card, CardContent, Typography, Paper, CircularProgress, Skeleton }
 import { People, LocalDrink, Groups, Accessible } from "@mui/icons-material";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
+import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
+import { point, polygon } from "@turf/helpers";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 
-// Lista de comunas con nombres y colores
-const COMUNAS_INFO = [
-  { id: 1, name: "ZARATE", color: "#9f004c" },
-  { id: 2, name: "CAMPOY", color: "#52f9eb" },
-  { id: 3, name: "MANGOMARCA", color: "#54cdd3" },
-  { id: 4, name: "SALSAS", color: "#6119f9" },
-  { id: 5, name: "HUAYRONA", color: "#d16567" },
-  { id: 6, name: "CANTO REY", color: "#ac9da9" },
-  { id: 7, name: "HUANCARAY", color: "#ecc20f" },
-  { id: 8, name: "MARISCAL CACERES", color: "#72427c" },
-  { id: 9, name: "MOTUPE", color: "#eb147c" },
-  { id: 10, name: "JICAMARCA", color: "#db63b2" },
-  { id: 11, name: "MARIATEGUI", color: "#d6a59c" },
-  { id: 12, name: "CASA BLANCA", color: "#fdd15d" },
-  { id: 13, name: "BAYOVAR", color: "#5c335d" },
-  { id: 14, name: "HUASCAR", color: "#efaeac" },
-  { id: 15, name: "CANTO GRANDE", color: "#8768c9" },
-  { id: 16, name: "SAN HILARION", color: "#73165f" },
-  { id: 17, name: "LAS FLORES", color: "#ab83cf" },
-  { id: 18, name: "CAJA DE AGUA", color: "#72cfdf" },
-];
+// Interface para el GeoJSON de sectores
+interface SectorFeature {
+  type: "Feature";
+  properties: {
+    id: number;
+    name: string;
+    numero: number;
+    color: string;
+  };
+  geometry: {
+    type: "Polygon" | "MultiPolygon";
+    coordinates: number[][][] | number[][][][];
+  };
+}
+
+interface SectoresGeoJSON {
+  type: "FeatureCollection";
+  features: SectorFeature[];
+}
 
 // Interfaces para el backend
 interface CommitteeBackend {
@@ -68,6 +68,14 @@ interface BackendResponse {
   };
 }
 
+// Interface para los datos de comuna calculados
+interface ComunaData {
+  id: number;
+  nombre: string;
+  color: string;
+  cantidad: number;
+}
+
 // Función para generar el path de un segmento del donut
 const generateDonutSegment = (
   startAngle: number,
@@ -101,6 +109,18 @@ export default function PVLDashboardPage() {
   const { getData } = useFetch();
   const [isLoading, setIsLoading] = useState(true);
   const [comitesData, setComitesData] = useState<CommitteeBackend[]>([]);
+  const [sectoresData, setSectoresData] = useState<SectoresGeoJSON | null>(null);
+
+  // Cargar GeoJSON de sectores
+  const fetchSectores = useCallback(async () => {
+    try {
+      const response = await fetch("/data/sectores-pvl.geojson");
+      const data = await response.json();
+      setSectoresData(data);
+    } catch (error) {
+      console.error("Error cargando sectores:", error);
+    }
+  }, []);
 
   // Cargar datos del backend
   const fetchData = useCallback(async () => {
@@ -127,15 +147,49 @@ export default function PVLDashboardPage() {
   }, [getData]);
 
   useEffect(() => {
+    fetchSectores();
     fetchData();
-  }, [fetchData]);
+  }, [fetchSectores, fetchData]);
+
+  // Función para determinar la comuna de un comité basándose en sus coordenadas
+  const getComunaFromCoordinates = useCallback(
+    (lat: number, lng: number): SectorFeature["properties"] | null => {
+      if (!sectoresData) return null;
+
+      const pt = point([lng, lat]);
+
+      for (const feature of sectoresData.features) {
+        try {
+          if (feature.geometry.type === "Polygon") {
+            const poly = polygon(feature.geometry.coordinates as number[][][]);
+            if (booleanPointInPolygon(pt, poly)) {
+              return feature.properties;
+            }
+          } else if (feature.geometry.type === "MultiPolygon") {
+            // Para MultiPolygon, verificar cada polígono individualmente
+            const multiCoords = feature.geometry.coordinates as number[][][][];
+            for (const polyCoords of multiCoords) {
+              const poly = polygon(polyCoords);
+              if (booleanPointInPolygon(pt, poly)) {
+                return feature.properties;
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error checking point in polygon:", error);
+        }
+      }
+
+      return null;
+    },
+    [sectoresData]
+  );
 
   // Calcular estadísticas
   const totalBeneficiarios = comitesData.reduce((sum, c) => sum + c.beneficiaries, 0);
   const totalComites = comitesData.length;
   const totalSocios = comitesData.reduce((sum, c) => sum + c.members, 0);
   const totalDiscapacitados = comitesData.reduce((sum, c) => sum + c.handicappeds, 0);
-  const totalExtranjeros = comitesData.reduce((sum, c) => sum + c.beneficiaries_foreign, 0);
 
   // Estadísticas para las tarjetas
   const stats = [
@@ -165,47 +219,81 @@ export default function PVLDashboardPage() {
     },
   ];
 
-  // Calcular beneficiarios por comuna
-  const beneficiariosPorComuna = COMUNAS_INFO.map((comuna) => {
-    const comitesComuna = comitesData.filter((c) => c.commune === comuna.id);
-    const totalBenef = comitesComuna.reduce((sum, c) => sum + c.beneficiaries, 0);
-    return {
-      id: comuna.id,
-      nombre: comuna.name,
-      cantidad: totalBenef,
-      color: comuna.color,
-    };
-  }).filter((c) => c.cantidad > 0);
+  // Calcular comités por comuna basándose en coordenadas
+  const comitesPorComuna: ComunaData[] = [];
+  const beneficiariosPorComuna: ComunaData[] = [];
 
-  // Calcular comités por comuna
-  const comitesPorComuna = COMUNAS_INFO.map((comuna) => {
-    const cantidad = comitesData.filter((c) => c.commune === comuna.id).length;
-    return {
-      id: comuna.id,
-      nombre: comuna.name,
-      cantidad,
-      color: comuna.color,
-    };
-  }).filter((c) => c.cantidad > 0);
+  if (sectoresData && comitesData.length > 0) {
+    // Crear un mapa para acumular datos por comuna
+    const comunaMap = new Map<number, { nombre: string; color: string; comites: number; beneficiarios: number }>();
+
+    // Inicializar con los sectores del GeoJSON
+    sectoresData.features.forEach((feature) => {
+      comunaMap.set(feature.properties.id, {
+        nombre: feature.properties.name,
+        color: feature.properties.color,
+        comites: 0,
+        beneficiarios: 0,
+      });
+    });
+
+    // Calcular comités y beneficiarios por comuna
+    comitesData.forEach((comite) => {
+      if (comite.latitude && comite.longitude) {
+        const comuna = getComunaFromCoordinates(comite.latitude, comite.longitude);
+        if (comuna) {
+          const existing = comunaMap.get(comuna.id);
+          if (existing) {
+            existing.comites += 1;
+            existing.beneficiarios += comite.beneficiaries;
+          }
+        }
+      }
+    });
+
+    // Convertir a arrays
+    comunaMap.forEach((value, key) => {
+      if (value.comites > 0) {
+        comitesPorComuna.push({
+          id: key,
+          nombre: value.nombre,
+          color: value.color,
+          cantidad: value.comites,
+        });
+      }
+      if (value.beneficiarios > 0) {
+        beneficiariosPorComuna.push({
+          id: key,
+          nombre: value.nombre,
+          color: value.color,
+          cantidad: value.beneficiarios,
+        });
+      }
+    });
+  }
 
   const totalBenefComuna = beneficiariosPorComuna.reduce((sum, c) => sum + c.cantidad, 0);
   const maxComites = Math.max(...comitesPorComuna.map((c) => c.cantidad), 1);
 
   // Calcular segmentos del donut para beneficiarios
   let currentAngle = -Math.PI / 2;
-  const segments = beneficiariosPorComuna.map((comuna) => {
-    const angle = totalBenefComuna > 0 ? (comuna.cantidad / totalBenefComuna) * 2 * Math.PI : 0;
-    const startAngle = currentAngle;
-    const endAngle = currentAngle + angle;
-    currentAngle = endAngle;
+  const segments = beneficiariosPorComuna
+    .sort((a, b) => b.cantidad - a.cantidad)
+    .map((comuna) => {
+      const angle = totalBenefComuna > 0 ? (comuna.cantidad / totalBenefComuna) * 2 * Math.PI : 0;
+      const startAngle = currentAngle;
+      const endAngle = currentAngle + angle;
+      currentAngle = endAngle;
 
-    return {
-      ...comuna,
-      startAngle,
-      endAngle,
-      path: generateDonutSegment(startAngle, endAngle, 90, 50, 100, 100),
-    };
-  });
+      return {
+        ...comuna,
+        startAngle,
+        endAngle,
+        path: generateDonutSegment(startAngle, endAngle, 90, 50, 100, 100),
+      };
+    });
+
+  const isDataReady = !isLoading && sectoresData !== null;
 
   return (
     <Box>
@@ -338,12 +426,18 @@ export default function PVLDashboardPage() {
             Comités por Comuna
           </Typography>
           <Typography variant="body2" sx={{ color: "#64748b", mb: 2 }}>
-            Distribución de comités por zona
+            Distribución de comités por zona (basado en coordenadas)
           </Typography>
 
-          {isLoading ? (
+          {!isDataReady ? (
             <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
               <CircularProgress sx={{ color: "#d81b7e" }} />
+            </Box>
+          ) : comitesPorComuna.length === 0 ? (
+            <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
+              <Typography variant="body2" color="text.secondary">
+                No hay datos disponibles
+              </Typography>
             </Box>
           ) : (
             <Box
@@ -412,9 +506,15 @@ export default function PVLDashboardPage() {
             Distribución de beneficiarios por zona
           </Typography>
 
-          {isLoading ? (
+          {!isDataReady ? (
             <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
               <CircularProgress sx={{ color: "#d81b7e" }} />
+            </Box>
+          ) : beneficiariosPorComuna.length === 0 ? (
+            <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
+              <Typography variant="body2" color="text.secondary">
+                No hay datos disponibles
+              </Typography>
             </Box>
           ) : (
             <>
@@ -542,18 +642,6 @@ export default function PVLDashboardPage() {
             </>
           )}
         </Paper>
-      </Box>
-
-      {/* Fila adicional de estadísticas */}
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" },
-          gap: 3,
-          mt: 3,
-        }}
-      >
-        
       </Box>
     </Box>
   );
