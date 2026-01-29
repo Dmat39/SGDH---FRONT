@@ -43,6 +43,7 @@ export interface Comedor {
     inicio: string;
     fin: string;
   };
+  comuna?: number;
 }
 
 interface CapasVisibles {
@@ -60,66 +61,70 @@ interface MapaComedoresProps {
   capasVisibles?: CapasVisibles;
 }
 
-// Icono personalizado para los marcadores - Olla de comida estilo cute (color terracota/naranja)
+// Icono personalizado - Plato con cubiertos estilo cute (azul/celeste)
 const createCustomIcon = (isSelected: boolean) => {
   const size = isSelected ? 42 : 34;
 
-  const potSvg = `
+  const platoSvg = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${size}" height="${size}">
       <defs>
-        <radialGradient id="potGrad" cx="30%" cy="30%" r="70%">
-          <stop offset="0%" style="stop-color:#fb923c"/>
-          <stop offset="100%" style="stop-color:#ea580c"/>
+        <radialGradient id="plateGrad" cx="30%" cy="30%" r="70%">
+          <stop offset="0%" style="stop-color:#7dd3fc"/>
+          <stop offset="100%" style="stop-color:#0ea5e9"/>
         </radialGradient>
-        <radialGradient id="lidGrad" cx="30%" cy="30%" r="70%">
-          <stop offset="0%" style="stop-color:#fdba74"/>
-          <stop offset="100%" style="stop-color:#f97316"/>
+        <radialGradient id="plateInnerGrad" cx="30%" cy="30%" r="70%">
+          <stop offset="0%" style="stop-color:#e0f2fe"/>
+          <stop offset="100%" style="stop-color:#bae6fd"/>
         </radialGradient>
-        <radialGradient id="handleGrad" cx="30%" cy="30%" r="70%">
-          <stop offset="0%" style="stop-color:#c2410c"/>
-          <stop offset="100%" style="stop-color:#9a3412"/>
-        </radialGradient>
-        <linearGradient id="foodGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+        <linearGradient id="utensilGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" style="stop-color:#94a3b8"/>
+          <stop offset="100%" style="stop-color:#cbd5e1"/>
+        </linearGradient>
+        <linearGradient id="foodComedorGrad" x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" style="stop-color:#fcd34d"/>
           <stop offset="100%" style="stop-color:#f59e0b"/>
         </linearGradient>
       </defs>
 
       <!-- Vapor/steam -->
-      <path d="M35 25 Q32 18 35 12 Q38 6 35 0" stroke="#e5e5e5" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.8"/>
-      <path d="M50 22 Q47 14 50 8 Q53 2 50 -4" stroke="#e5e5e5" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.9"/>
-      <path d="M65 25 Q68 18 65 12 Q62 6 65 0" stroke="#e5e5e5" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.8"/>
+      <path d="M40 18 Q37 12 40 6 Q43 0 40 -6" stroke="#e5e5e5" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+      <path d="M50 15 Q47 8 50 2 Q53 -4 50 -10" stroke="#e5e5e5" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.85"/>
+      <path d="M60 18 Q63 12 60 6 Q57 0 60 -6" stroke="#e5e5e5" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.7"/>
 
-      <!-- Asas de la olla -->
-      <ellipse cx="12" cy="60" rx="8" ry="12" fill="url(#potGrad)" stroke="#c2410c" stroke-width="2"/>
-      <ellipse cx="12" cy="60" rx="4" ry="8" fill="#9a3412"/>
-      <ellipse cx="88" cy="60" rx="8" ry="12" fill="url(#potGrad)" stroke="#c2410c" stroke-width="2"/>
-      <ellipse cx="88" cy="60" rx="4" ry="8" fill="#9a3412"/>
+      <!-- Tenedor (izquierda) -->
+      <rect x="8" y="25" width="3" height="50" rx="1.5" fill="url(#utensilGrad)" stroke="#64748b" stroke-width="1"/>
+      <rect x="5" y="25" width="2" height="18" rx="1" fill="url(#utensilGrad)" stroke="#64748b" stroke-width="0.5"/>
+      <rect x="9" y="25" width="2" height="18" rx="1" fill="url(#utensilGrad)" stroke="#64748b" stroke-width="0.5"/>
+      <rect x="13" y="25" width="2" height="18" rx="1" fill="url(#utensilGrad)" stroke="#64748b" stroke-width="0.5"/>
 
-      <!-- Cuerpo de la olla -->
-      <path d="M20 45 L20 75 Q20 90 50 90 Q80 90 80 75 L80 45 Z" fill="url(#potGrad)" stroke="#c2410c" stroke-width="2"/>
+      <!-- Cuchara (derecha) -->
+      <rect x="89" y="45" width="3" height="30" rx="1.5" fill="url(#utensilGrad)" stroke="#64748b" stroke-width="1"/>
+      <ellipse cx="90.5" cy="32" rx="6" ry="14" fill="url(#utensilGrad)" stroke="#64748b" stroke-width="1"/>
+      <ellipse cx="90.5" cy="32" rx="3.5" ry="10" fill="#f1f5f9"/>
 
-      <!-- Comida visible (guiso/sopa) -->
-      <ellipse cx="50" cy="45" rx="28" ry="8" fill="url(#foodGrad)"/>
+      <!-- Plato exterior -->
+      <ellipse cx="50" cy="60" rx="38" ry="18" fill="url(#plateGrad)" stroke="#0284c7" stroke-width="2"/>
 
-      <!-- Decoración de la comida (vegetales) -->
-      <circle cx="38" cy="44" r="4" fill="#22c55e"/>
-      <circle cx="55" cy="43" r="3" fill="#ef4444"/>
-      <circle cx="62" cy="45" r="3.5" fill="#22c55e"/>
-      <circle cx="45" cy="46" r="2.5" fill="#fbbf24"/>
+      <!-- Plato interior (donde va la comida) -->
+      <ellipse cx="50" cy="55" rx="28" ry="12" fill="url(#plateInnerGrad)" stroke="#7dd3fc" stroke-width="1"/>
 
-      <!-- Tapa de la olla (levantada) -->
-      <ellipse cx="50" cy="35" rx="32" ry="6" fill="url(#lidGrad)" stroke="#c2410c" stroke-width="2"/>
+      <!-- Comida en el plato -->
+      <ellipse cx="50" cy="52" rx="22" ry="8" fill="url(#foodComedorGrad)"/>
 
-      <!-- Manija de la tapa -->
-      <ellipse cx="50" cy="30" rx="6" ry="4" fill="url(#handleGrad)"/>
-      <ellipse cx="50" cy="29" rx="4" ry="2.5" fill="#fdba74"/>
+      <!-- Decoración de comida (arroz, vegetales) -->
+      <circle cx="42" cy="50" r="3.5" fill="#ffffff" opacity="0.9"/>
+      <circle cx="48" cy="52" r="3" fill="#ffffff" opacity="0.9"/>
+      <circle cx="55" cy="50" r="3.5" fill="#ffffff" opacity="0.9"/>
+      <circle cx="38" cy="53" r="2.5" fill="#22c55e"/>
+      <circle cx="58" cy="54" r="3" fill="#ef4444"/>
+      <circle cx="50" cy="55" r="2" fill="#22c55e"/>
+      <circle cx="62" cy="51" r="2.5" fill="#fbbf24"/>
 
-      <!-- Brillo en la olla -->
-      <path d="M25 50 Q28 55 25 65" stroke="rgba(255,255,255,0.5)" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <!-- Brillo en el plato -->
+      <path d="M25 55 Q30 50 35 55" stroke="rgba(255,255,255,0.6)" stroke-width="2" fill="none" stroke-linecap="round"/>
 
-      <!-- Corazón pequeño (indica amor por cocinar) -->
-      <path d="M75 38 C75 35 72 33 70 35 C68 33 65 35 65 38 C65 42 70 45 70 45 C70 45 75 42 75 38" fill="#ef4444" opacity="0.95"/>
+      <!-- Corazón pequeño -->
+      <path d="M75 30 C75 27 72 25 70 27 C68 25 65 27 65 30 C65 34 70 37 70 37 C70 37 75 34 75 30" fill="#ef4444" opacity="0.95"/>
     </svg>
   `;
 
@@ -133,9 +138,9 @@ const createCustomIcon = (isSelected: boolean) => {
       justify-content: center;
       cursor: pointer;
       filter: drop-shadow(0 3px 6px rgba(0,0,0,0.3));
-      ${isSelected ? "transform: scale(1.15); filter: drop-shadow(0 4px 8px rgba(216, 27, 126, 0.5));" : ""}
+      ${isSelected ? "transform: scale(1.15); filter: drop-shadow(0 4px 8px rgba(14, 165, 233, 0.5));" : ""}
     ">
-      ${potSvg}
+      ${platoSvg}
     </div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],

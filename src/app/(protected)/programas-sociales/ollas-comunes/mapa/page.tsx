@@ -44,6 +44,9 @@ import {
 } from "@mui/icons-material";
 import type { OllaComun } from "./MapaOllas";
 import { useFetch } from "@/lib/hooks/useFetch";
+import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
+import { point as turfPoint } from "@turf/helpers";
+import type { Feature, Polygon, MultiPolygon, FeatureCollection } from "geojson";
 
 // Importar el mapa dinámicamente para evitar SSR
 const MapaOllas = dynamic(() => import("./MapaOllas"), {
@@ -54,6 +57,60 @@ const MapaOllas = dynamic(() => import("./MapaOllas"), {
     </div>
   ),
 });
+
+// Lista de comunas basada en el GeoJSON sectores-pvl (igual que PVL)
+const COMUNAS_MAPA = [
+  { id: 1, name: "ZARATE" },
+  { id: 2, name: "CAMPOY" },
+  { id: 3, name: "MANGOMARCA" },
+  { id: 4, name: "SAUCES" },
+  { id: 5, name: "HUAYRONA" },
+  { id: 6, name: "CANTO REY" },
+  { id: 7, name: "HUANCARAY" },
+  { id: 8, name: "MARISCAL CACERES" },
+  { id: 9, name: "MOTUPE" },
+  { id: 10, name: "JICAMARCA" },
+  { id: 11, name: "MARIATEGUI" },
+  { id: 12, name: "CASA BLANCA" },
+  { id: 13, name: "BAYOVAR" },
+  { id: 14, name: "HUASCAR" },
+  { id: 15, name: "CANTO GRANDE" },
+  { id: 16, name: "SAN HILARION" },
+  { id: 17, name: "LAS FLORES" },
+  { id: 18, name: "CAJA DE AGUA" },
+];
+
+// Interface para las propiedades del sector en el GeoJSON
+interface SectorProperties {
+  id: number;
+  name: string;
+  numero: number;
+  color: string;
+}
+
+// Tipo para el GeoJSON de sectores
+type SectoresGeoJSON = FeatureCollection<Polygon | MultiPolygon, SectorProperties>;
+
+// Función para determinar la comuna de un punto usando point-in-polygon
+const determinarComunaDesdeCoordenadas = (
+  lat: number,
+  lng: number,
+  sectoresGeoJSON: SectoresGeoJSON | null
+): number => {
+  if (!sectoresGeoJSON || !sectoresGeoJSON.features) {
+    return 0;
+  }
+
+  const punto = turfPoint([lng, lat]);
+
+  for (const feature of sectoresGeoJSON.features) {
+    if (booleanPointInPolygon(punto, feature as Feature<Polygon | MultiPolygon>)) {
+      return feature.properties.id || feature.properties.numero || 0;
+    }
+  }
+
+  return 0;
+};
 
 // Configuración de filtros
 const FILTROS_CONFIG = [
@@ -115,6 +172,12 @@ export default function OllasMapaPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [filtrosSeleccionados, setFiltrosSeleccionados] = useState<Record<string, string[]>>({});
   const [expandedAccordion, setExpandedAccordion] = useState<string | false>("situacion");
+
+  // Control de comunas seleccionadas
+  const [comunasSeleccionadas, setComunasSeleccionadas] = useState<number[]>([]);
+
+  // GeoJSON de sectores para point-in-polygon
+  const [sectoresGeoJSON, setSectoresGeoJSON] = useState<SectoresGeoJSON | null>(null);
 
   // Control de límite de visualización
   const [limiteVisible, setLimiteVisible] = useState(100);
@@ -185,13 +248,49 @@ export default function OllasMapaPage() {
       : undefined,
   });
 
+  // Cargar GeoJSON de sectores al montar el componente
+  useEffect(() => {
+    const cargarSectoresGeoJSON = async () => {
+      try {
+        const response = await fetch("/data/sectores-pvl.geojson");
+        const data = await response.json();
+        setSectoresGeoJSON(data as SectoresGeoJSON);
+        console.log("GeoJSON de sectores cargado:", data.features?.length, "sectores");
+      } catch (error) {
+        console.error("Error cargando GeoJSON de sectores:", error);
+      }
+    };
+    cargarSectoresGeoJSON();
+  }, []);
+
   // Cargar datos del backend
   const cargarOllas = useCallback(async () => {
+    // Esperar a que el GeoJSON esté cargado
+    if (!sectoresGeoJSON) {
+      console.log("Esperando carga del GeoJSON de sectores...");
+      return;
+    }
+
     try {
       setLoading(true);
       const response = await getData<BackendResponse>("pca/center?page=0&modality=CPOT");
       if (response?.data?.data) {
-        const ollasMapeadas = response.data.data.map((item) => mapBackendToOlla(item));
+        // Mapear datos del backend al formato del frontend y calcular comuna
+        const ollasMapeadas = response.data.data.map((item) => {
+          const ollaBase = mapBackendToOlla(item);
+
+          // Calcular la comuna usando las coordenadas y el GeoJSON de sectores
+          const comunaCalculada = determinarComunaDesdeCoordenadas(
+            item.latitude,
+            item.longitude,
+            sectoresGeoJSON
+          );
+
+          return {
+            ...ollaBase,
+            comuna: comunaCalculada,
+          };
+        });
         setOllas(ollasMapeadas);
         console.log("Ollas comunes cargadas:", ollasMapeadas.length);
       }
@@ -200,12 +299,14 @@ export default function OllasMapaPage() {
     } finally {
       setLoading(false);
     }
-  }, [getData]);
+  }, [getData, sectoresGeoJSON]);
 
-  // Cargar ollas al montar el componente
+  // Cargar ollas cuando el GeoJSON esté listo
   useEffect(() => {
-    cargarOllas();
-  }, [cargarOllas]);
+    if (sectoresGeoJSON) {
+      cargarOllas();
+    }
+  }, [sectoresGeoJSON, cargarOllas]);
 
   // Filtrar ollas
   const ollasFiltradas = ollas.filter((olla) => {
@@ -213,6 +314,12 @@ export default function OllasMapaPage() {
     const situacionesFiltro = filtrosSeleccionados["situacion"] || [];
     if (situacionesFiltro.length > 0 && !situacionesFiltro.includes(olla.situacion)) {
       return false;
+    }
+    // Filtro por comuna
+    if (comunasSeleccionadas.length > 0) {
+      if (!comunasSeleccionadas.includes(olla.comuna || 0)) {
+        return false;
+      }
     }
     return true;
   });
@@ -223,7 +330,9 @@ export default function OllasMapaPage() {
 
   // Contar filtros activos
   const contarFiltrosActivos = () => {
-    return Object.values(filtrosSeleccionados).reduce((acc, arr) => acc + arr.length, 0);
+    const filtrosBasicos = Object.values(filtrosSeleccionados).reduce((acc, arr) => acc + arr.length, 0);
+    const filtroComunas = comunasSeleccionadas.length > 0 ? 1 : 0;
+    return filtrosBasicos + filtroComunas;
   };
 
   const hayFiltrosActivos = () => contarFiltrosActivos() > 0;
@@ -243,6 +352,14 @@ export default function OllasMapaPage() {
   // Limpiar todos los filtros
   const limpiarFiltros = () => {
     setFiltrosSeleccionados({});
+    setComunasSeleccionadas([]);
+  };
+
+  // Manejar toggle de comuna
+  const handleComunaToggle = (comunaId: number) => {
+    setComunasSeleccionadas((prev) =>
+      prev.includes(comunaId) ? prev.filter((c) => c !== comunaId) : [...prev, comunaId]
+    );
   };
 
   // Aplicar filtros
@@ -1014,6 +1131,73 @@ export default function OllasMapaPage() {
             );
           })}
 
+          {/* Filtro de Comunas */}
+          <Accordion
+            expanded={expandedAccordion === "comunas"}
+            onChange={(_, isExpanded) => setExpandedAccordion(isExpanded ? "comunas" : false)}
+            disableGutters
+            elevation={0}
+            sx={{ "&:before": { display: "none" }, borderBottom: "1px solid", borderColor: "divider" }}
+          >
+            <AccordionSummary expandIcon={<ExpandMore />} sx={{ minHeight: 48, "& .MuiAccordionSummary-content": { my: 0 } }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Typography fontWeight="medium">Comunas</Typography>
+                {comunasSeleccionadas.length > 0 && (
+                  <Box
+                    sx={{
+                      bgcolor: "#0369a1",
+                      color: "white",
+                      borderRadius: "50%",
+                      width: 20,
+                      height: 20,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 12,
+                    }}
+                  >
+                    {comunasSeleccionadas.length}
+                  </Box>
+                )}
+              </Box>
+            </AccordionSummary>
+            <AccordionDetails sx={{ pt: 0 }}>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 0.5,
+                  maxHeight: 280,
+                  overflowY: "auto",
+                }}
+              >
+                {COMUNAS_MAPA.map((comuna) => (
+                  <FormControlLabel
+                    key={comuna.id}
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={comunasSeleccionadas.includes(comuna.id)}
+                        onChange={() => handleComunaToggle(comuna.id)}
+                        sx={{ color: "#0369a1", "&.Mui-checked": { color: "#0369a1" }, py: 0.25 }}
+                      />
+                    }
+                    label={
+                      <Typography variant="caption" sx={{ fontSize: "0.7rem" }}>
+                        {comuna.id}. {comuna.name}
+                      </Typography>
+                    }
+                    sx={{ mr: 0 }}
+                  />
+                ))}
+              </Box>
+              {comunasSeleccionadas.length > 0 && (
+                <Typography variant="caption" color="#0369a1" sx={{ mt: 1, display: "block" }}>
+                  {comunasSeleccionadas.length} comuna(s) seleccionada(s)
+                </Typography>
+              )}
+            </AccordionDetails>
+          </Accordion>
         </Box>
       </Drawer>
     </Box>
