@@ -87,6 +87,15 @@ export default function HomePage() {
 
       {/* Footer con logo */}
       <div className="py-4 relative z-10">
+        {/* Enlace de Política de Seguridad */}
+        <div className="flex justify-center mb-6">
+          <Link
+            href="/politica-seguridad"
+            className="text-gray-600 text-sm hover:text-gray-800 hover:underline transition-colors"
+          >
+            Política de Seguridad
+          </Link>
+        </div>
         <div className="flex justify-center items-center">
           <Image
             src={logoSjlImg}
