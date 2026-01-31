@@ -30,6 +30,7 @@
     "react-leaflet": "^5.0.0",
     "react-pro-sidebar": "^1.1.0",
     "react-redux": "^9.2.0",
+    "socket.io-client": "^4.8.3",
     "sweetalert2": "^11.26.17",
     "xlsx": "^0.18.5",
     "yup": "^1.7.1"

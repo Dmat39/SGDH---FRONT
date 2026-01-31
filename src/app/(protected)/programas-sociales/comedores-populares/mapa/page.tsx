@@ -44,6 +44,9 @@ import {
 } from "@mui/icons-material";
 import type { Comedor } from "./MapaComedores";
 import { useFetch } from "@/lib/hooks/useFetch";
+import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
+import { point as turfPoint } from "@turf/helpers";
+import type { Feature, Polygon, MultiPolygon, FeatureCollection } from "geojson";
 
 // Importar el mapa dinámicamente para evitar SSR
 const MapaComedores = dynamic(() => import("./MapaComedores"), {
@@ -55,21 +58,59 @@ const MapaComedores = dynamic(() => import("./MapaComedores"), {
   ),
 });
 
-// Lista de jurisdicciones
-const JURISDICCIONES_MAPA = [
+// Lista de comunas basada en el GeoJSON sectores-pvl (igual que PVL)
+const COMUNAS_MAPA = [
   { id: 1, name: "ZARATE" },
   { id: 2, name: "CAMPOY" },
   { id: 3, name: "MANGOMARCA" },
-  { id: 4, name: "HUAYRONA" },
-  { id: 5, name: "CANTO REY" },
-  { id: 6, name: "HUANCARAY" },
-  { id: 7, name: "MARISCAL CACERES" },
-  { id: 8, name: "MOTUPE" },
-  { id: 9, name: "JICAMARCA" },
-  { id: 10, name: "BAYOVAR" },
-  { id: 11, name: "CANTO GRANDE" },
-  { id: 12, name: "SAN HILARION" },
+  { id: 4, name: "SAUCES" },
+  { id: 5, name: "HUAYRONA" },
+  { id: 6, name: "CANTO REY" },
+  { id: 7, name: "HUANCARAY" },
+  { id: 8, name: "MARISCAL CACERES" },
+  { id: 9, name: "MOTUPE" },
+  { id: 10, name: "JICAMARCA" },
+  { id: 11, name: "MARIATEGUI" },
+  { id: 12, name: "CASA BLANCA" },
+  { id: 13, name: "BAYOVAR" },
+  { id: 14, name: "HUASCAR" },
+  { id: 15, name: "CANTO GRANDE" },
+  { id: 16, name: "SAN HILARION" },
+  { id: 17, name: "LAS FLORES" },
+  { id: 18, name: "CAJA DE AGUA" },
 ];
+
+// Interface para las propiedades del sector en el GeoJSON
+interface SectorProperties {
+  id: number;
+  name: string;
+  numero: number;
+  color: string;
+}
+
+// Tipo para el GeoJSON de sectores
+type SectoresGeoJSON = FeatureCollection<Polygon | MultiPolygon, SectorProperties>;
+
+// Función para determinar la comuna de un punto usando point-in-polygon
+const determinarComunaDesdeCoordenadas = (
+  lat: number,
+  lng: number,
+  sectoresGeoJSON: SectoresGeoJSON | null
+): number => {
+  if (!sectoresGeoJSON || !sectoresGeoJSON.features) {
+    return 0;
+  }
+
+  const punto = turfPoint([lng, lat]);
+
+  for (const feature of sectoresGeoJSON.features) {
+    if (booleanPointInPolygon(punto, feature as Feature<Polygon | MultiPolygon>)) {
+      return feature.properties.id || feature.properties.numero || 0;
+    }
+  }
+
+  return 0;
+};
 
 // Configuración de filtros
 const FILTROS_CONFIG = [
@@ -132,8 +173,11 @@ export default function ComedoresMapaPage() {
   const [filtrosSeleccionados, setFiltrosSeleccionados] = useState<Record<string, string[]>>({});
   const [expandedAccordion, setExpandedAccordion] = useState<string | false>("estado");
 
-  // Control de jurisdicciones seleccionadas
-  const [jurisdiccionesSeleccionadas, setJurisdiccionesSeleccionadas] = useState<number[]>([]);
+  // Control de comunas seleccionadas
+  const [comunasSeleccionadas, setComunasSeleccionadas] = useState<number[]>([]);
+
+  // GeoJSON de sectores para point-in-polygon
+  const [sectoresGeoJSON, setSectoresGeoJSON] = useState<SectoresGeoJSON | null>(null);
 
   // Control de límite de visualización
   const [limiteVisible, setLimiteVisible] = useState(100);
@@ -163,6 +207,12 @@ export default function ComedoresMapaPage() {
     const situacionesFiltro = filtrosSeleccionados["situacion"] || [];
     if (situacionesFiltro.length > 0 && !situacionesFiltro.includes(comedor.situacion)) {
       return false;
+    }
+    // Filtro por comuna
+    if (comunasSeleccionadas.length > 0) {
+      if (!comunasSeleccionadas.includes(comedor.comuna || 0)) {
+        return false;
+      }
     }
     return true;
   });
@@ -206,8 +256,8 @@ export default function ComedoresMapaPage() {
   // Contar filtros activos
   const contarFiltrosActivos = () => {
     const filtrosBasicos = Object.values(filtrosSeleccionados).reduce((acc, arr) => acc + arr.length, 0);
-    const filtroJurisdicciones = jurisdiccionesSeleccionadas.length > 0 ? 1 : 0;
-    return filtrosBasicos + filtroJurisdicciones;
+    const filtroComunas = comunasSeleccionadas.length > 0 ? 1 : 0;
+    return filtrosBasicos + filtroComunas;
   };
 
   const hayFiltrosActivos = () => contarFiltrosActivos() > 0;
@@ -227,13 +277,13 @@ export default function ComedoresMapaPage() {
   // Limpiar todos los filtros
   const limpiarFiltros = () => {
     setFiltrosSeleccionados({});
-    setJurisdiccionesSeleccionadas([]);
+    setComunasSeleccionadas([]);
   };
 
-  // Manejar toggle de jurisdicción
-  const handleJurisdiccionToggle = (jurisdiccionId: number) => {
-    setJurisdiccionesSeleccionadas((prev) =>
-      prev.includes(jurisdiccionId) ? prev.filter((c) => c !== jurisdiccionId) : [...prev, jurisdiccionId]
+  // Manejar toggle de comuna
+  const handleComunaToggle = (comunaId: number) => {
+    setComunasSeleccionadas((prev) =>
+      prev.includes(comunaId) ? prev.filter((c) => c !== comunaId) : [...prev, comunaId]
     );
   };
 
@@ -269,14 +319,49 @@ export default function ComedoresMapaPage() {
     };
   }
 
+  // Cargar GeoJSON de sectores al montar el componente
+  useEffect(() => {
+    const cargarSectoresGeoJSON = async () => {
+      try {
+        const response = await fetch("/data/sectores-pvl.geojson");
+        const data = await response.json();
+        setSectoresGeoJSON(data as SectoresGeoJSON);
+        console.log("GeoJSON de sectores cargado:", data.features?.length, "sectores");
+      } catch (error) {
+        console.error("Error cargando GeoJSON de sectores:", error);
+      }
+    };
+    cargarSectoresGeoJSON();
+  }, []);
+
   // Cargar datos del backend
   const cargarComedores = useCallback(async () => {
+    // Esperar a que el GeoJSON esté cargado
+    if (!sectoresGeoJSON) {
+      console.log("Esperando carga del GeoJSON de sectores...");
+      return;
+    }
+
     try {
       setLoading(true);
       const response = await getData<BackendResponse>("pca/center?page=0&modality=EATER");
       if (response?.data?.data) {
-        // Mapear datos del backend al formato del frontend
-        const comedoresMapeados = response.data.data.map((item) => mapBackendToComedor(item));
+        // Mapear datos del backend al formato del frontend y calcular comuna
+        const comedoresMapeados = response.data.data.map((item) => {
+          const comedorBase = mapBackendToComedor(item);
+
+          // Calcular la comuna usando las coordenadas y el GeoJSON de sectores
+          const comunaCalculada = determinarComunaDesdeCoordenadas(
+            item.latitude,
+            item.longitude,
+            sectoresGeoJSON
+          );
+
+          return {
+            ...comedorBase,
+            comuna: comunaCalculada,
+          };
+        });
         setComedores(comedoresMapeados);
         console.log("Comedores populares cargados:", comedoresMapeados.length);
       }
@@ -285,12 +370,14 @@ export default function ComedoresMapaPage() {
     } finally {
       setLoading(false);
     }
-  }, [getData]);
+  }, [getData, sectoresGeoJSON]);
 
-  // Cargar comedores al montar el componente
+  // Cargar comedores cuando el GeoJSON esté listo
   useEffect(() => {
-    cargarComedores();
-  }, [cargarComedores]);
+    if (sectoresGeoJSON) {
+      cargarComedores();
+    }
+  }, [sectoresGeoJSON, cargarComedores]);
 
   return (
     <Box
@@ -1044,18 +1131,18 @@ export default function ComedoresMapaPage() {
             );
           })}
 
-          {/* Filtro de Jurisdicciones */}
+          {/* Filtro de Comunas */}
           <Accordion
-            expanded={expandedAccordion === "jurisdicciones"}
-            onChange={(_, isExpanded) => setExpandedAccordion(isExpanded ? "jurisdicciones" : false)}
+            expanded={expandedAccordion === "comunas"}
+            onChange={(_, isExpanded) => setExpandedAccordion(isExpanded ? "comunas" : false)}
             disableGutters
             elevation={0}
             sx={{ "&:before": { display: "none" }, borderBottom: "1px solid", borderColor: "divider" }}
           >
             <AccordionSummary expandIcon={<ExpandMore />} sx={{ minHeight: 48, "& .MuiAccordionSummary-content": { my: 0 } }}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <Typography fontWeight="medium">Jurisdicciones</Typography>
-                {jurisdiccionesSeleccionadas.length > 0 && (
+                <Typography fontWeight="medium">Comunas</Typography>
+                {comunasSeleccionadas.length > 0 && (
                   <Box
                     sx={{
                       bgcolor: "#0369a1",
@@ -1069,7 +1156,7 @@ export default function ComedoresMapaPage() {
                       fontSize: 12,
                     }}
                   >
-                    {jurisdiccionesSeleccionadas.length}
+                    {comunasSeleccionadas.length}
                   </Box>
                 )}
               </Box>
@@ -1084,29 +1171,29 @@ export default function ComedoresMapaPage() {
                   overflowY: "auto",
                 }}
               >
-                {JURISDICCIONES_MAPA.map((jurisdiccion) => (
+                {COMUNAS_MAPA.map((comuna) => (
                   <FormControlLabel
-                    key={jurisdiccion.id}
+                    key={comuna.id}
                     control={
                       <Checkbox
                         size="small"
-                        checked={jurisdiccionesSeleccionadas.includes(jurisdiccion.id)}
-                        onChange={() => handleJurisdiccionToggle(jurisdiccion.id)}
+                        checked={comunasSeleccionadas.includes(comuna.id)}
+                        onChange={() => handleComunaToggle(comuna.id)}
                         sx={{ color: "#0369a1", "&.Mui-checked": { color: "#0369a1" }, py: 0.25 }}
                       />
                     }
                     label={
                       <Typography variant="caption" sx={{ fontSize: "0.7rem" }}>
-                        {jurisdiccion.name}
+                        {comuna.id}. {comuna.name}
                       </Typography>
                     }
                     sx={{ mr: 0 }}
                   />
                 ))}
               </Box>
-              {jurisdiccionesSeleccionadas.length > 0 && (
+              {comunasSeleccionadas.length > 0 && (
                 <Typography variant="caption" color="#0369a1" sx={{ mt: 1, display: "block" }}>
-                  {jurisdiccionesSeleccionadas.length} jurisdicción(es) seleccionada(s)
+                  {comunasSeleccionadas.length} comuna(s) seleccionada(s)
                 </Typography>
               )}
             </AccordionDetails>

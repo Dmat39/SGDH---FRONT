@@ -409,7 +409,7 @@ export default function PVLDashboardPage() {
           gap: 3,
         }}
       >
-        {/* Gráfico de Comités por Comuna */}
+        {/* Gráfico de Barras - Comités por Comuna */}
         <Paper
           sx={{
             p: 3,
@@ -426,7 +426,7 @@ export default function PVLDashboardPage() {
             Comités por Comuna
           </Typography>
           <Typography variant="body2" sx={{ color: "#64748b", mb: 2 }}>
-            Distribución de comités por zona (basado en coordenadas)
+            Distribución de comités por zona
           </Typography>
 
           {!isDataReady ? (
@@ -443,45 +443,123 @@ export default function PVLDashboardPage() {
             <Box
               sx={{
                 flex: 1,
-                overflowY: "auto",
-                pr: 1,
-                "&::-webkit-scrollbar": { width: "4px" },
-                "&::-webkit-scrollbar-track": { background: "#f1f5f9", borderRadius: "4px" },
-                "&::-webkit-scrollbar-thumb": { background: "#cbd5e1", borderRadius: "4px" },
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
               }}
             >
-              {comitesPorComuna
-                .sort((a, b) => b.cantidad - a.cantidad)
-                .map((comuna) => (
-                  <Box key={comuna.id} sx={{ mb: 1.5 }}>
-                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
-                      <Typography variant="caption" sx={{ color: "#475569", fontWeight: 500, fontSize: "0.7rem" }}>
-                        {comuna.id}. {comuna.nombre}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: "#334155", fontWeight: 600, fontSize: "0.7rem" }}>
-                        {comuna.cantidad}
-                      </Typography>
-                    </Box>
+              {/* Gráfico de barras vertical */}
+              <Box
+                sx={{
+                  height: "220px",
+                  display: "flex",
+                  alignItems: "flex-end",
+                  gap: 0.5,
+                  px: 1,
+                  overflowX: "auto",
+                  overflowY: "hidden",
+                  "&::-webkit-scrollbar": { height: "4px" },
+                  "&::-webkit-scrollbar-track": { background: "#f1f5f9", borderRadius: "4px" },
+                  "&::-webkit-scrollbar-thumb": { background: "#cbd5e1", borderRadius: "4px" },
+                }}
+              >
+                {comitesPorComuna
+                  .sort((a, b) => a.id - b.id)
+                  .map((comuna) => {
+                    // Calcular altura en píxeles (máximo 180px)
+                    const maxBarHeight = 180;
+                    const barHeight = Math.max((comuna.cantidad / maxComites) * maxBarHeight, 8);
+                    return (
+                      <Box
+                        key={comuna.id}
+                        sx={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          minWidth: "30px",
+                          flex: 1,
+                          maxWidth: "50px",
+                        }}
+                      >
+                        {/* Valor encima de la barra */}
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: "#334155",
+                            fontWeight: 700,
+                            fontSize: "0.7rem",
+                            mb: 0.5,
+                          }}
+                        >
+                          {comuna.cantidad}
+                        </Typography>
+                        {/* Barra */}
+                        <Box
+                          sx={{
+                            width: "80%",
+                            height: `${barHeight}px`,
+                            backgroundColor: comuna.color,
+                            borderRadius: "4px 4px 0 0",
+                            transition: "all 0.3s ease",
+                            cursor: "pointer",
+                            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                            "&:hover": {
+                              opacity: 0.85,
+                              transform: "scaleX(1.1)",
+                              boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
+                            },
+                          }}
+                          title={`${comuna.nombre}: ${comuna.cantidad} comités`}
+                        />
+                      </Box>
+                    );
+                  })}
+              </Box>
+              {/* Línea base */}
+              <Box
+                sx={{
+                  height: "2px",
+                  backgroundColor: "#94a3b8",
+                  borderRadius: "1px",
+                  mx: 1,
+                }}
+              />
+              {/* Etiquetas de comunas */}
+              <Box
+                sx={{
+                  display: "flex",
+                  gap: 0.5,
+                  px: 1,
+                  mt: 0.5,
+                  overflowX: "auto",
+                  "&::-webkit-scrollbar": { display: "none" },
+                }}
+              >
+                {comitesPorComuna
+                  .sort((a, b) => a.id - b.id)
+                  .map((comuna) => (
                     <Box
+                      key={comuna.id}
                       sx={{
-                        height: 8,
-                        backgroundColor: "#e2e8f0",
-                        borderRadius: "4px",
-                        overflow: "hidden",
+                        minWidth: "30px",
+                        flex: 1,
+                        maxWidth: "50px",
+                        textAlign: "center",
                       }}
                     >
-                      <Box
+                      <Typography
+                        variant="caption"
                         sx={{
-                          height: "100%",
-                          width: `${(comuna.cantidad / maxComites) * 100}%`,
-                          backgroundColor: comuna.color,
-                          borderRadius: "4px",
-                          transition: "width 0.5s ease",
+                          color: "#64748b",
+                          fontSize: "0.6rem",
+                          fontWeight: 500,
                         }}
-                      />
+                      >
+                        C{comuna.id}
+                      </Typography>
                     </Box>
-                  </Box>
-                ))}
+                  ))}
+              </Box>
             </Box>
           )}
         </Paper>

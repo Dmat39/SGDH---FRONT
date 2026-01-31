@@ -148,7 +148,7 @@ export const MODULOS_PROGRAMAS_SOCIALES: MenuItem[] = [
     id: "lista-general",
     nombre: "Lista General",
     ruta: "/programas-sociales/lista-general",
-    icono: "ListAlt",
+    icono: "List",
     descripcion: "Lista unificada de PVL, Ollas Comunes y Comedores Populares",
     permisos: ["pvl", "ollas_comunes", "comedores_populares", "all_programas_sociales", "all"],
   },

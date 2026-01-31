@@ -53,6 +53,7 @@ import {
   FamilyRestroom,
   GridView,
   Explore,
+  WhatsApp,
 } from "@mui/icons-material";
 
 interface DynamicIconProps {
@@ -117,6 +118,7 @@ const iconMap: Record<string, React.ReactNode> = {
   FamilyRestroom: <FamilyRestroom />,
   GridView: <GridView />,
   Explore: <Explore />,
+  WhatsApp: <WhatsApp />,
 };
 
 export default function DynamicIcon({ iconName, className }: DynamicIconProps) {
