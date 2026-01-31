@@ -28,7 +28,12 @@ import {
   FilterList,
   Cake,
   Clear,
+  WhatsApp,
 } from "@mui/icons-material";
+import { useRouter } from "next/navigation";
+import WhatsAppMessageDialog from "../mensajeria-whatsapp/components/WhatsAppMessageDialog";
+import { PersonaParaEnvio } from "../mensajeria-whatsapp/types";
+import { showSuccess, showError } from "@/lib/utils/swalConfig";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
 import * as XLSX from "xlsx";
@@ -122,9 +127,11 @@ interface BackendResponsePCA {
 }
 
 export default function ListaGeneralPage() {
-  const { getData } = useFetch();
+  const { getData, postData } = useFetch();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [personas, setPersonas] = useState<PersonaUnificada[]>([]);
+  const [whatsappDialogOpen, setWhatsappDialogOpen] = useState(false);
 
   // Estados de filtros
   const [filtroModulo, setFiltroModulo] = useState<ModuloType | "">("");
@@ -149,21 +156,19 @@ export default function ListaGeneralPage() {
         const pvlResponse = await getData<BackendResponsePVL>(`pvl/committee?page=1&limit=${pvlTotal}`);
         if (pvlResponse?.data?.data) {
           pvlResponse.data.data.forEach((committee) => {
-            if (committee.coordinator) {
-              todasLasPersonas.push({
-                id: `pvl-${committee.id}-${committee.coordinator.id}`,
-                modulo: "PVL",
-                moduloLabel: "PVL",
-                entidadNombre: committee.name,
-                entidadCodigo: committee.code,
-                nombre: committee.coordinator.name,
-                apellido: committee.coordinator.lastname,
-                dni: committee.coordinator.dni,
-                telefono: committee.coordinator.phone,
-                cumpleanos: committee.coordinator.birthday || null,
-                rol: "Coordinador/a",
-              });
-            }
+            todasLasPersonas.push({
+              id: `pvl-${committee.id}-${committee.coordinator?.id || "sin-coord"}`,
+              modulo: "PVL",
+              moduloLabel: "PVL",
+              entidadNombre: committee.name,
+              entidadCodigo: committee.code,
+              nombre: committee.coordinator?.name || "",
+              apellido: committee.coordinator?.lastname || "",
+              dni: committee.coordinator?.dni || "",
+              telefono: committee.coordinator?.phone || "",
+              cumpleanos: committee.coordinator?.birthday || null,
+              rol: committee.coordinator ? "Coordinador/a" : "Sin asignar",
+            });
           });
         }
       }
@@ -172,21 +177,19 @@ export default function ListaGeneralPage() {
       const ollasResponse = await getData<BackendResponsePCA>(`pca/center?page=0&modality=CPOT&limit=1000`);
       if (ollasResponse?.data?.data) {
         ollasResponse.data.data.forEach((center) => {
-          if (center.president) {
-            todasLasPersonas.push({
-              id: `ollas-${center.id}-${center.president.id}`,
-              modulo: "OLLAS_COMUNES",
-              moduloLabel: "Ollas Comunes",
-              entidadNombre: center.name,
-              entidadCodigo: center.code,
-              nombre: center.president.name,
-              apellido: center.president.lastname,
-              dni: center.president.dni,
-              telefono: center.president.phone,
-              cumpleanos: center.president.birthday || null,
-              rol: "Presidente/a",
-            });
-          }
+          todasLasPersonas.push({
+            id: `ollas-${center.id}-${center.president?.id || "sin-pres"}`,
+            modulo: "OLLAS_COMUNES",
+            moduloLabel: "Ollas Comunes",
+            entidadNombre: center.name,
+            entidadCodigo: center.code,
+            nombre: center.president?.name || "",
+            apellido: center.president?.lastname || "",
+            dni: center.president?.dni || "",
+            telefono: center.president?.phone || "",
+            cumpleanos: center.president?.birthday || null,
+            rol: center.president ? "Presidente/a" : "Sin asignar",
+          });
         });
       }
 
@@ -194,21 +197,19 @@ export default function ListaGeneralPage() {
       const comedoresResponse = await getData<BackendResponsePCA>(`pca/center?page=0&modality=EATER&limit=1000`);
       if (comedoresResponse?.data?.data) {
         comedoresResponse.data.data.forEach((center) => {
-          if (center.president) {
-            todasLasPersonas.push({
-              id: `comedores-${center.id}-${center.president.id}`,
-              modulo: "COMEDORES_POPULARES",
-              moduloLabel: "Comedores Populares",
-              entidadNombre: center.name,
-              entidadCodigo: center.code,
-              nombre: center.president.name,
-              apellido: center.president.lastname,
-              dni: center.president.dni,
-              telefono: center.president.phone,
-              cumpleanos: center.president.birthday || null,
-              rol: "Presidente/a",
-            });
-          }
+          todasLasPersonas.push({
+            id: `comedores-${center.id}-${center.president?.id || "sin-pres"}`,
+            modulo: "COMEDORES_POPULARES",
+            moduloLabel: "Comedores Populares",
+            entidadNombre: center.name,
+            entidadCodigo: center.code,
+            nombre: center.president?.name || "",
+            apellido: center.president?.lastname || "",
+            dni: center.president?.dni || "",
+            telefono: center.president?.phone || "",
+            cumpleanos: center.president?.birthday || null,
+            rol: center.president ? "Presidente/a" : "Sin asignar",
+          });
         });
       }
 
@@ -363,6 +364,30 @@ export default function ListaGeneralPage() {
   };
 
   const hayFiltrosActivos = filtroModulo || filtroDia || filtroMes || filtroBusqueda;
+
+  // Filtrar personas con teléfono válido para WhatsApp
+  const personasConTelefono = useMemo(() => {
+    return personasFiltradas.filter(
+      (p) => p.telefono && p.telefono.trim() !== "" && p.cumpleanos
+    );
+  }, [personasFiltradas]);
+
+  // Enviar mensajes de WhatsApp
+  const handleEnviarWhatsApp = async (personas: PersonaParaEnvio[]) => {
+    try {
+      await postData("whatsapp/messages/send", { personas });
+      showSuccess(
+        "Mensajes enviados",
+        `Se han encolado ${personas.length} mensaje(s) para envío`
+      );
+      // Navegar al historial de mensajes
+      router.push("/programas-sociales/mensajeria-whatsapp");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Error al enviar mensajes";
+      showError("Error", errorMessage);
+      throw error;
+    }
+  };
 
   return (
     <Box>
@@ -524,6 +549,40 @@ export default function ListaGeneralPage() {
           >
             Descargar Excel
           </Button>
+
+          {/* Botón WhatsApp - solo visible cuando hay filtro de cumpleaños */}
+          {(filtroDia || filtroMes) && personasConTelefono.length > 0 && (
+            <Tooltip title={`Enviar saludo de cumpleaños a ${personasConTelefono.length} persona(s) con teléfono`}>
+              <Button
+                variant="contained"
+                startIcon={<WhatsApp />}
+                onClick={() => setWhatsappDialogOpen(true)}
+                sx={{
+                  backgroundColor: "#25D366",
+                  "&:hover": { backgroundColor: "#128C7E" },
+                }}
+              >
+                WhatsApp ({personasConTelefono.length})
+              </Button>
+            </Tooltip>
+          )}
+
+          {/* Botón Historial de WhatsApp */}
+          <Tooltip title="Ver historial de mensajes WhatsApp">
+            <IconButton
+              onClick={() => router.push("/programas-sociales/mensajeria-whatsapp")}
+              size="small"
+              sx={{
+                color: "#25D366",
+                border: "1px solid #25D366",
+                "&:hover": {
+                  backgroundColor: "#dcfce7",
+                },
+              }}
+            >
+              <WhatsApp fontSize="small" />
+            </IconButton>
+          </Tooltip>
         </Box>
 
         {/* Resumen de filtros */}
@@ -767,6 +826,15 @@ export default function ListaGeneralPage() {
           </>
         )}
       </Paper>
+
+      {/* Dialog de WhatsApp */}
+      <WhatsAppMessageDialog
+        open={whatsappDialogOpen}
+        onClose={() => setWhatsappDialogOpen(false)}
+        personas={personasFiltradas}
+        onConfirm={handleEnviarWhatsApp}
+        calcularEdad={calcularEdad}
+      />
     </Box>
   );
 }

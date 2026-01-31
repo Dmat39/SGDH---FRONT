@@ -5,8 +5,38 @@ import { Box, Card, CardContent, Typography, Paper, CircularProgress, Skeleton }
 import { Restaurant, Groups, Male, Female, CheckCircle, HourglassEmpty } from "@mui/icons-material";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
+import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
+import { point, polygon } from "@turf/helpers";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
+
+// Interface para el GeoJSON de sectores
+interface SectorFeature {
+  type: "Feature";
+  properties: {
+    id: number;
+    name: string;
+    numero: number;
+    color: string;
+  };
+  geometry: {
+    type: "Polygon" | "MultiPolygon";
+    coordinates: number[][][] | number[][][][];
+  };
+}
+
+interface SectoresGeoJSON {
+  type: "FeatureCollection";
+  features: SectorFeature[];
+}
+
+// Interface para los datos de comuna calculados
+interface ComunaData {
+  id: number;
+  nombre: string;
+  color: string;
+  cantidad: number;
+}
 
 // Interface para los datos del backend
 interface ComedorBackend {
@@ -87,6 +117,18 @@ export default function ComedoresDashboardPage() {
   const { getData } = useFetch();
   const [isLoading, setIsLoading] = useState(true);
   const [comedoresData, setComedoresData] = useState<ComedorBackend[]>([]);
+  const [sectoresData, setSectoresData] = useState<SectoresGeoJSON | null>(null);
+
+  // Cargar GeoJSON de sectores
+  const fetchSectores = useCallback(async () => {
+    try {
+      const response = await fetch("/data/sectores-pvl.geojson");
+      const data = await response.json();
+      setSectoresData(data);
+    } catch (error) {
+      console.error("Error cargando sectores:", error);
+    }
+  }, []);
 
   // Cargar datos del backend
   const fetchData = useCallback(async () => {
@@ -113,8 +155,42 @@ export default function ComedoresDashboardPage() {
   }, [getData]);
 
   useEffect(() => {
+    fetchSectores();
     fetchData();
-  }, [fetchData]);
+  }, [fetchSectores, fetchData]);
+
+  // Función para determinar la comuna de un comedor basándose en sus coordenadas
+  const getComunaFromCoordinates = useCallback(
+    (lat: number, lng: number): SectorFeature["properties"] | null => {
+      if (!sectoresData) return null;
+
+      const pt = point([lng, lat]);
+
+      for (const feature of sectoresData.features) {
+        try {
+          if (feature.geometry.type === "Polygon") {
+            const poly = polygon(feature.geometry.coordinates as number[][][]);
+            if (booleanPointInPolygon(pt, poly)) {
+              return feature.properties;
+            }
+          } else if (feature.geometry.type === "MultiPolygon") {
+            const multiCoords = feature.geometry.coordinates as number[][][][];
+            for (const polyCoords of multiCoords) {
+              const poly = polygon(polyCoords);
+              if (booleanPointInPolygon(pt, poly)) {
+                return feature.properties;
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error checking point in polygon:", error);
+        }
+      }
+
+      return null;
+    },
+    [sectoresData]
+  );
 
   // Calcular estadísticas
   const totalComedores = comedoresData.length;
@@ -201,6 +277,50 @@ export default function ComedoresDashboardPage() {
       percentage: totalGenero > 0 ? ((item.cantidad / totalGenero) * 100).toFixed(1) : "0",
     };
   });
+
+  // Calcular comedores por comuna basándose en coordenadas
+  const comedoresPorComuna: ComunaData[] = [];
+
+  if (sectoresData && comedoresData.length > 0) {
+    const comunaMap = new Map<number, { nombre: string; color: string; cantidad: number }>();
+
+    // Inicializar con los sectores del GeoJSON
+    sectoresData.features.forEach((feature) => {
+      comunaMap.set(feature.properties.id, {
+        nombre: feature.properties.name,
+        color: feature.properties.color,
+        cantidad: 0,
+      });
+    });
+
+    // Calcular comedores por comuna
+    comedoresData.forEach((comedor) => {
+      if (comedor.latitude && comedor.longitude) {
+        const comuna = getComunaFromCoordinates(comedor.latitude, comedor.longitude);
+        if (comuna) {
+          const existing = comunaMap.get(comuna.id);
+          if (existing) {
+            existing.cantidad += 1;
+          }
+        }
+      }
+    });
+
+    // Convertir a array
+    comunaMap.forEach((value, key) => {
+      if (value.cantidad > 0) {
+        comedoresPorComuna.push({
+          id: key,
+          nombre: value.nombre,
+          color: value.color,
+          cantidad: value.cantidad,
+        });
+      }
+    });
+  }
+
+  const maxComedoresComuna = Math.max(...comedoresPorComuna.map((c) => c.cantidad), 1);
+  const isDataReady = !isLoading && sectoresData !== null;
 
   // Top 10 comedores con más socios
   const topComedores = [...comedoresData]
@@ -350,7 +470,7 @@ export default function ComedoresDashboardPage() {
           gap: 3,
         }}
       >
-        {/* Gráfico de Situación */}
+        {/* Gráfico de Barras - Comedores por Comuna */}
         <Paper
           sx={{
             p: 3,
@@ -372,7 +492,7 @@ export default function ComedoresDashboardPage() {
               fontFamily: "'Poppins', 'Roboto', sans-serif",
             }}
           >
-            Estado de Comedores
+            Comedores por Comuna
           </Typography>
           <Typography
             variant="body2"
@@ -382,60 +502,138 @@ export default function ComedoresDashboardPage() {
               fontFamily: "'Inter', 'Roboto', sans-serif",
             }}
           >
-            Distribución por situación
+            Distribución de comedores por zona
           </Typography>
 
-          {isLoading ? (
+          {!isDataReady ? (
             <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
               <CircularProgress sx={{ color: "#d81b7e" }} />
             </Box>
+          ) : comedoresPorComuna.length === 0 ? (
+            <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
+              <Typography variant="body2" color="text.secondary">
+                No hay datos disponibles
+              </Typography>
+            </Box>
           ) : (
-            <Box display="flex" flexDirection="column" alignItems="center" flex={1} justifyContent="center">
-              {/* Gráfico Donut */}
-              <svg width="200" height="200" viewBox="0 0 200 200">
-                <circle
-                  cx="100"
-                  cy="100"
-                  r="92"
-                  fill="none"
-                  stroke="#e2e8f0"
-                  strokeWidth="2"
-                  strokeDasharray="4 4"
-                />
-                {segmentsSituacion.map((segment, index) => (
-                  <path
-                    key={index}
-                    d={segment.path}
-                    fill={segment.color}
-                    stroke="white"
-                    strokeWidth="2"
-                    style={{ transition: "all 0.3s ease", cursor: "pointer" }}
-                  />
-                ))}
-                <circle cx="100" cy="100" r="45" fill="white" />
-                <text x="100" y="95" textAnchor="middle" fontSize="12" fontWeight="600" fill="#334155">
-                  Total
-                </text>
-                <text x="100" y="112" textAnchor="middle" fontSize="14" fontWeight="700" fill="#d81b7e">
-                  {totalComedores.toLocaleString()}
-                </text>
-              </svg>
-
-              {/* Leyenda */}
-              <Box sx={{ display: "flex", gap: 4, mt: 3 }}>
-                {segmentsSituacion.map((item) => (
-                  <Box key={item.nombre} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <Box sx={{ width: 16, height: 16, borderRadius: "4px", backgroundColor: item.color }} />
-                    <Box>
-                      <Typography variant="body2" fontWeight="600" sx={{ color: "#334155" }}>
-                        {item.nombre}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: "#64748b" }}>
-                        {item.cantidad} ({item.percentage}%)
+            <Box
+              sx={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+              }}
+            >
+              {/* Gráfico de barras vertical */}
+              <Box
+                sx={{
+                  height: "220px",
+                  display: "flex",
+                  alignItems: "flex-end",
+                  gap: 0.5,
+                  px: 1,
+                  overflowX: "auto",
+                  overflowY: "hidden",
+                  "&::-webkit-scrollbar": { height: "4px" },
+                  "&::-webkit-scrollbar-track": { background: "#f1f5f9", borderRadius: "4px" },
+                  "&::-webkit-scrollbar-thumb": { background: "#cbd5e1", borderRadius: "4px" },
+                }}
+              >
+                {comedoresPorComuna
+                  .sort((a, b) => a.id - b.id)
+                  .map((comuna) => {
+                    const maxBarHeight = 180;
+                    const barHeight = Math.max((comuna.cantidad / maxComedoresComuna) * maxBarHeight, 8);
+                    return (
+                      <Box
+                        key={comuna.id}
+                        sx={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          minWidth: "30px",
+                          flex: 1,
+                          maxWidth: "50px",
+                        }}
+                      >
+                        {/* Valor encima de la barra */}
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: "#334155",
+                            fontWeight: 700,
+                            fontSize: "0.7rem",
+                            mb: 0.5,
+                          }}
+                        >
+                          {comuna.cantidad}
+                        </Typography>
+                        {/* Barra */}
+                        <Box
+                          sx={{
+                            width: "80%",
+                            height: `${barHeight}px`,
+                            backgroundColor: comuna.color,
+                            borderRadius: "4px 4px 0 0",
+                            transition: "all 0.3s ease",
+                            cursor: "pointer",
+                            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                            "&:hover": {
+                              opacity: 0.85,
+                              transform: "scaleX(1.1)",
+                              boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
+                            },
+                          }}
+                          title={`${comuna.nombre}: ${comuna.cantidad} comedores`}
+                        />
+                      </Box>
+                    );
+                  })}
+              </Box>
+              {/* Línea base */}
+              <Box
+                sx={{
+                  height: "2px",
+                  backgroundColor: "#94a3b8",
+                  borderRadius: "1px",
+                  mx: 1,
+                }}
+              />
+              {/* Etiquetas de comunas */}
+              <Box
+                sx={{
+                  display: "flex",
+                  gap: 0.5,
+                  px: 1,
+                  mt: 0.5,
+                  overflowX: "auto",
+                  "&::-webkit-scrollbar": { display: "none" },
+                }}
+              >
+                {comedoresPorComuna
+                  .sort((a, b) => a.id - b.id)
+                  .map((comuna) => (
+                    <Box
+                      key={comuna.id}
+                      sx={{
+                        minWidth: "30px",
+                        flex: 1,
+                        maxWidth: "50px",
+                        textAlign: "center",
+                      }}
+                    >
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: "#64748b",
+                          fontSize: "0.6rem",
+                          fontWeight: 500,
+                        }}
+                      >
+                        C{comuna.id}
                       </Typography>
                     </Box>
-                  </Box>
-                ))}
+                  ))}
               </Box>
             </Box>
           )}

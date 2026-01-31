@@ -43,6 +43,7 @@ export interface OllaComun {
     inicio: string;
     fin: string;
   };
+  comuna?: number;
 }
 
 interface CapasVisibles {
@@ -67,59 +68,59 @@ const createCustomIcon = (isSelected: boolean) => {
   const ollaSvg = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${size}" height="${size}">
       <defs>
-        <radialGradient id="ollaGrad" cx="30%" cy="30%" r="70%">
-          <stop offset="0%" style="stop-color:#66bb6a"/>
-          <stop offset="100%" style="stop-color:#43a047"/>
+        <radialGradient id="potGrad" cx="30%" cy="30%" r="70%">
+          <stop offset="0%" style="stop-color:#fb923c"/>
+          <stop offset="100%" style="stop-color:#ea580c"/>
         </radialGradient>
-        <radialGradient id="lidOllaGrad" cx="30%" cy="30%" r="70%">
-          <stop offset="0%" style="stop-color:#81c784"/>
-          <stop offset="100%" style="stop-color:#4caf50"/>
+        <radialGradient id="lidGrad" cx="30%" cy="30%" r="70%">
+          <stop offset="0%" style="stop-color:#fdba74"/>
+          <stop offset="100%" style="stop-color:#f97316"/>
         </radialGradient>
-        <radialGradient id="handleOllaGrad" cx="30%" cy="30%" r="70%">
-          <stop offset="0%" style="stop-color:#2e7d32"/>
-          <stop offset="100%" style="stop-color:#1b5e20"/>
+        <radialGradient id="handleGrad" cx="30%" cy="30%" r="70%">
+          <stop offset="0%" style="stop-color:#c2410c"/>
+          <stop offset="100%" style="stop-color:#9a3412"/>
         </radialGradient>
-        <linearGradient id="foodOllaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" style="stop-color:#fff59d"/>
-          <stop offset="100%" style="stop-color:#fbc02d"/>
+        <linearGradient id="foodGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" style="stop-color:#fcd34d"/>
+          <stop offset="100%" style="stop-color:#f59e0b"/>
         </linearGradient>
       </defs>
 
       <!-- Vapor/steam -->
-      <path d="M35 22 Q32 14 35 8 Q38 2 35 -4" stroke="#e0e0e0" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.9"/>
-      <path d="M50 18 Q47 10 50 4 Q53 -2 50 -8" stroke="#e0e0e0" stroke-width="4" fill="none" stroke-linecap="round" opacity="1"/>
-      <path d="M65 22 Q68 14 65 8 Q62 2 65 -4" stroke="#e0e0e0" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.9"/>
+      <path d="M35 25 Q32 18 35 12 Q38 6 35 0" stroke="#e5e5e5" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.8"/>
+      <path d="M50 22 Q47 14 50 8 Q53 2 50 -4" stroke="#e5e5e5" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.9"/>
+      <path d="M65 25 Q68 18 65 12 Q62 6 65 0" stroke="#e5e5e5" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.8"/>
 
       <!-- Asas de la olla -->
-      <ellipse cx="12" cy="58" rx="8" ry="12" fill="url(#ollaGrad)" stroke="#2e7d32" stroke-width="2"/>
-      <ellipse cx="12" cy="58" rx="4" ry="8" fill="#1b5e20"/>
-      <ellipse cx="88" cy="58" rx="8" ry="12" fill="url(#ollaGrad)" stroke="#2e7d32" stroke-width="2"/>
-      <ellipse cx="88" cy="58" rx="4" ry="8" fill="#1b5e20"/>
+      <ellipse cx="12" cy="60" rx="8" ry="12" fill="url(#potGrad)" stroke="#c2410c" stroke-width="2"/>
+      <ellipse cx="12" cy="60" rx="4" ry="8" fill="#9a3412"/>
+      <ellipse cx="88" cy="60" rx="8" ry="12" fill="url(#potGrad)" stroke="#c2410c" stroke-width="2"/>
+      <ellipse cx="88" cy="60" rx="4" ry="8" fill="#9a3412"/>
 
       <!-- Cuerpo de la olla -->
-      <path d="M20 42 L20 72 Q20 88 50 88 Q80 88 80 72 L80 42 Z" fill="url(#ollaGrad)" stroke="#2e7d32" stroke-width="2"/>
+      <path d="M20 45 L20 75 Q20 90 50 90 Q80 90 80 75 L80 45 Z" fill="url(#potGrad)" stroke="#c2410c" stroke-width="2"/>
 
-      <!-- Comida visible -->
-      <ellipse cx="50" cy="42" rx="28" ry="8" fill="url(#foodOllaGrad)"/>
+      <!-- Comida visible (guiso/sopa) -->
+      <ellipse cx="50" cy="45" rx="28" ry="8" fill="url(#foodGrad)"/>
 
-      <!-- Vegetales en la comida -->
-      <circle cx="38" cy="41" r="4" fill="#ff7043"/>
-      <circle cx="55" cy="40" r="3" fill="#8bc34a"/>
-      <circle cx="62" cy="42" r="3.5" fill="#ff7043"/>
-      <circle cx="45" cy="43" r="2.5" fill="#8bc34a"/>
+      <!-- Decoración de la comida (vegetales) -->
+      <circle cx="38" cy="44" r="4" fill="#22c55e"/>
+      <circle cx="55" cy="43" r="3" fill="#ef4444"/>
+      <circle cx="62" cy="45" r="3.5" fill="#22c55e"/>
+      <circle cx="45" cy="46" r="2.5" fill="#fbbf24"/>
 
-      <!-- Tapa de la olla -->
-      <ellipse cx="50" cy="32" rx="32" ry="6" fill="url(#lidOllaGrad)" stroke="#2e7d32" stroke-width="2"/>
+      <!-- Tapa de la olla (levantada) -->
+      <ellipse cx="50" cy="35" rx="32" ry="6" fill="url(#lidGrad)" stroke="#c2410c" stroke-width="2"/>
 
       <!-- Manija de la tapa -->
-      <ellipse cx="50" cy="27" rx="6" ry="4" fill="url(#handleOllaGrad)"/>
-      <ellipse cx="50" cy="26" rx="4" ry="2.5" fill="#81c784"/>
+      <ellipse cx="50" cy="30" rx="6" ry="4" fill="url(#handleGrad)"/>
+      <ellipse cx="50" cy="29" rx="4" ry="2.5" fill="#fdba74"/>
 
       <!-- Brillo en la olla -->
-      <path d="M25 48 Q28 53 25 63" stroke="rgba(255,255,255,0.5)" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M25 50 Q28 55 25 65" stroke="rgba(255,255,255,0.5)" stroke-width="3" fill="none" stroke-linecap="round"/>
 
-      <!-- Corazoncito -->
-      <path d="M75 35 C75 32 72 30 70 32 C68 30 65 32 65 35 C65 39 70 42 70 42 C70 42 75 39 75 35" fill="#e91e63" opacity="0.95"/>
+      <!-- Corazón pequeño (indica amor por cocinar) -->
+      <path d="M75 38 C75 35 72 33 70 35 C68 33 65 35 65 38 C65 42 70 45 70 45 C70 45 75 42 75 38" fill="#ef4444" opacity="0.95"/>
     </svg>
   `;
 
