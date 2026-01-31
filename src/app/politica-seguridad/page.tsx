@@ -316,9 +316,6 @@ export default function PoliticaSeguridadPage() {
               {nombreSistema}
             </Typography>
             <Box sx={{ mt: 2 }}>
-              <Link href="/politica-privacidad" style={{ color: "#64748b", fontSize: "0.875rem", marginRight: "16px" }}>
-                Política de Privacidad
-              </Link>
               <Link href="/terminos-condiciones" style={{ color: "#64748b", fontSize: "0.875rem" }}>
                 Términos y Condiciones
               </Link>
