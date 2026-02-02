@@ -282,10 +282,11 @@ export default function ListaGeneralPage() {
       "Nombre": persona.nombre,
       "Apellido": persona.apellido,
       "DNI": persona.dni,
-      "Teléfono": persona.telefono,
+      "Teléfono": formatearTelefono(persona.telefono),
       "Cumpleaños": persona.cumpleanos
-        ? `${new Date(persona.cumpleanos).toLocaleDateString("es-PE")} (${calcularEdad(persona.cumpleanos)} años)`
+        ? new Date(persona.cumpleanos).toLocaleDateString("es-PE")
         : "",
+      "Edad": persona.cumpleanos ? calcularEdad(persona.cumpleanos) : "",
     }));
 
     // Crear workbook y worksheet
@@ -302,7 +303,8 @@ export default function ListaGeneralPage() {
       { wch: 20 }, // Apellido
       { wch: 12 }, // DNI
       { wch: 12 }, // Teléfono
-      { wch: 22 }, // Cumpleaños (incluye edad)
+      { wch: 12 }, // Cumpleaños
+      { wch: 6 },  // Edad
     ];
     ws["!cols"] = colWidths;
 
@@ -361,6 +363,19 @@ export default function ListaGeneralPage() {
     });
     const edad = calcularEdad(fecha);
     return `${fechaFormateada} (${edad} años)`;
+  };
+
+  // Formatear teléfono con prefijo +51
+  const formatearTelefono = (telefono: string | null | undefined): string => {
+    if (!telefono || telefono.trim() === "") return "";
+    const telefonoLimpio = telefono.trim();
+    if (telefonoLimpio.startsWith("+51")) {
+      return telefonoLimpio;
+    }
+    if (telefonoLimpio.startsWith("51") && telefonoLimpio.length >= 11) {
+      return `+${telefonoLimpio}`;
+    }
+    return `+51${telefonoLimpio}`;
   };
 
   const hayFiltrosActivos = filtroModulo || filtroDia || filtroMes || filtroBusqueda;
@@ -789,7 +804,7 @@ export default function ListaGeneralPage() {
                           </Typography>
                         </TableCell>
                         <TableCell>
-                          <Typography variant="body2">{persona.telefono || "-"}</Typography>
+                          <Typography variant="body2">{formatearTelefono(persona.telefono) || "-"}</Typography>
                         </TableCell>
                         <TableCell>
                           <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
