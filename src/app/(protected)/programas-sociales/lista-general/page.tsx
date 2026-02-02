@@ -41,12 +41,13 @@ import * as XLSX from "xlsx";
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 
 // Tipos de módulos
-type ModuloType = "PVL" | "OLLAS_COMUNES" | "COMEDORES_POPULARES";
+type ModuloType = "PVL" | "OLLAS_COMUNES" | "COMEDORES_POPULARES" | "ULE";
 
 const MODULOS_CONFIG: { id: ModuloType; label: string; color: string }[] = [
   { id: "PVL", label: "PVL", color: "#d81b7e" },
   { id: "OLLAS_COMUNES", label: "Ollas Comunes", color: "#4caf50" },
   { id: "COMEDORES_POPULARES", label: "Comedores Populares", color: "#ff9800" },
+  { id: "ULE", label: "ULE", color: "#2196f3" },
 ];
 
 // Meses para el filtro
@@ -126,6 +127,27 @@ interface BackendResponsePCA {
   };
 }
 
+interface ULERegisteredPerson {
+  id: string;
+  fsu: string;
+  s100: string;
+  dni: string;
+  name: string;
+  lastname: string;
+  phone: string;
+  birthday: string;
+  format: string;
+  urban: { id: string; name: string } | null;
+}
+
+interface BackendResponseULE {
+  message: string;
+  data: {
+    data: ULERegisteredPerson[];
+    totalCount: number;
+  };
+}
+
 export default function ListaGeneralPage() {
   const { getData, postData } = useFetch();
   const router = useRouter();
@@ -148,8 +170,8 @@ export default function ListaGeneralPage() {
     setIsLoading(true);
     const todasLasPersonas: PersonaUnificada[] = [];
 
+    // Cargar PVL
     try {
-      // Cargar PVL
       const pvlFirst = await getData<BackendResponsePVL>(`pvl/committee?page=1&limit=1`);
       const pvlTotal = pvlFirst?.data?.totalCount || 0;
       if (pvlTotal > 0) {
@@ -172,8 +194,12 @@ export default function ListaGeneralPage() {
           });
         }
       }
+    } catch (error) {
+      console.error("Error cargando PVL:", error);
+    }
 
-      // Cargar Ollas Comunes
+    // Cargar Ollas Comunes
+    try {
       const ollasResponse = await getData<BackendResponsePCA>(`pca/center?page=0&modality=CPOT&limit=1000`);
       if (ollasResponse?.data?.data) {
         ollasResponse.data.data.forEach((center) => {
@@ -192,8 +218,12 @@ export default function ListaGeneralPage() {
           });
         });
       }
+    } catch (error) {
+      console.error("Error cargando Ollas Comunes:", error);
+    }
 
-      // Cargar Comedores Populares
+    // Cargar Comedores Populares
+    try {
       const comedoresResponse = await getData<BackendResponsePCA>(`pca/center?page=0&modality=EATER&limit=1000`);
       if (comedoresResponse?.data?.data) {
         comedoresResponse.data.data.forEach((center) => {
@@ -212,13 +242,40 @@ export default function ListaGeneralPage() {
           });
         });
       }
-
-      setPersonas(todasLasPersonas);
     } catch (error) {
-      console.error("Error cargando datos:", error);
-    } finally {
-      setIsLoading(false);
+      console.error("Error cargando Comedores Populares:", error);
     }
+
+    // Cargar ULE (Empadronados)
+    try {
+      const uleFirst = await getData<BackendResponseULE>(`ule/registered?page=1&limit=1`);
+      const uleTotal = uleFirst?.data?.totalCount || 0;
+      if (uleTotal > 0) {
+        const uleResponse = await getData<BackendResponseULE>(`ule/registered?page=1&limit=${uleTotal}`);
+        if (uleResponse?.data?.data) {
+          uleResponse.data.data.forEach((person) => {
+            todasLasPersonas.push({
+              id: `ule-${person.id}`,
+              modulo: "ULE",
+              moduloLabel: "ULE",
+              entidadNombre: person.urban?.name || "Sin urbanización",
+              entidadCodigo: person.fsu || person.s100 || "-",
+              nombre: person.name || "",
+              apellido: person.lastname || "",
+              dni: person.dni || "",
+              telefono: person.phone || "",
+              cumpleanos: person.birthday || null,
+              rol: "Empadronado",
+            });
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error cargando ULE:", error);
+    }
+
+    setPersonas(todasLasPersonas);
+    setIsLoading(false);
   }, [getData]);
 
   useEffect(() => {
@@ -420,7 +477,7 @@ export default function ListaGeneralPage() {
           Lista General
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Datos unificados de PVL, Ollas Comunes y Comedores Populares
+          Datos unificados de PVL, Ollas Comunes, Comedores Populares y ULE
         </Typography>
       </Box>
 
