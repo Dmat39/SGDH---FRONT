@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -49,6 +49,11 @@ export default function Sidebar({ toggled, setToggled, menuItems, color, subgere
   const { user } = useAppSelector((state) => state.auth);
   const [collapsed, setCollapsed] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handlePopoverOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -98,10 +103,9 @@ export default function Sidebar({ toggled, setToggled, menuItems, color, subgere
     },
   };
 
-  const isActive = (ruta?: string) => pathname === ruta;
-
   const renderMenuItem = (item: MenuItemType) => {
-    const active = isActive(item.ruta);
+    // Solo calcular active después de montar para evitar hydration mismatch
+    const active = mounted && pathname === item.ruta;
 
     if (item.children && item.children.length > 0) {
       return (
@@ -115,17 +119,29 @@ export default function Sidebar({ toggled, setToggled, menuItems, color, subgere
       );
     }
 
+    // Estilos base que siempre se aplican (sin depender de active)
+    const baseStyle = {
+      backgroundColor: "transparent",
+      borderLeft: "4px solid transparent",
+    };
+
+    // Solo aplicar estilos activos después del montaje
+    const activeStyle = active ? {
+      backgroundColor: `${color}20`,
+      borderLeft: `4px solid ${color}`,
+    } : baseStyle;
+
     return (
       <MenuItem
         key={item.id}
         component={<Link href={item.ruta || "#"} />}
         icon={item.icono ? <DynamicIcon iconName={item.icono} /> : undefined}
-        style={{
-          backgroundColor: active ? `${color}20` : "transparent",
-          borderLeft: active ? `4px solid ${color}` : "4px solid transparent",
-        }}
+        style={mounted ? activeStyle : baseStyle}
       >
-        <span style={{ color: active ? color : "inherit", fontWeight: active ? "bold" : "normal" }}>
+        <span style={{
+          color: active ? color : "inherit",
+          fontWeight: active ? "bold" : "normal"
+        }}>
           {item.nombre}
         </span>
       </MenuItem>
