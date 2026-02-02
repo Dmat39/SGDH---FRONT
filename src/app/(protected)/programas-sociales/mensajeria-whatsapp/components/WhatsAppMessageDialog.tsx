@@ -46,6 +46,19 @@ interface WhatsAppMessageDialogProps {
   calcularEdad: (fecha: string) => number;
 }
 
+// Formatear teléfono con prefijo +51
+const formatearTelefono = (telefono: string | null | undefined): string => {
+  if (!telefono || telefono.trim() === "") return "";
+  const telefonoLimpio = telefono.trim();
+  if (telefonoLimpio.startsWith("+51")) {
+    return telefonoLimpio;
+  }
+  if (telefonoLimpio.startsWith("51") && telefonoLimpio.length >= 11) {
+    return `+${telefonoLimpio}`;
+  }
+  return `+51${telefonoLimpio}`;
+};
+
 export default function WhatsAppMessageDialog({
   open,
   onClose,
@@ -97,7 +110,7 @@ export default function WhatsAppMessageDialog({
           personaId: p.id,
           nombre: p.nombre,
           apellido: p.apellido,
-          telefono: p.telefono,
+          telefono: formatearTelefono(p.telefono),
           edad: p.cumpleanos ? calcularEdad(p.cumpleanos) : 0,
           modulo: p.modulo,
           entidadNombre: p.entidadNombre,
@@ -254,7 +267,7 @@ export default function WhatsAppMessageDialog({
                     secondary={
                       <Box display="flex" alignItems="center" gap={2} mt={0.5}>
                         <Typography variant="body2" color="text.secondary">
-                          {persona.telefono}
+                          {formatearTelefono(persona.telefono)}
                         </Typography>
                         {persona.cumpleanos && (
                           <Box display="flex" alignItems="center" gap={0.5}>

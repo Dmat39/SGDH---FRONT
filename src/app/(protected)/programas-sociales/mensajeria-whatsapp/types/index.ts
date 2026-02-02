@@ -14,7 +14,7 @@ export enum MessageStatus {
 }
 
 // Tipo de módulo
-export type ModuloType = "PVL" | "OLLAS_COMUNES" | "COMEDORES_POPULARES";
+export type ModuloType = "PVL" | "OLLAS_COMUNES" | "COMEDORES_POPULARES" | "ULE";
 
 // Interface para un mensaje de WhatsApp
 export interface WhatsAppMessage {
@@ -151,4 +151,5 @@ export const MODULO_CONFIG: Record<ModuloType, {
   PVL: { label: "PVL", color: "#d81b7e" },
   OLLAS_COMUNES: { label: "Ollas Comunes", color: "#4caf50" },
   COMEDORES_POPULARES: { label: "Comedores Populares", color: "#ff9800" },
+  ULE: { label: "ULE", color: "#2196f3" },
 };
