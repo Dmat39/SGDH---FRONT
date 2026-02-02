@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -31,6 +31,7 @@ import {
   Popover,
   ToggleButton,
   ToggleButtonGroup,
+  Alert,
 } from "@mui/material";
 import {
   Search,
@@ -57,6 +58,7 @@ import { useFetch } from "@/lib/hooks/useFetch";
 import * as XLSX from "xlsx";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
+const BATCH_SIZE = 500; // Cargar en lotes de 500 registros
 
 // Nombres de los meses en español
 const MESES = [
@@ -116,6 +118,9 @@ export default function ULEEmpadronadosPage() {
   const { getData } = useFetch();
   const [isLoading, setIsLoading] = useState(true);
   const [empadronados, setEmpadronados] = useState<RegisteredPerson[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const hasFetched = useRef(false);
 
   // Estados de paginación
   const [page, setPage] = useState(0);
@@ -136,30 +141,56 @@ export default function ULEEmpadronadosPage() {
   const [selectedEmpadronado, setSelectedEmpadronado] = useState<RegisteredPerson | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
-  // Cargar datos
+  // Cargar datos en lotes
   const fetchData = useCallback(async () => {
     setIsLoading(true);
+    setError(null);
+    setLoadingProgress(0);
+
     try {
-      const firstResponse = await getData<BackendResponse>(`ule/registered?page=1&limit=1`);
+      // Primero obtener el total
+      const firstResponse = await getData<BackendResponse>(`ule/registered?page=1&limit=1`, { showErrorAlert: false });
       const totalCount = firstResponse?.data?.totalCount || 0;
 
-      if (totalCount > 0) {
-        const response = await getData<BackendResponse>(
-          `ule/registered?page=1&limit=${totalCount}`
-        );
-        if (response?.data?.data) {
-          setEmpadronados(response.data.data);
-        }
+      if (totalCount === 0) {
+        setEmpadronados([]);
+        setIsLoading(false);
+        return;
       }
+
+      // Calcular número de páginas necesarias
+      const totalPages = Math.ceil(totalCount / BATCH_SIZE);
+      const allData: RegisteredPerson[] = [];
+
+      // Cargar en lotes
+      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+        const response = await getData<BackendResponse>(
+          `ule/registered?page=${pageNum}&limit=${BATCH_SIZE}`,
+          { showErrorAlert: false }
+        );
+
+        if (response?.data?.data) {
+          allData.push(...response.data.data);
+        }
+
+        // Actualizar progreso
+        setLoadingProgress(Math.round((pageNum / totalPages) * 100));
+      }
+
+      setEmpadronados(allData);
     } catch (error) {
       console.error("Error fetching data:", error);
+      setError("Error al cargar los datos. Por favor, intenta de nuevo.");
     } finally {
       setIsLoading(false);
     }
   }, [getData]);
 
   useEffect(() => {
-    fetchData();
+    if (!hasFetched.current) {
+      hasFetched.current = true;
+      fetchData();
+    }
   }, [fetchData]);
 
   // Obtener lista única de urbanizaciones para el filtro
@@ -416,6 +447,13 @@ export default function ULEEmpadronadosPage() {
         </Typography>
       </Box>
 
+      {/* Mensaje de error */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+
       {/* Tarjeta principal */}
       <Card
         sx={{
@@ -546,7 +584,7 @@ export default function ULEEmpadronadosPage() {
             )}
 
             <Tooltip title="Actualizar datos">
-              <IconButton onClick={fetchData} disabled={isLoading} size="small">
+              <IconButton onClick={() => { hasFetched.current = false; fetchData(); }} disabled={isLoading} size="small">
                 <Refresh />
               </IconButton>
             </Tooltip>
@@ -739,8 +777,13 @@ export default function ULEEmpadronadosPage() {
 
           {/* Tabla */}
           {isLoading ? (
-            <Box display="flex" justifyContent="center" alignItems="center" height={400}>
+            <Box display="flex" flexDirection="column" justifyContent="center" alignItems="center" height={400} gap={1}>
               <CircularProgress sx={{ color: subgerencia.color }} />
+              {loadingProgress > 0 && (
+                <Typography variant="caption" color="text.secondary">
+                  Cargando... {loadingProgress}%
+                </Typography>
+              )}
             </Box>
           ) : (
             <>

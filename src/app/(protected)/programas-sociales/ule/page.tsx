@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Box, Card, CardContent, Typography, Paper, CircularProgress, Skeleton } from "@mui/material";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Box, Card, CardContent, Typography, Paper, CircularProgress, Skeleton, Alert } from "@mui/material";
 import { People, Assignment, Cake, PersonSearch } from "@mui/icons-material";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -68,37 +68,66 @@ const URBAN_COLORS = [
   "#3f51b5", "#009688", "#ff5722", "#673ab7", "#8bc34a",
 ];
 
+const BATCH_SIZE = 500; // Cargar en lotes de 500 registros
+
 export default function ULEDashboardPage() {
   const { getData } = useFetch();
   const [isLoading, setIsLoading] = useState(true);
   const [registeredData, setRegisteredData] = useState<RegisteredPerson[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const hasFetched = useRef(false);
 
-  // Cargar datos del backend
+  // Cargar datos del backend en lotes
   const fetchData = useCallback(async () => {
     setIsLoading(true);
+    setError(null);
+    setLoadingProgress(0);
+
     try {
       // Primero obtener el total
-      const firstResponse = await getData<BackendResponse>(`ule/registered?page=1&limit=1`);
+      const firstResponse = await getData<BackendResponse>(`ule/registered?page=1&limit=1`, { showErrorAlert: false });
       const totalCount = firstResponse?.data?.totalCount || 0;
 
-      if (totalCount > 0) {
-        // Luego obtener todos los datos
-        const response = await getData<BackendResponse>(
-          `ule/registered?page=1&limit=${totalCount}`
-        );
-        if (response?.data?.data) {
-          setRegisteredData(response.data.data);
-        }
+      if (totalCount === 0) {
+        setRegisteredData([]);
+        setIsLoading(false);
+        return;
       }
+
+      // Calcular número de páginas necesarias
+      const totalPages = Math.ceil(totalCount / BATCH_SIZE);
+      const allData: RegisteredPerson[] = [];
+
+      // Cargar en lotes
+      for (let page = 1; page <= totalPages; page++) {
+        const response = await getData<BackendResponse>(
+          `ule/registered?page=${page}&limit=${BATCH_SIZE}`,
+          { showErrorAlert: false }
+        );
+
+        if (response?.data?.data) {
+          allData.push(...response.data.data);
+        }
+
+        // Actualizar progreso
+        setLoadingProgress(Math.round((page / totalPages) * 100));
+      }
+
+      setRegisteredData(allData);
     } catch (error) {
       console.error("Error fetching data:", error);
+      setError("Error al cargar los datos. Por favor, intenta de nuevo.");
     } finally {
       setIsLoading(false);
     }
   }, [getData]);
 
   useEffect(() => {
-    fetchData();
+    if (!hasFetched.current) {
+      hasFetched.current = true;
+      fetchData();
+    }
   }, [fetchData]);
 
   // Calcular estadísticas
@@ -181,6 +210,12 @@ export default function ULEDashboardPage() {
   const maxUrban = Math.max(...empadronadosPorUrban.map((u) => u.cantidad), 1);
   const top10Urban = empadronadosPorUrban.slice(0, 10);
 
+  // Calcular porcentajes de forma segura
+  const porcentajeFSU = totalEmpadronados > 0 ? (formatoFSU / totalEmpadronados) * 100 : 0;
+  const porcentajeS100 = totalEmpadronados > 0 ? (formatoS100 / totalEmpadronados) * 100 : 0;
+  const dashFSU = totalEmpadronados > 0 ? (formatoFSU / totalEmpadronados) * 440 : 0;
+  const dashS100 = totalEmpadronados > 0 ? (formatoS100 / totalEmpadronados) * 440 : 0;
+
   return (
     <Box>
       {/* Encabezado */}
@@ -192,6 +227,13 @@ export default function ULEDashboardPage() {
           Dashboard de la Unidad Local de Empadronamiento
         </Typography>
       </Box>
+
+      {/* Mensaje de error */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
 
       {/* Tarjetas de estadísticas */}
       <Box
@@ -316,8 +358,13 @@ export default function ULEDashboardPage() {
           </Typography>
 
           {isLoading ? (
-            <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
+            <Box display="flex" flexDirection="column" justifyContent="center" alignItems="center" flex={1} gap={1}>
               <CircularProgress sx={{ color: "#d81b7e" }} />
+              {loadingProgress > 0 && (
+                <Typography variant="caption" color="text.secondary">
+                  Cargando... {loadingProgress}%
+                </Typography>
+              )}
             </Box>
           ) : top10Urban.length === 0 ? (
             <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
@@ -411,8 +458,13 @@ export default function ULEDashboardPage() {
           </Typography>
 
           {isLoading ? (
-            <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
+            <Box display="flex" flexDirection="column" justifyContent="center" alignItems="center" flex={1} gap={1}>
               <CircularProgress sx={{ color: "#d81b7e" }} />
+              {loadingProgress > 0 && (
+                <Typography variant="caption" color="text.secondary">
+                  Cargando... {loadingProgress}%
+                </Typography>
+              )}
             </Box>
           ) : totalEmpadronados === 0 ? (
             <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
@@ -451,7 +503,7 @@ export default function ULEDashboardPage() {
                     fill="none"
                     stroke="#d81b7e"
                     strokeWidth="20"
-                    strokeDasharray={`${(formatoFSU / totalEmpadronados) * 440} 440`}
+                    strokeDasharray={`${dashFSU} 440`}
                     strokeDashoffset="0"
                     transform="rotate(-90 90 90)"
                   />
@@ -463,8 +515,8 @@ export default function ULEDashboardPage() {
                     fill="none"
                     stroke="#00a3a8"
                     strokeWidth="20"
-                    strokeDasharray={`${(formatoS100 / totalEmpadronados) * 440} 440`}
-                    strokeDashoffset={`${-(formatoFSU / totalEmpadronados) * 440}`}
+                    strokeDasharray={`${dashS100} 440`}
+                    strokeDashoffset={`${-dashFSU}`}
                     transform="rotate(-90 90 90)"
                   />
                   {/* Centro */}
@@ -487,7 +539,7 @@ export default function ULEDashboardPage() {
                       FSU
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {formatoFSU.toLocaleString()} ({((formatoFSU / totalEmpadronados) * 100).toFixed(1)}%)
+                      {formatoFSU.toLocaleString()} ({porcentajeFSU.toFixed(1)}%)
                     </Typography>
                   </Box>
                 </Box>
@@ -498,7 +550,7 @@ export default function ULEDashboardPage() {
                       S100
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {formatoS100.toLocaleString()} ({((formatoS100 / totalEmpadronados) * 100).toFixed(1)}%)
+                      {formatoS100.toLocaleString()} ({porcentajeS100.toFixed(1)}%)
                     </Typography>
                   </Box>
                 </Box>

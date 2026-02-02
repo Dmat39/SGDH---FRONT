@@ -246,28 +246,33 @@ export default function ListaGeneralPage() {
       console.error("Error cargando Comedores Populares:", error);
     }
 
-    // Cargar ULE (Empadronados)
+    // Cargar ULE (Empadronados) en lotes de 500
     try {
       const uleFirst = await getData<BackendResponseULE>(`ule/registered?page=1&limit=1`);
       const uleTotal = uleFirst?.data?.totalCount || 0;
       if (uleTotal > 0) {
-        const uleResponse = await getData<BackendResponseULE>(`ule/registered?page=1&limit=${uleTotal}`);
-        if (uleResponse?.data?.data) {
-          uleResponse.data.data.forEach((person) => {
-            todasLasPersonas.push({
-              id: `ule-${person.id}`,
-              modulo: "ULE",
-              moduloLabel: "ULE",
-              entidadNombre: person.urban?.name || "Sin urbanización",
-              entidadCodigo: person.fsu || person.s100 || "-",
-              nombre: person.name || "",
-              apellido: person.lastname || "",
-              dni: person.dni || "",
-              telefono: person.phone || "",
-              cumpleanos: person.birthday || null,
-              rol: "Empadronado",
+        const BATCH_SIZE = 500;
+        const totalPages = Math.ceil(uleTotal / BATCH_SIZE);
+
+        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+          const uleResponse = await getData<BackendResponseULE>(`ule/registered?page=${pageNum}&limit=${BATCH_SIZE}`);
+          if (uleResponse?.data?.data) {
+            uleResponse.data.data.forEach((person) => {
+              todasLasPersonas.push({
+                id: `ule-${person.id}`,
+                modulo: "ULE",
+                moduloLabel: "ULE",
+                entidadNombre: person.urban?.name || "Sin urbanización",
+                entidadCodigo: person.fsu || person.s100 || "-",
+                nombre: person.name || "",
+                apellido: person.lastname || "",
+                dni: person.dni || "",
+                telefono: person.phone || "",
+                cumpleanos: person.birthday || null,
+                rol: "Empadronado",
+              });
             });
-          });
+          }
         }
       }
     } catch (error) {
