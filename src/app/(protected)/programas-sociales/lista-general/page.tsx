@@ -517,12 +517,14 @@ export default function ListaGeneralPage() {
               setPage(0);
             }}
             sx={{ minWidth: 280 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search fontSize="small" />
-                </InputAdornment>
-              ),
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search fontSize="small" />
+                  </InputAdornment>
+                ),
+              },
             }}
           />
 
@@ -567,12 +569,14 @@ export default function ListaGeneralPage() {
               setPage(0);
             }}
             sx={{ minWidth: 180 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Cake fontSize="small" sx={{ color: "#d81b7e" }} />
-                </InputAdornment>
-              ),
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Cake fontSize="small" sx={{ color: "#d81b7e" }} />
+                  </InputAdornment>
+                ),
+              },
             }}
           >
             <MenuItem value="">Todos los meses</MenuItem>
@@ -597,7 +601,7 @@ export default function ListaGeneralPage() {
               }
             }}
             sx={{ width: 80 }}
-            inputProps={{ min: 1, max: 31 }}
+            slotProps={{ htmlInput: { min: 1, max: 31 } }}
           />
 
           {/* Espaciador */}
