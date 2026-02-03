@@ -104,8 +104,7 @@ export default function Sidebar({ toggled, setToggled, menuItems, color, subgere
   };
 
   const renderMenuItem = (item: MenuItemType) => {
-    // Solo calcular active después de montar para evitar hydration mismatch
-    const active = mounted && pathname === item.ruta;
+    const active = pathname === item.ruta;
 
     if (item.children && item.children.length > 0) {
       return (
@@ -119,24 +118,16 @@ export default function Sidebar({ toggled, setToggled, menuItems, color, subgere
       );
     }
 
-    // Estilos base que siempre se aplican (sin depender de active)
-    const baseStyle = {
-      backgroundColor: "transparent",
-      borderLeft: "4px solid transparent",
-    };
-
-    // Solo aplicar estilos activos después del montaje
-    const activeStyle = active ? {
-      backgroundColor: `${color}20`,
-      borderLeft: `4px solid ${color}`,
-    } : baseStyle;
+    const style = active
+      ? { backgroundColor: `${color}20`, borderLeft: `4px solid ${color}` }
+      : { backgroundColor: "transparent", borderLeft: "4px solid transparent" };
 
     return (
       <MenuItem
         key={item.id}
         component={<Link href={item.ruta || "#"} />}
         icon={item.icono ? <DynamicIcon iconName={item.icono} /> : undefined}
-        style={mounted ? activeStyle : baseStyle}
+        style={style}
       >
         <span style={{
           color: active ? color : "inherit",
@@ -147,6 +138,10 @@ export default function Sidebar({ toggled, setToggled, menuItems, color, subgere
       </MenuItem>
     );
   };
+
+  if (!mounted) {
+    return <div className="relative h-full w-max z-[1200]" style={{ width: 250 }} />;
+  }
 
   return (
     <div className="relative h-full w-max z-[1200]">
