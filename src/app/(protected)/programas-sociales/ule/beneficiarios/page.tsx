@@ -380,12 +380,14 @@ export default function ULEBeneficiariosPage() {
                 setSearchTerm(e.target.value);
                 setPage(0);
               }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search sx={{ color: "#64748b", fontSize: 20 }} />
-                  </InputAdornment>
-                ),
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search sx={{ color: "#64748b", fontSize: 20 }} />
+                    </InputAdornment>
+                  ),
+                },
               }}
               size="small"
               sx={{

@@ -455,12 +455,14 @@ export default function PVLComitesPage() {
                 placeholder="Buscar por código, comité, coordinadora..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Search sx={{ color: "#64748b", fontSize: 20 }} />
-                    </InputAdornment>
-                  ),
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Search sx={{ color: "#64748b", fontSize: 20 }} />
+                      </InputAdornment>
+                    ),
+                  },
                 }}
                 size="small"
                 sx={{
