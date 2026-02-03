@@ -48,6 +48,7 @@ import {
 import * as XLSX from "xlsx";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
+import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 
@@ -221,6 +222,9 @@ export default function ComedoresListaPage() {
     setSelectedComedor(null);
   };
 
+  // Formatear strings del backend (Title Case, preservar siglas en direcciones)
+  const allComedoresFormateados = useFormatTableData(allComedores);
+
   // Formatear fecha
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return "-";
@@ -233,7 +237,7 @@ export default function ComedoresListaPage() {
   };
 
   // Filtrar datos localmente sobre TODOS los datos
-  const filteredData = allComedores.filter((c: ComedorAPI) => {
+  const filteredData = allComedoresFormateados.filter((c: ComedorAPI) => {
     const matchesSearch =
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||

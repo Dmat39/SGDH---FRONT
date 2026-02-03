@@ -27,6 +27,7 @@ import {
 import { Search, People, Refresh, Download, Clear } from "@mui/icons-material";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
+import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import * as XLSX from "xlsx";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
@@ -146,10 +147,13 @@ export default function ULEBeneficiariosPage() {
     }
   }, [fetchData]);
 
+  // Formatear strings del backend (Title Case, preservar siglas en direcciones)
+  const empadronadosFormateados = useFormatTableData(empadronados);
+
   // Obtener lista única de urbanizaciones para el filtro
   const urbanizaciones = useMemo(() => {
     const uniqueUrban = new Map<string, string>();
-    empadronados.forEach((e) => {
+    empadronadosFormateados.forEach((e) => {
       if (e.urban) {
         uniqueUrban.set(e.urban.id, e.urban.name);
       }
@@ -157,11 +161,11 @@ export default function ULEBeneficiariosPage() {
     return Array.from(uniqueUrban.entries())
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [empadronados]);
+  }, [empadronadosFormateados]);
 
   // Filtrar datos
   const empadronadosFiltrados = useMemo(() => {
-    return empadronados.filter((e) => {
+    return empadronadosFormateados.filter((e) => {
       // Filtro por búsqueda
       if (searchTerm) {
         const busqueda = searchTerm.toLowerCase();
@@ -189,7 +193,7 @@ export default function ULEBeneficiariosPage() {
 
       return true;
     });
-  }, [empadronados, searchTerm, filtroFormato, filtroUrban]);
+  }, [empadronadosFormateados, searchTerm, filtroFormato, filtroUrban]);
 
   // Paginación
   const empadronadosPaginados = useMemo(() => {
