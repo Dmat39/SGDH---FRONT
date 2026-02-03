@@ -254,19 +254,21 @@ export default function MensajeriaWhatsAppPage() {
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyPress={(e) => e.key === "Enter" && handleSearch()}
             sx={{ minWidth: 250 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search fontSize="small" />
-                </InputAdornment>
-              ),
-              endAdornment: searchInput && (
-                <InputAdornment position="end">
-                  <IconButton size="small" onClick={handleClearSearch}>
-                    <Clear fontSize="small" />
-                  </IconButton>
-                </InputAdornment>
-              ),
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search fontSize="small" />
+                  </InputAdornment>
+                ),
+                endAdornment: searchInput && (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={handleClearSearch}>
+                      <Clear fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              },
             }}
           />
 
