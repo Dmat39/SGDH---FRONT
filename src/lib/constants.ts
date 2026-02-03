@@ -302,13 +302,6 @@ export const MODULOS_PROGRAMAS_SOCIALES: MenuItem[] = [
         icono: "People",
         permisos: ["ule", "all_programas_sociales", "all"],
       },
-      {
-        id: "ule-mapa",
-        nombre: "Mapa",
-        ruta: "/programas-sociales/ule/mapa",
-        icono: "Map",
-        permisos: ["ule", "mapa_ule", "all_programas_sociales", "all"],
-      },
     ],
   },
   {
