@@ -2,14 +2,15 @@ import { useMemo } from "react";
 import { toTitleCase, formatDireccion } from "@/lib/utils/formatters";
 
 const SKIP_KEYS_PATTERN =
-  /id|dni|code|codigo|phone|telefono|fsu|s100|email|ruc/i;
+  /id|dni|code|codigo|phone|telefono|fsu|s100|email|ruc|modulo|modality|format|level|situation|route|rol|estado|status|type|sex/i;
 
 const ADDRESS_KEYS_PATTERN = /direccion|domicilio|address/i;
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}/;
+const ENUM_VALUE_PATTERN = /^[A-Z0-9_]+$/;
 
 function shouldSkipValue(value: string): boolean {
-  return value.length <= 3 || ISO_DATE_PATTERN.test(value);
+  return value.length <= 3 || ISO_DATE_PATTERN.test(value) || ENUM_VALUE_PATTERN.test(value);
 }
 
 function formatRecord<T extends object>(obj: T): T {
