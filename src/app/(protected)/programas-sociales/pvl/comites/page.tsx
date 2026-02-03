@@ -44,6 +44,7 @@ import {
 } from "@mui/icons-material";
 import * as XLSX from "xlsx";
 import { useFetch } from "@/lib/hooks/useFetch";
+import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
@@ -317,8 +318,11 @@ export default function PVLComitesPage() {
     setSelectedComite(null);
   };
 
+  // Formatear strings del backend (Title Case, preservar siglas en direcciones)
+  const allComitesFormateados = useFormatTableData(allComitesData);
+
   // Filtrar datos localmente sobre TODOS los datos
-  const filteredData = allComitesData.filter((c: ComiteFrontend) => {
+  const filteredData = allComitesFormateados.filter((c: ComiteFrontend) => {
     const matchesSearch =
       c.comite.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.codigo.includes(searchTerm) ||
@@ -451,12 +455,14 @@ export default function PVLComitesPage() {
                 placeholder="Buscar por código, comité, coordinadora..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Search sx={{ color: "#64748b", fontSize: 20 }} />
-                    </InputAdornment>
-                  ),
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Search sx={{ color: "#64748b", fontSize: 20 }} />
+                      </InputAdornment>
+                    ),
+                  },
                 }}
                 size="small"
                 sx={{

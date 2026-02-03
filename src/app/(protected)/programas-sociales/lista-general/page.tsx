@@ -36,6 +36,7 @@ import { PersonaParaEnvio } from "../mensajeria-whatsapp/types";
 import { showSuccess, showError } from "@/lib/utils/swalConfig";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
+import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import * as XLSX from "xlsx";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
@@ -287,9 +288,12 @@ export default function ListaGeneralPage() {
     fetchAllData();
   }, [fetchAllData]);
 
+  // Formatear strings del backend (Title Case, preservar siglas en direcciones)
+  const personasFormateadas = useFormatTableData(personas);
+
   // Filtrar datos
   const personasFiltradas = useMemo(() => {
-    return personas.filter((persona) => {
+    return personasFormateadas.filter((persona) => {
       // Filtro por módulo
       if (filtroModulo && persona.modulo !== filtroModulo) {
         return false;
@@ -326,7 +330,7 @@ export default function ListaGeneralPage() {
 
       return true;
     });
-  }, [personas, filtroModulo, filtroBusqueda, filtroDia, filtroMes]);
+  }, [personasFormateadas, filtroModulo, filtroBusqueda, filtroDia, filtroMes]);
 
   // Paginación
   const personasPaginadas = useMemo(() => {
@@ -513,12 +517,14 @@ export default function ListaGeneralPage() {
               setPage(0);
             }}
             sx={{ minWidth: 280 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search fontSize="small" />
-                </InputAdornment>
-              ),
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search fontSize="small" />
+                  </InputAdornment>
+                ),
+              },
             }}
           />
 
@@ -563,12 +569,14 @@ export default function ListaGeneralPage() {
               setPage(0);
             }}
             sx={{ minWidth: 180 }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Cake fontSize="small" sx={{ color: "#d81b7e" }} />
-                </InputAdornment>
-              ),
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Cake fontSize="small" sx={{ color: "#d81b7e" }} />
+                  </InputAdornment>
+                ),
+              },
             }}
           >
             <MenuItem value="">Todos los meses</MenuItem>
@@ -593,7 +601,7 @@ export default function ListaGeneralPage() {
               }
             }}
             sx={{ width: 80 }}
-            inputProps={{ min: 1, max: 31 }}
+            slotProps={{ htmlInput: { min: 1, max: 31 } }}
           />
 
           {/* Espaciador */}
