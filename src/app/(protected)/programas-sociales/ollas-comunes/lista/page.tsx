@@ -48,6 +48,7 @@ import {
 import * as XLSX from "xlsx";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
+import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 
@@ -221,6 +222,9 @@ export default function OllasListaPage() {
     setSelectedOlla(null);
   };
 
+  // Formatear strings del backend (Title Case, preservar siglas en direcciones)
+  const allOllasFormateadas = useFormatTableData(allOllas);
+
   // Formatear fecha
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return "-";
@@ -233,7 +237,7 @@ export default function OllasListaPage() {
   };
 
   // Filtrar datos localmente sobre TODOS los datos
-  const filteredData = allOllas.filter((c: OllaAPI) => {
+  const filteredData = allOllasFormateadas.filter((c: OllaAPI) => {
     const matchesSearch =
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
