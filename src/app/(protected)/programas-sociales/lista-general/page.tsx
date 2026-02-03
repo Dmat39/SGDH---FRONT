@@ -36,6 +36,7 @@ import { PersonaParaEnvio } from "../mensajeria-whatsapp/types";
 import { showSuccess, showError } from "@/lib/utils/swalConfig";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
+import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import * as XLSX from "xlsx";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
@@ -287,9 +288,12 @@ export default function ListaGeneralPage() {
     fetchAllData();
   }, [fetchAllData]);
 
+  // Formatear strings del backend (Title Case, preservar siglas en direcciones)
+  const personasFormateadas = useFormatTableData(personas);
+
   // Filtrar datos
   const personasFiltradas = useMemo(() => {
-    return personas.filter((persona) => {
+    return personasFormateadas.filter((persona) => {
       // Filtro por módulo
       if (filtroModulo && persona.modulo !== filtroModulo) {
         return false;
@@ -326,7 +330,7 @@ export default function ListaGeneralPage() {
 
       return true;
     });
-  }, [personas, filtroModulo, filtroBusqueda, filtroDia, filtroMes]);
+  }, [personasFormateadas, filtroModulo, filtroBusqueda, filtroDia, filtroMes]);
 
   // Paginación
   const personasPaginadas = useMemo(() => {

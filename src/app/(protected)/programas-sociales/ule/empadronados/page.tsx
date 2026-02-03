@@ -55,6 +55,7 @@ import {
 } from "@mui/icons-material";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
+import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import * as XLSX from "xlsx";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
@@ -193,10 +194,13 @@ export default function ULEEmpadronadosPage() {
     }
   }, [fetchData]);
 
+  // Formatear strings del backend (Title Case, preservar siglas en direcciones)
+  const empadronadosFormateados = useFormatTableData(empadronados);
+
   // Obtener lista única de urbanizaciones para el filtro
   const urbanizaciones = useMemo(() => {
     const uniqueUrban = new Map<string, string>();
-    empadronados.forEach((e) => {
+    empadronadosFormateados.forEach((e) => {
       if (e.urban) {
         uniqueUrban.set(e.urban.id, e.urban.name);
       }
@@ -204,11 +208,11 @@ export default function ULEEmpadronadosPage() {
     return Array.from(uniqueUrban.entries())
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [empadronados]);
+  }, [empadronadosFormateados]);
 
   // Filtrar datos
   const empadronadosFiltrados = useMemo(() => {
-    return empadronados.filter((e) => {
+    return empadronadosFormateados.filter((e) => {
       // Filtro por búsqueda
       if (searchTerm) {
         const busqueda = searchTerm.toLowerCase();
@@ -254,7 +258,7 @@ export default function ULEEmpadronadosPage() {
 
       return true;
     });
-  }, [empadronados, searchTerm, filtroFormato, filtroUrban, cumpleanosModo, mesesCumpleanos, diaCumpleanos]);
+  }, [empadronadosFormateados, searchTerm, filtroFormato, filtroUrban, cumpleanosModo, mesesCumpleanos, diaCumpleanos]);
 
   // Paginación
   const empadronadosPaginados = useMemo(() => {
