@@ -70,6 +70,29 @@ const DEMO_USERS: Record<string, { password: string; user: DemoUserData }> = {
       cargo: "Operador PVL",
     },
   },
+  userA: {
+    password: "user2026$",
+    user: {
+      id: 3,
+      username: "userA",
+      firstName: "Usuario",
+      lastName: "A",
+      fullName: "Usuario A",
+      email: "userA@sjl.gob.pe",
+      permissions: [
+        "ule",
+        "pvl",
+        "mapa_pvl",
+        "ollas_comunes",
+        "mapa_ollas",
+        "comedores_populares",
+        "mapa_comedores",
+        "all_servicios_sociales",
+      ],
+      subgerencia: "programas-sociales" as SubgerenciaType,
+      cargo: "Operador de Programas Sociales",
+    },
+  },
 };
 
 export default function LoginForm({ subgerencia, color, subgerenciaName }: LoginFormProps) {
@@ -119,7 +142,7 @@ export default function LoginForm({ subgerencia, color, subgerenciaName }: Login
             showSuccess("Bienvenido", `Hola ${demoUser.fullName}`);
 
             // Redirigir según permisos del usuario
-            if (demoUser.permissions.includes("all") || demoUser.permissions.includes("all_programas_sociales")) {
+            if (demoUser.permissions.includes("all") || demoUser.permissions.includes("all_programas_sociales") || demoUser.permissions.includes("all_servicios_sociales")) {
               router.push(`/${subgerencia}`);
             } else if (demoUser.permissions.includes("pvl")) {
               router.push(`/${subgerencia}/pvl`);
