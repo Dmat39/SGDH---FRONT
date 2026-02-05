@@ -355,6 +355,7 @@ export const MODULOS_PROGRAMAS_SOCIALES: MenuItem[] = [
         icono: "People",
         permisos: ["ciam", "all_programas_sociales", "all"],
       },
+      /* ciam no tiene mapa ya que no tiene lat y long 
       {
         id: "ciam-mapa",
         nombre: "Mapa",
@@ -362,6 +363,7 @@ export const MODULOS_PROGRAMAS_SOCIALES: MenuItem[] = [
         icono: "Map",
         permisos: ["ciam", "mapa_ciam", "all_programas_sociales", "all"],
       },
+      */
     ],
   },
   // Módulo de Mapa General (solo para subgerente)
