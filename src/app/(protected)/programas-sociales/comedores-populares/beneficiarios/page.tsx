@@ -8,6 +8,7 @@ export default function ComedoresBeneficiariosPage() {
       title="Comedores Populares - Beneficiarios"
       subtitle="Listado de beneficiarios de Comedores Populares"
       unidadLabel="Comedor"
+      showAgeFilter
     />
   );
 }

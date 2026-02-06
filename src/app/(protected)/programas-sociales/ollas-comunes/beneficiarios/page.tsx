@@ -8,6 +8,7 @@ export default function OllasBeneficiariosPage() {
       title="Ollas Comunes - Beneficiarios"
       subtitle="Listado de beneficiarios de Ollas Comunes"
       unidadLabel="Olla"
+      showAgeFilter
     />
   );
 }
