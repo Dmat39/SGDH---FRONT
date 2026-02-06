@@ -451,22 +451,7 @@ export default function OllasListaPage() {
                   <FilterList sx={{ color: filterOpen ? subgerencia.color : "#64748b", fontSize: 20 }} />
                 </IconButton>
               </Tooltip>
-              <Tooltip title="Filtrar por edad">
-                <IconButton
-                  onClick={handleEdadFilterClick}
-                  sx={{
-                    backgroundColor: edadFilterOpen ? "#e0e7ff" : "#f8fafc",
-                    border: `1px solid ${edadFilterOpen ? "#6366f1" : "#e2e8f0"}`,
-                    borderRadius: "8px",
-                    "&:hover": {
-                      backgroundColor: "#e0e7ff",
-                      borderColor: "#6366f1",
-                    },
-                  }}
-                >
-                  <FilterList sx={{ color: edadFilterOpen ? "#4338ca" : "#64748b", fontSize: 20 }} />
-                </IconButton>
-              </Tooltip>
+              
               <Tooltip title="Exportar a Excel">
                 <IconButton
                   onClick={handleExport}
