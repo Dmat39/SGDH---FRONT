@@ -59,7 +59,7 @@ const MESES = [
 ];
 
 // Tipo de filtro
-type FilterType = "miembros" | "cumpleanos";
+type FilterType = "miembros" | "cumpleanos" | "edad";
 
 // Tipo de filtro de cumpleaños
 type CumpleanosModo = "mes" | "dia";
@@ -131,7 +131,9 @@ export default function OllasListaPage() {
   const [mesesCumpleanos, setMesesCumpleanos] = useState<number[]>([]);
   const [cumpleanosModo, setCumpleanosModo] = useState<CumpleanosModo>("mes");
   const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
+  const [edadRange, setEdadRange] = useState<number[]>([0, 100]);
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
+  const [edadFilterAnchor, setEdadFilterAnchor] = useState<HTMLButtonElement | null>(null);
 
   // Estados para detalle
   const [selectedOlla, setSelectedOlla] = useState<OllaAPI | null>(null);
@@ -179,6 +181,16 @@ export default function OllasListaPage() {
     setFilterAnchor(null);
   };
 
+  const handleEdadFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setEdadFilterAnchor(event.currentTarget);
+  };
+
+  const handleEdadFilterClose = () => {
+    setEdadFilterAnchor(null);
+  };
+
+  const edadFilterOpen = Boolean(edadFilterAnchor);
+
   const handleFilterTypeChange = (
     _event: React.MouseEvent<HTMLElement>,
     newFilterType: FilterType | null
@@ -192,6 +204,22 @@ export default function OllasListaPage() {
     setMiembrosRange(newValue as number[]);
   };
 
+  const handleEdadChange = (_event: Event, newValue: number | number[]) => {
+    setEdadRange(newValue as number[]);
+  };
+
+  const calcularEdad = (fechaNacimiento: string | null | undefined): number => {
+    if (!fechaNacimiento) return 0;
+    const hoy = new Date();
+    const nacimiento = new Date(fechaNacimiento);
+    let edad = hoy.getFullYear() - nacimiento.getFullYear();
+    const mes = hoy.getMonth() - nacimiento.getMonth();
+    if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) {
+      edad--;
+    }
+    return edad;
+  };
+
   const handleMesToggle = (mes: number) => {
     setMesesCumpleanos((prev) =>
       prev.includes(mes) ? prev.filter((m) => m !== mes) : [...prev, mes]
@@ -202,6 +230,7 @@ export default function OllasListaPage() {
 
   const isMiembrosFiltered = miembrosRange[0] > 0 || miembrosRange[1] < 500;
   const isCumpleanosFiltered = cumpleanosModo === "mes" ? mesesCumpleanos.length > 0 : diaCumpleanos !== "";
+  const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 100;
 
   const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
@@ -267,13 +296,24 @@ export default function OllasListaPage() {
       }
     }
 
-    return matchesSearch && matchesMiembros && matchesCumpleanos;
+    // Filtro por edad del presidente
+    let matchesEdad = true;
+    if (isEdadFiltered) {
+      if (c.president?.birthday) {
+        const edad = calcularEdad(c.president.birthday);
+        matchesEdad = edad >= edadRange[0] && edad <= edadRange[1];
+      } else {
+        matchesEdad = false;
+      }
+    }
+
+    return matchesSearch && matchesMiembros && matchesCumpleanos && matchesEdad;
   });
 
   // Resetear página cuando cambian los filtros
   useEffect(() => {
     setPage(0);
-  }, [searchTerm, miembrosRange, mesesCumpleanos, cumpleanosModo, diaCumpleanos]);
+  }, [searchTerm, miembrosRange, mesesCumpleanos, cumpleanosModo, diaCumpleanos, edadRange]);
 
   // Datos paginados para mostrar en la tabla
   const paginatedData = filteredData.slice(
@@ -411,6 +451,7 @@ export default function OllasListaPage() {
                   <FilterList sx={{ color: filterOpen ? subgerencia.color : "#64748b", fontSize: 20 }} />
                 </IconButton>
               </Tooltip>
+              
               <Tooltip title="Exportar a Excel">
                 <IconButton
                   onClick={handleExport}
@@ -483,6 +524,30 @@ export default function OllasListaPage() {
                   </IconButton>
                 </Box>
               )}
+              {isEdadFiltered && (
+                <Box
+                  sx={{
+                    backgroundColor: "#e0e7ff",
+                    borderRadius: "16px",
+                    px: 1.5,
+                    py: 0.5,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 0.5,
+                  }}
+                >
+                  <Typography variant="caption" color="#4338ca" fontWeight={500}>
+                    Edad: {edadRange[0]} - {edadRange[1]}
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    onClick={() => setEdadRange([0, 100])}
+                    sx={{ p: 0.25 }}
+                  >
+                    <Close sx={{ fontSize: 14, color: "#4338ca" }} />
+                  </IconButton>
+                </Box>
+              )}
 
               <Typography
                 variant="body2"
@@ -551,6 +616,20 @@ export default function OllasListaPage() {
                     }}
                   >
                     Cumpleaños
+                  </ToggleButton>
+                  <ToggleButton
+                    value="edad"
+                    sx={{
+                      textTransform: "none",
+                      fontSize: "0.75rem",
+                      "&.Mui-selected": {
+                        backgroundColor: "#e0e7ff",
+                        color: "#4338ca",
+                        "&:hover": { backgroundColor: "#c7d2fe" },
+                      },
+                    }}
+                  >
+                    Edad
                   </ToggleButton>
                 </ToggleButtonGroup>
 
@@ -696,6 +775,39 @@ export default function OllasListaPage() {
                   </>
                 )}
 
+                {/* Filtro por edad */}
+                {filterType === "edad" && (
+                  <>
+                    <Typography variant="body2" color="#475569" mb={1.5}>
+                      Edad del presidente
+                    </Typography>
+                    <Slider
+                      value={edadRange}
+                      onChange={handleEdadChange}
+                      valueLabelDisplay="auto"
+                      min={0}
+                      max={100}
+                      sx={{
+                        color: "#6366f1",
+                        "& .MuiSlider-thumb": {
+                          backgroundColor: "#4338ca",
+                        },
+                        "& .MuiSlider-track": {
+                          backgroundColor: "#6366f1",
+                        },
+                      }}
+                    />
+                    <Box display="flex" justifyContent="space-between" mt={1}>
+                      <Typography variant="caption" color="text.secondary">
+                        {edadRange[0]} años
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {edadRange[1]} años
+                      </Typography>
+                    </Box>
+                  </>
+                )}
+
                 <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
                   <Button
                     size="small"
@@ -703,6 +815,7 @@ export default function OllasListaPage() {
                       setMiembrosRange([0, 500]);
                       setMesesCumpleanos([]);
                       setDiaCumpleanos("");
+                      setEdadRange([0, 100]);
                     }}
                     sx={{
                       color: "#64748b",
@@ -721,6 +834,73 @@ export default function OllasListaPage() {
                       textTransform: "none",
                       fontFamily: "'Inter', 'Roboto', sans-serif",
                       "&:hover": { backgroundColor: "#be185d" },
+                    }}
+                  >
+                    Aplicar
+                  </Button>
+                </Box>
+              </Box>
+            </Popover>
+
+            {/* Popover de filtro por edad */}
+            <Popover
+              open={edadFilterOpen}
+              anchorEl={edadFilterAnchor}
+              onClose={handleEdadFilterClose}
+              anchorOrigin={{
+                vertical: "bottom",
+                horizontal: "left",
+              }}
+              transformOrigin={{
+                vertical: "top",
+                horizontal: "left",
+              }}
+              sx={{ mt: 1 }}
+            >
+              <Box sx={{ p: 2.5, width: 280 }}>
+                <Typography variant="subtitle2" fontWeight={600} color="#334155" mb={2}>
+                  Filtrar por rango de edad
+                </Typography>
+                <Slider
+                  value={edadRange}
+                  onChange={handleEdadChange}
+                  valueLabelDisplay="auto"
+                  min={0}
+                  max={100}
+                  sx={{
+                    color: "#6366f1",
+                    "& .MuiSlider-thumb": {
+                      backgroundColor: "#4338ca",
+                    },
+                    "& .MuiSlider-track": {
+                      backgroundColor: "#6366f1",
+                    },
+                  }}
+                />
+                <Box display="flex" justifyContent="space-between" mt={1}>
+                  <Typography variant="caption" color="text.secondary">
+                    {edadRange[0]} años
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {edadRange[1]} años
+                  </Typography>
+                </Box>
+                <Box display="flex" justifyContent="flex-end" mt={2} gap={1}>
+                  <Button
+                    size="small"
+                    onClick={() => setEdadRange([0, 100])}
+                    sx={{ color: "#64748b", textTransform: "none" }}
+                  >
+                    Limpiar
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={handleEdadFilterClose}
+                    sx={{
+                      backgroundColor: "#4338ca",
+                      textTransform: "none",
+                      "&:hover": { backgroundColor: "#3730a3" },
                     }}
                   >
                     Aplicar
