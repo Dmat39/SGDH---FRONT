@@ -19,8 +19,11 @@ import {
   Chip,
   IconButton,
   Tooltip,
+  Popover,
+  Slider,
+  Button,
 } from "@mui/material";
-import { Search, Visibility, Edit, Delete } from "@mui/icons-material";
+import { Search, Visibility, Edit, Delete, FilterList } from "@mui/icons-material";
 
 interface Beneficiario {
   id: number;
@@ -36,6 +39,7 @@ interface ModuleBeneficiariosProps {
   subtitle: string;
   unidadLabel?: string;
   data?: Beneficiario[];
+  showAgeFilter?: boolean;
 }
 
 // Datos de ejemplo
@@ -52,10 +56,27 @@ export default function ModuleBeneficiarios({
   subtitle,
   unidadLabel = "Unidad",
   data = defaultData,
+  showAgeFilter = false,
 }: ModuleBeneficiariosProps) {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState("");
+  const [ageRange, setAgeRange] = useState<number[]>([0, 100]);
+  const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
+
+  const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setFilterAnchor(event.currentTarget);
+  };
+
+  const handleFilterClose = () => {
+    setFilterAnchor(null);
+  };
+
+  const handleAgeChange = (_event: Event, newValue: number | number[]) => {
+    setAgeRange(newValue as number[]);
+  };
+
+  const filterOpen = Boolean(filterAnchor);
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);
@@ -97,9 +118,8 @@ export default function ModuleBeneficiarios({
 
       <Card>
         <CardContent>
-          <Box mb={3}>
+          <Box mb={3} display="flex" gap={1.5} alignItems="center">
             <TextField
-              fullWidth
               placeholder="Buscar por nombre, DNI o jurisdicción..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -113,8 +133,105 @@ export default function ModuleBeneficiarios({
                 },
               }}
               size="small"
+              sx={{ width: 320 }}
             />
+            {showAgeFilter && (
+              <>
+                <Tooltip title="Filtrar por edad">
+                  <IconButton
+                    onClick={handleFilterClick}
+                    sx={{
+                      backgroundColor: filterOpen ? "#e2e8f0" : "#f8fafc",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "8px",
+                      "&:hover": {
+                        backgroundColor: "#e2e8f0",
+                      },
+                    }}
+                  >
+                    <FilterList sx={{ color: "#64748b", fontSize: 20 }} />
+                  </IconButton>
+                </Tooltip>
+                {(ageRange[0] > 0 || ageRange[1] < 100) && (
+                  <Chip
+                    label={`Edad: ${ageRange[0]} - ${ageRange[1]}`}
+                    size="small"
+                    onDelete={() => setAgeRange([0, 100])}
+                    sx={{ backgroundColor: "#e2e8f0" }}
+                  />
+                )}
+              </>
+            )}
           </Box>
+
+          {/* Popover de filtro por edad */}
+          {showAgeFilter && (
+            <Popover
+              open={filterOpen}
+              anchorEl={filterAnchor}
+              onClose={handleFilterClose}
+              anchorOrigin={{
+                vertical: "bottom",
+                horizontal: "left",
+              }}
+              transformOrigin={{
+                vertical: "top",
+                horizontal: "left",
+              }}
+              sx={{ mt: 1 }}
+            >
+              <Box sx={{ p: 2.5, width: 280 }}>
+                <Typography variant="subtitle2" fontWeight={600} color="#334155" mb={2}>
+                  Filtrar por rango de edad
+                </Typography>
+                <Slider
+                  value={ageRange}
+                  onChange={handleAgeChange}
+                  valueLabelDisplay="auto"
+                  min={0}
+                  max={100}
+                  sx={{
+                    color: "#64748b",
+                    "& .MuiSlider-thumb": {
+                      backgroundColor: "#475569",
+                    },
+                    "& .MuiSlider-track": {
+                      backgroundColor: "#64748b",
+                    },
+                  }}
+                />
+                <Box display="flex" justifyContent="space-between" mt={1}>
+                  <Typography variant="caption" color="text.secondary">
+                    {ageRange[0]} años
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {ageRange[1]} años
+                  </Typography>
+                </Box>
+                <Box display="flex" justifyContent="flex-end" mt={2} gap={1}>
+                  <Button
+                    size="small"
+                    onClick={() => setAgeRange([0, 100])}
+                    sx={{ color: "#64748b", textTransform: "none" }}
+                  >
+                    Limpiar
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={handleFilterClose}
+                    sx={{
+                      backgroundColor: "#475569",
+                      textTransform: "none",
+                      "&:hover": { backgroundColor: "#334155" },
+                    }}
+                  >
+                    Aplicar
+                  </Button>
+                </Box>
+              </Box>
+            </Popover>
+          )}
 
           <TableContainer component={Paper} variant="outlined">
             <Table>
