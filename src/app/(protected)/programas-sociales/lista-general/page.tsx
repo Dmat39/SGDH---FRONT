@@ -48,13 +48,14 @@ import * as XLSX from "xlsx";
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 
 // Tipos de módulos
-type ModuloType = "PVL" | "OLLAS_COMUNES" | "COMEDORES_POPULARES" | "ULE";
+type ModuloType = "PVL" | "OLLAS_COMUNES" | "COMEDORES_POPULARES" | "ULE" | "CIAM";
 
 const MODULOS_CONFIG: { id: ModuloType; label: string; color: string }[] = [
   { id: "PVL", label: "PVL", color: "#d81b7e" },
   { id: "OLLAS_COMUNES", label: "Ollas Comunes", color: "#4caf50" },
   { id: "COMEDORES_POPULARES", label: "Comedores Populares", color: "#ff9800" },
   { id: "ULE", label: "ULE", color: "#2196f3" },
+  { id: "CIAM", label: "CIAM", color: "#9c27b0" },
 ];
 
 // Meses para el filtro
@@ -172,6 +173,24 @@ interface BackendResponseULE {
   data: {
     data: ULERegisteredPerson[];
     totalCount: number;
+  };
+}
+
+interface CIAMBeneficiary {
+  id: string;
+  name: string;
+  lastname: string;
+  cellphone: string | null;
+  birthday: string;
+  district_live: { id: string; name: string } | null;
+}
+
+interface BackendResponseCIAM {
+  message: string;
+  data: {
+    data: CIAMBeneficiary[];
+    totalCount: number;
+    totalPages: number;
   };
 }
 
@@ -307,6 +326,39 @@ export default function ListaGeneralPage() {
       }
     } catch (error) {
       console.error("Error cargando ULE:", error);
+    }
+
+    // Cargar CIAM (Beneficiarios adultos mayores) en lotes de 500
+    try {
+      const ciamFirst = await getData<BackendResponseCIAM>(`pam/benefited?page=1&limit=1`);
+      const ciamTotal = ciamFirst?.data?.totalCount || 0;
+      if (ciamTotal > 0) {
+        const BATCH_SIZE = 500;
+        const totalPages = Math.ceil(ciamTotal / BATCH_SIZE);
+
+        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+          const ciamResponse = await getData<BackendResponseCIAM>(`pam/benefited?page=${pageNum}&limit=${BATCH_SIZE}`);
+          if (ciamResponse?.data?.data) {
+            ciamResponse.data.data.forEach((person) => {
+              todasLasPersonas.push({
+                id: `ciam-${person.id}`,
+                modulo: "CIAM",
+                moduloLabel: "CIAM",
+                entidadNombre: person.district_live?.name || "Sin distrito",
+                entidadCodigo: "-",
+                nombre: person.name || "",
+                apellido: person.lastname || "",
+                dni: "",
+                telefono: person.cellphone || "",
+                cumpleanos: person.birthday || null,
+                rol: "Adulto Mayor",
+              });
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error cargando CIAM:", error);
     }
 
     setPersonas(todasLasPersonas);
@@ -532,7 +584,7 @@ export default function ListaGeneralPage() {
           Lista General
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Datos unificados de PVL, Ollas Comunes, Comedores Populares y ULE
+          Datos unificados de PVL, Ollas Comunes, Comedores Populares, ULE y CIAM
         </Typography>
       </Box>
 
