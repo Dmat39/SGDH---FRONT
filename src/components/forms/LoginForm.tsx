@@ -88,6 +88,7 @@ const DEMO_USERS: Record<string, { password: string; user: DemoUserData }> = {
         "comedores_populares",
         "mapa_comedores",
         "all_servicios_sociales",
+        "ciam",
       ],
       subgerencia: "programas-sociales" as SubgerenciaType,
       cargo: "Operador de Programas Sociales",
@@ -142,8 +143,10 @@ export default function LoginForm({ subgerencia, color, subgerenciaName }: Login
             showSuccess("Bienvenido", `Hola ${demoUser.fullName}`);
 
             // Redirigir según permisos del usuario
-            if (demoUser.permissions.includes("all") || demoUser.permissions.includes("all_programas_sociales") || demoUser.permissions.includes("all_servicios_sociales")) {
+            if (demoUser.permissions.includes("all") || demoUser.permissions.includes("all_programas_sociales")) {
               router.push(`/${subgerencia}`);
+            } else if (demoUser.permissions.includes("all_servicios_sociales") || demoUser.permissions.includes("ule")) {
+              router.push(`/${subgerencia}/lista-general`);
             } else if (demoUser.permissions.includes("pvl")) {
               router.push(`/${subgerencia}/pvl`);
             } else if (demoUser.permissions.includes("pantbc")) {
@@ -152,8 +155,6 @@ export default function LoginForm({ subgerencia, color, subgerenciaName }: Login
               router.push(`/${subgerencia}/comedores-populares`);
             } else if (demoUser.permissions.includes("ollas_comunes")) {
               router.push(`/${subgerencia}/ollas-comunes`);
-            } else if (demoUser.permissions.includes("ule")) {
-              router.push(`/${subgerencia}/ule`);
             } else if (demoUser.permissions.includes("omaped")) {
               router.push(`/${subgerencia}/omaped`);
             } else if (demoUser.permissions.includes("ciam")) {
