@@ -261,6 +261,7 @@ interface BeneficiarioTabla {
   distritoResidencia: string;
   modo: string;
   celular: string;
+  housingStatus: string;
 }
 
 // ============================================
@@ -278,6 +279,7 @@ const mapListaToTabla = (item: BeneficiarioListaBackend): BeneficiarioTabla => (
   distritoResidencia: item.district_live?.name || "-",
   modo: traducir("mode", item.mode),
   celular: item.cellphone || "-",
+  housingStatus: traducir("housing_status", item.housing_status),
 });
 
 // ============================================
@@ -311,6 +313,13 @@ const MODO_CHIP_COLORS: Record<string, { bg: string; color: string }> = {
   Alta: { bg: "#e8f5e9", color: "#2e7d32" },
   Media: { bg: "#fff3e0", color: "#e65100" },
   Baja: { bg: "#ffebee", color: "#c62828" },
+};
+
+const HOUSING_CHIP_COLORS: Record<string, { bg: string; color: string }> = {
+  Propia: { bg: "#e8f5e9", color: "#2e7d32" },
+  Alquilada: { bg: "#e3f2fd", color: "#1565c0" },
+  Prestada: { bg: "#fff3e0", color: "#e65100" },
+  Otro: { bg: "#f3e5f5", color: "#7b1fa2" },
 };
 
 // ============================================
@@ -1000,9 +1009,8 @@ export default function CIAMBeneficiariosPage() {
       "Fecha Nacimiento": formatearFecha(b.fechaNacimiento),
       "Estado Civil": b.estadoCivil,
       "Seguro de Salud": b.seguroSalud,
-      "Distrito": b.distritoResidencia,
-      "Modo": b.modo,
       "Celular": b.celular,
+      "Vivienda": b.housingStatus,
     }));
     if (exportData.length === 0) {
       return;
@@ -1067,7 +1075,7 @@ export default function CIAMBeneficiariosPage() {
             {/* Buscador y Filtros */}
             <Box mb={3} display="flex" gap={1.5} alignItems="center" flexWrap="wrap">
               <TextField
-                placeholder="Buscar por nombre, distrito o celular..."
+                placeholder="Buscar por nombre o celular..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 slotProps={{
@@ -1397,8 +1405,8 @@ export default function CIAMBeneficiariosPage() {
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Edad</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Estado Civil</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Seguro</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Distrito</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Modo</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Celular</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Vivienda</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                   </TableRow>
                 </TableHead>
@@ -1424,7 +1432,6 @@ export default function CIAMBeneficiariosPage() {
                     paginatedData.map((row: BeneficiarioTabla, index: number) => {
                       const sexoColors = SEXO_CHIP_COLORS[row.sexo] || { bg: "#f5f5f5", color: "#757575" };
                       const seguroColors = SEGURO_CHIP_COLORS[row.seguroSalud] || SEGURO_CHIP_COLORS["Otro"];
-                      const modoColors = MODO_CHIP_COLORS[row.modo] || { bg: "#f5f5f5", color: "#757575" };
                       return (
                         <TableRow
                           key={row.id}
@@ -1443,15 +1450,20 @@ export default function CIAMBeneficiariosPage() {
                             <Chip label={row.sexo} size="small" sx={{ backgroundColor: sexoColors.bg, color: sexoColors.color, fontWeight: 600, fontSize: "0.7rem" }} />
                           </TableCell>
                           <TableCell align="center">
-                            <Chip label={`${row.edad} años`} size="small" sx={{ backgroundColor: "#f3e5f5", color: "#7b1fa2", fontWeight: 600, fontSize: "0.75rem" }} />
+                            <Box display="flex" flexDirection="column" alignItems="center" gap={0.3}>
+                              <Chip label={`${row.edad} años`} size="small" sx={{ backgroundColor: "#f3e5f5", color: "#7b1fa2", fontWeight: 600, fontSize: "0.75rem" }} />
+                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem" }}>
+                                {formatearFecha(row.fechaNacimiento)}
+                              </Typography>
+                            </Box>
                           </TableCell>
                           <TableCell>{row.estadoCivil}</TableCell>
                           <TableCell>
                             <Chip label={row.seguroSalud} size="small" sx={{ backgroundColor: seguroColors.bg, color: seguroColors.color, fontWeight: 600, fontSize: "0.7rem" }} />
                           </TableCell>
-                          <TableCell>{row.distritoResidencia}</TableCell>
+                          <TableCell>{row.celular}</TableCell>
                           <TableCell align="center">
-                            <Chip label={row.modo} size="small" sx={{ backgroundColor: modoColors.bg, color: modoColors.color, fontWeight: 600, fontSize: "0.7rem" }} />
+                            <Chip label={row.housingStatus} size="small" sx={{ backgroundColor: (HOUSING_CHIP_COLORS[row.housingStatus] || { bg: "#f5f5f5", color: "#757575" }).bg, color: (HOUSING_CHIP_COLORS[row.housingStatus] || { bg: "#f5f5f5", color: "#757575" }).color, fontWeight: 600, fontSize: "0.7rem" }} />
                           </TableCell>
                           <TableCell align="center">
                             <Tooltip title="Ver detalles">
