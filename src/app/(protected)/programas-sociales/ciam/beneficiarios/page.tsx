@@ -65,9 +65,9 @@ const calcularEdad = (fechaNacimiento: string | null | undefined): number => {
   if (!fechaNacimiento) return 0;
   const hoy = new Date();
   const nacimiento = new Date(fechaNacimiento);
-  let edad = hoy.getFullYear() - nacimiento.getFullYear();
-  const mes = hoy.getMonth() - nacimiento.getMonth();
-  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) {
+  let edad = hoy.getUTCFullYear() - nacimiento.getUTCFullYear();
+  const mes = hoy.getUTCMonth() - nacimiento.getUTCMonth();
+  if (mes < 0 || (mes === 0 && hoy.getUTCDate() < nacimiento.getUTCDate())) {
     edad--;
   }
   return edad;
@@ -76,9 +76,9 @@ const calcularEdad = (fechaNacimiento: string | null | undefined): number => {
 const formatearFecha = (fecha: string | null | undefined): string => {
   if (!fecha) return "-";
   const date = new Date(fecha);
-  const dia = date.getDate().toString().padStart(2, "0");
-  const mes = (date.getMonth() + 1).toString().padStart(2, "0");
-  const anio = date.getFullYear();
+  const dia = date.getUTCDate().toString().padStart(2, "0");
+  const mes = (date.getUTCMonth() + 1).toString().padStart(2, "0");
+  const anio = date.getUTCFullYear();
   return `${dia}/${mes}/${anio}`;
 };
 
@@ -970,7 +970,7 @@ export default function CIAMBeneficiariosPage() {
     let matchesCumpleanos = true;
     if (cumpleanosModo === "mes" && mesesCumpleanos.length > 0) {
       if (b.fechaNacimiento) {
-        const mesCumple = new Date(b.fechaNacimiento).getMonth();
+        const mesCumple = new Date(b.fechaNacimiento).getUTCMonth();
         matchesCumpleanos = mesesCumpleanos.includes(mesCumple);
       } else {
         matchesCumpleanos = false;
@@ -979,7 +979,7 @@ export default function CIAMBeneficiariosPage() {
       if (b.fechaNacimiento) {
         const fechaNac = new Date(b.fechaNacimiento);
         const [, mes, dia] = diaCumpleanos.split("-").map(Number);
-        matchesCumpleanos = fechaNac.getMonth() + 1 === mes && fechaNac.getDate() === dia;
+        matchesCumpleanos = fechaNac.getUTCMonth() + 1 === mes && fechaNac.getUTCDate() === dia;
       } else {
         matchesCumpleanos = false;
       }

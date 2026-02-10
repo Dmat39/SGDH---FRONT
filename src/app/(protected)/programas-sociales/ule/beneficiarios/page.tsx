@@ -204,12 +204,12 @@ export default function ULEBeneficiariosPage() {
   const calcularEdad = (fechaNacimiento: string): number => {
     const hoy = new Date();
     const nacimiento = new Date(fechaNacimiento);
-    let edad = hoy.getFullYear() - nacimiento.getFullYear();
-    const mesActual = hoy.getMonth();
-    const mesNacimiento = nacimiento.getMonth();
+    let edad = hoy.getUTCFullYear() - nacimiento.getUTCFullYear();
+    const mesActual = hoy.getUTCMonth();
+    const mesNacimiento = nacimiento.getUTCMonth();
 
     if (mesActual < mesNacimiento ||
-        (mesActual === mesNacimiento && hoy.getDate() < nacimiento.getDate())) {
+        (mesActual === mesNacimiento && hoy.getUTCDate() < nacimiento.getUTCDate())) {
       edad--;
     }
 
@@ -236,6 +236,7 @@ export default function ULEBeneficiariosPage() {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
+      timeZone: "UTC",
     });
   };
 
