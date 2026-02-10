@@ -133,10 +133,10 @@ export default function ULEDashboardPage() {
   // Calcular estadísticas
   const totalEmpadronados = registeredData.length;
   const totalMiembros = registeredData.reduce((sum, r) => sum + r.members, 0);
-  const mesActual = new Date().getMonth();
+  const mesActual = new Date().getUTCMonth();
   const cumpleanosEsteMes = registeredData.filter(r => {
     if (!r.birthday) return false;
-    const mesCumple = new Date(r.birthday).getMonth();
+    const mesCumple = new Date(r.birthday).getUTCMonth();
     return mesCumple === mesActual;
   }).length;
   const totalEmpadronadores = new Set(registeredData.filter(r => r.enumerator).map(r => r.enumerator!.id)).size;

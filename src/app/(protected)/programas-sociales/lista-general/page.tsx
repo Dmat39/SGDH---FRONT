@@ -81,13 +81,13 @@ type FilterType = "edad" | "cumpleanos";
 const calcularEdad = (fechaNacimiento: string): number => {
   const hoy = new Date();
   const nacimiento = new Date(fechaNacimiento);
-  let edad = hoy.getFullYear() - nacimiento.getFullYear();
-  const mesActual = hoy.getMonth();
-  const mesNacimiento = nacimiento.getMonth();
+  let edad = hoy.getUTCFullYear() - nacimiento.getUTCFullYear();
+  const mesActual = hoy.getUTCMonth();
+  const mesNacimiento = nacimiento.getUTCMonth();
 
   // Ajustar si aún no ha llegado el cumpleaños este año
   if (mesActual < mesNacimiento ||
-      (mesActual === mesNacimiento && hoy.getDate() < nacimiento.getDate())) {
+      (mesActual === mesNacimiento && hoy.getUTCDate() < nacimiento.getUTCDate())) {
     edad--;
   }
 
@@ -405,8 +405,8 @@ export default function ListaGeneralPage() {
         if (!persona.cumpleanos) return false;
 
         const fecha = new Date(persona.cumpleanos);
-        const dia = fecha.getDate();
-        const mes = fecha.getMonth() + 1;
+        const dia = fecha.getUTCDate();
+        const mes = fecha.getUTCMonth() + 1;
 
         if (filtroDia && dia !== parseInt(filtroDia)) {
           return false;
@@ -524,6 +524,7 @@ export default function ListaGeneralPage() {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
+      timeZone: "UTC",
     });
     const edad = calcularEdad(fecha);
     return `${fechaFormateada} (${edad} años)`;
