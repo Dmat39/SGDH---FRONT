@@ -20,6 +20,11 @@ import {
   IconButton,
   Tooltip,
   InputAdornment,
+  Popover,
+  ToggleButton,
+  ToggleButtonGroup,
+  Divider,
+  Slider,
 } from "@mui/material";
 import {
   Download,
@@ -29,6 +34,7 @@ import {
   Cake,
   Clear,
   WhatsApp,
+  Close,
 } from "@mui/icons-material";
 import { useRouter } from "next/navigation";
 import WhatsAppMessageDialog from "../mensajeria-whatsapp/components/WhatsAppMessageDialog";
@@ -42,13 +48,14 @@ import * as XLSX from "xlsx";
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 
 // Tipos de módulos
-type ModuloType = "PVL" | "OLLAS_COMUNES" | "COMEDORES_POPULARES" | "ULE";
+type ModuloType = "PVL" | "OLLAS_COMUNES" | "COMEDORES_POPULARES" | "ULE" | "CIAM";
 
 const MODULOS_CONFIG: { id: ModuloType; label: string; color: string }[] = [
   { id: "PVL", label: "PVL", color: "#d81b7e" },
   { id: "OLLAS_COMUNES", label: "Ollas Comunes", color: "#4caf50" },
   { id: "COMEDORES_POPULARES", label: "Comedores Populares", color: "#ff9800" },
   { id: "ULE", label: "ULE", color: "#2196f3" },
+  { id: "CIAM", label: "CIAM", color: "#9c27b0" },
 ];
 
 // Meses para el filtro
@@ -66,6 +73,26 @@ const MESES = [
   { value: 11, label: "Noviembre" },
   { value: 12, label: "Diciembre" },
 ];
+
+// Tipo de filtro
+type FilterType = "edad" | "cumpleanos";
+
+// Función para calcular edad desde fecha de nacimiento
+const calcularEdad = (fechaNacimiento: string): number => {
+  const hoy = new Date();
+  const nacimiento = new Date(fechaNacimiento);
+  let edad = hoy.getFullYear() - nacimiento.getFullYear();
+  const mesActual = hoy.getMonth();
+  const mesNacimiento = nacimiento.getMonth();
+
+  // Ajustar si aún no ha llegado el cumpleaños este año
+  if (mesActual < mesNacimiento ||
+      (mesActual === mesNacimiento && hoy.getDate() < nacimiento.getDate())) {
+    edad--;
+  }
+
+  return edad;
+};
 
 // Interface unificada para la lista
 interface PersonaUnificada {
@@ -149,6 +176,24 @@ interface BackendResponseULE {
   };
 }
 
+interface CIAMBeneficiary {
+  id: string;
+  name: string;
+  lastname: string;
+  cellphone: string | null;
+  birthday: string;
+  district_live: { id: string; name: string } | null;
+}
+
+interface BackendResponseCIAM {
+  message: string;
+  data: {
+    data: CIAMBeneficiary[];
+    totalCount: number;
+    totalPages: number;
+  };
+}
+
 export default function ListaGeneralPage() {
   const { getData, postData } = useFetch();
   const router = useRouter();
@@ -161,6 +206,9 @@ export default function ListaGeneralPage() {
   const [filtroDia, setFiltroDia] = useState<string>("");
   const [filtroMes, setFiltroMes] = useState<number | "">("");
   const [filtroBusqueda, setFiltroBusqueda] = useState("");
+  const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
+  const [filterType, setFilterType] = useState<FilterType>("edad");
+  const [edadRange, setEdadRange] = useState<number[]>([0, 100]);
 
   // Estados de paginación
   const [page, setPage] = useState(0);
@@ -280,6 +328,39 @@ export default function ListaGeneralPage() {
       console.error("Error cargando ULE:", error);
     }
 
+    // Cargar CIAM (Beneficiarios adultos mayores) en lotes de 500
+    try {
+      const ciamFirst = await getData<BackendResponseCIAM>(`pam/benefited?page=1&limit=1`);
+      const ciamTotal = ciamFirst?.data?.totalCount || 0;
+      if (ciamTotal > 0) {
+        const BATCH_SIZE = 500;
+        const totalPages = Math.ceil(ciamTotal / BATCH_SIZE);
+
+        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+          const ciamResponse = await getData<BackendResponseCIAM>(`pam/benefited?page=${pageNum}&limit=${BATCH_SIZE}`);
+          if (ciamResponse?.data?.data) {
+            ciamResponse.data.data.forEach((person) => {
+              todasLasPersonas.push({
+                id: `ciam-${person.id}`,
+                modulo: "CIAM",
+                moduloLabel: "CIAM",
+                entidadNombre: person.district_live?.name || "Sin distrito",
+                entidadCodigo: "-",
+                nombre: person.name || "",
+                apellido: person.lastname || "",
+                dni: "",
+                telefono: person.cellphone || "",
+                cumpleanos: person.birthday || null,
+                rol: "Adulto Mayor",
+              });
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error cargando CIAM:", error);
+    }
+
     setPersonas(todasLasPersonas);
     setIsLoading(false);
   }, [getData]);
@@ -311,6 +392,14 @@ export default function ListaGeneralPage() {
         if (!coincide) return false;
       }
 
+      // Filtro por edad
+      if (persona.cumpleanos) {
+        const edad = calcularEdad(persona.cumpleanos);
+        if (edad < edadRange[0] || edad > edadRange[1]) {
+          return false;
+        }
+      }
+
       // Filtro por cumpleaños
       if (filtroDia || filtroMes) {
         if (!persona.cumpleanos) return false;
@@ -330,7 +419,7 @@ export default function ListaGeneralPage() {
 
       return true;
     });
-  }, [personasFormateadas, filtroModulo, filtroBusqueda, filtroDia, filtroMes]);
+  }, [personasFormateadas, filtroModulo, filtroBusqueda, filtroDia, filtroMes, edadRange]);
 
   // Paginación
   const personasPaginadas = useMemo(() => {
@@ -394,29 +483,38 @@ export default function ListaGeneralPage() {
     setFiltroDia("");
     setFiltroMes("");
     setFiltroBusqueda("");
+    setEdadRange([0, 100]);
     setPage(0);
   };
+
+  // Handlers para filtros de edad y cumpleaños
+  const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setFilterAnchor(event.currentTarget);
+  };
+
+  const handleFilterClose = () => {
+    setFilterAnchor(null);
+  };
+
+  const handleFilterTypeChange = (
+    _event: React.MouseEvent<HTMLElement>,
+    newFilterType: FilterType | null
+  ) => {
+    if (newFilterType !== null) {
+      setFilterType(newFilterType);
+    }
+  };
+
+  const handleEdadChange = (_event: unknown, newValue: number | number[]) => {
+    setEdadRange(newValue as number[]);
+  };
+
+  const filterOpen = Boolean(filterAnchor);
+  const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 100;
 
   // Obtener color del módulo
   const getModuloColor = (modulo: ModuloType) => {
     return MODULOS_CONFIG.find((m) => m.id === modulo)?.color || "#666";
-  };
-
-  // Calcular edad a partir de una fecha de nacimiento
-  const calcularEdad = (fechaNacimiento: string): number => {
-    const hoy = new Date();
-    const nacimiento = new Date(fechaNacimiento);
-    let edad = hoy.getFullYear() - nacimiento.getFullYear();
-    const mesActual = hoy.getMonth();
-    const mesNacimiento = nacimiento.getMonth();
-
-    // Ajustar si aún no ha llegado el cumpleaños este año
-    if (mesActual < mesNacimiento ||
-        (mesActual === mesNacimiento && hoy.getDate() < nacimiento.getDate())) {
-      edad--;
-    }
-
-    return edad;
   };
 
   // Formatear fecha con edad
@@ -444,7 +542,7 @@ export default function ListaGeneralPage() {
     return `+51${telefonoLimpio}`;
   };
 
-  const hayFiltrosActivos = filtroModulo || filtroDia || filtroMes || filtroBusqueda;
+  const hayFiltrosActivos = filtroModulo || filtroDia || filtroMes || filtroBusqueda || isEdadFiltered;
 
   // Filtrar personas con teléfono válido para WhatsApp
   const personasConTelefono = useMemo(() => {
@@ -486,7 +584,7 @@ export default function ListaGeneralPage() {
           Lista General
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Datos unificados de PVL, Ollas Comunes, Comedores Populares y ULE
+          Datos unificados de PVL, Ollas Comunes, Comedores Populares, ULE y CIAM
         </Typography>
       </Box>
 
@@ -558,51 +656,81 @@ export default function ListaGeneralPage() {
             ))}
           </TextField>
 
-          {/* Filtro por mes de cumpleaños */}
-          <TextField
-            select
-            size="small"
-            label="Mes de cumpleaños"
-            value={filtroMes}
-            onChange={(e) => {
-              setFiltroMes(e.target.value as number | "");
-              setPage(0);
-            }}
-            sx={{ minWidth: 180 }}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Cake fontSize="small" sx={{ color: "#d81b7e" }} />
-                  </InputAdornment>
-                ),
-              },
-            }}
-          >
-            <MenuItem value="">Todos los meses</MenuItem>
-            {MESES.map((mes) => (
-              <MenuItem key={mes.value} value={mes.value}>
-                {mes.label}
-              </MenuItem>
-            ))}
-          </TextField>
+          {/* Botón para abrir filtros de edad y cumpleaños */}
+          <Tooltip title="Filtros de edad y cumpleaños">
+            <IconButton
+              onClick={handleFilterClick}
+              sx={{
+                backgroundColor: filterOpen || isEdadFiltered || filtroDia || filtroMes ? "#fce7f3" : "#f8fafc",
+                border: `1px solid ${filterOpen || isEdadFiltered || filtroDia || filtroMes ? subgerencia.color : "#e2e8f0"}`,
+                borderRadius: "8px",
+                "&:hover": {
+                  backgroundColor: "#fce7f3",
+                  borderColor: subgerencia.color,
+                },
+              }}
+            >
+              <FilterList sx={{ color: filterOpen || isEdadFiltered || filtroDia || filtroMes ? subgerencia.color : "#64748b", fontSize: 20 }} />
+            </IconButton>
+          </Tooltip>
 
-          {/* Filtro por día de cumpleaños */}
-          <TextField
-            size="small"
-            label="Día"
-            type="number"
-            value={filtroDia}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (value === "" || (parseInt(value) >= 1 && parseInt(value) <= 31)) {
-                setFiltroDia(value);
-                setPage(0);
-              }
-            }}
-            sx={{ width: 80 }}
-            slotProps={{ htmlInput: { min: 1, max: 31 } }}
-          />
+          {/* Chip de filtro de edad activo */}
+          {isEdadFiltered && (
+            <Box
+              sx={{
+                backgroundColor: "#dbeafe",
+                borderRadius: "16px",
+                px: 1.5,
+                py: 0.5,
+                display: "flex",
+                alignItems: "center",
+                gap: 0.5,
+              }}
+            >
+              <Typography variant="caption" color="#1e40af">
+                Edad: {edadRange[0]} - {edadRange[1]} años
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={() => setEdadRange([0, 100])}
+                sx={{ p: 0.25 }}
+              >
+                <Close sx={{ fontSize: 14, color: "#1e40af" }} />
+              </IconButton>
+            </Box>
+          )}
+
+          {/* Chip de filtro de cumpleaños activo */}
+          {(filtroDia || filtroMes) && (
+            <Box
+              sx={{
+                backgroundColor: "#fce7f3",
+                borderRadius: "16px",
+                px: 1.5,
+                py: 0.5,
+                display: "flex",
+                alignItems: "center",
+                gap: 0.5,
+              }}
+            >
+              <Cake sx={{ fontSize: 14, color: "#be185d" }} />
+              <Typography variant="caption" color="#be185d">
+                {filtroMes && !filtroDia && MESES.find(m => m.value === filtroMes)?.label}
+                {filtroDia && filtroMes && `${filtroDia}/${filtroMes}`}
+                {filtroDia && !filtroMes && `Día ${filtroDia}`}
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={() => {
+                  setFiltroDia("");
+                  setFiltroMes("");
+                }}
+                sx={{ p: 0.25 }}
+              >
+                <Close sx={{ fontSize: 14, color: "#be185d" }} />
+              </IconButton>
+            </Box>
+          )}
 
           {/* Espaciador */}
           <Box sx={{ flex: 1 }} />
@@ -669,6 +797,176 @@ export default function ListaGeneralPage() {
             </IconButton>
           </Tooltip>
         </Box>
+
+        {/* Popover de filtro de edad y cumpleaños */}
+        <Popover
+          open={filterOpen}
+          anchorEl={filterAnchor}
+          onClose={handleFilterClose}
+          anchorOrigin={{
+            vertical: "bottom",
+            horizontal: "left",
+          }}
+          transformOrigin={{
+            vertical: "top",
+            horizontal: "left",
+          }}
+          sx={{ mt: 1 }}
+        >
+          <Box sx={{ p: 2.5, width: 320 }}>
+            {/* Selector de tipo de filtro */}
+            <Typography variant="subtitle2" fontWeight={600} color="#334155" mb={1.5}>
+              Tipo de filtro
+            </Typography>
+            <ToggleButtonGroup
+              value={filterType}
+              exclusive
+              onChange={handleFilterTypeChange}
+              size="small"
+              fullWidth
+              sx={{ mb: 2.5 }}
+            >
+              <ToggleButton
+                value="edad"
+                sx={{
+                  textTransform: "none",
+                  fontSize: "0.75rem",
+                  "&.Mui-selected": {
+                    backgroundColor: "#dbeafe",
+                    color: "#1e40af",
+                    "&:hover": { backgroundColor: "#bfdbfe" },
+                  },
+                }}
+              >
+                Edad
+              </ToggleButton>
+              <ToggleButton
+                value="cumpleanos"
+                sx={{
+                  textTransform: "none",
+                  fontSize: "0.75rem",
+                  "&.Mui-selected": {
+                    backgroundColor: "#fce7f3",
+                    color: "#be185d",
+                    "&:hover": { backgroundColor: "#fbcfe8" },
+                  },
+                }}
+              >
+                Cumpleaños
+              </ToggleButton>
+            </ToggleButtonGroup>
+
+            <Divider sx={{ mb: 2 }} />
+
+            {/* Filtro por edad */}
+            {filterType === "edad" && (
+              <>
+                <Typography variant="body2" color="#475569" mb={1.5}>
+                  Rango de edad
+                </Typography>
+                <Slider
+                  value={edadRange}
+                  onChange={handleEdadChange}
+                  valueLabelDisplay="auto"
+                  min={0}
+                  max={100}
+                  sx={{
+                    color: "#3b82f6",
+                    "& .MuiSlider-thumb": {
+                      backgroundColor: "#1e40af",
+                    },
+                    "& .MuiSlider-track": {
+                      backgroundColor: "#3b82f6",
+                    },
+                  }}
+                />
+                <Box display="flex" justifyContent="space-between" mt={1}>
+                  <Typography variant="caption" color="text.secondary">
+                    {edadRange[0]} años
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {edadRange[1]} años
+                  </Typography>
+                </Box>
+              </>
+            )}
+
+            {/* Filtro por cumpleaños */}
+            {filterType === "cumpleanos" && (
+              <>
+                <Typography variant="body2" color="#475569" mb={1.5}>
+                  Filtrar por cumpleaños
+                </Typography>
+
+                <TextField
+                  select
+                  size="small"
+                  label="Mes"
+                  fullWidth
+                  value={filtroMes}
+                  onChange={(e) => {
+                    setFiltroMes(e.target.value as number | "");
+                    setPage(0);
+                  }}
+                  sx={{ mb: 2 }}
+                >
+                  <MenuItem value="">Todos los meses</MenuItem>
+                  {MESES.map((mes) => (
+                    <MenuItem key={mes.value} value={mes.value}>
+                      {mes.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                <TextField
+                  size="small"
+                  label="Día (opcional)"
+                  type="number"
+                  fullWidth
+                  value={filtroDia}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === "" || (parseInt(value) >= 1 && parseInt(value) <= 31)) {
+                      setFiltroDia(value);
+                      setPage(0);
+                    }
+                  }}
+                  slotProps={{ htmlInput: { min: 1, max: 31 } }}
+                  helperText="Selecciona un día específico (opcional)"
+                />
+              </>
+            )}
+
+            <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
+              <Button
+                size="small"
+                onClick={() => {
+                  setEdadRange([0, 100]);
+                  setFiltroDia("");
+                  setFiltroMes("");
+                }}
+                sx={{
+                  color: "#64748b",
+                  textTransform: "none",
+                }}
+              >
+                Limpiar todo
+              </Button>
+              <Button
+                size="small"
+                variant="contained"
+                onClick={handleFilterClose}
+                sx={{
+                  backgroundColor: subgerencia.color,
+                  textTransform: "none",
+                  "&:hover": { backgroundColor: "#be185d" },
+                }}
+              >
+                Aplicar
+              </Button>
+            </Box>
+          </Box>
+        </Popover>
 
         {/* Resumen de filtros */}
         {hayFiltrosActivos && (

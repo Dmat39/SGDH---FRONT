@@ -7,10 +7,26 @@ const SKIP_KEYS_PATTERN =
 const ADDRESS_KEYS_PATTERN = /direccion|domicilio|address/i;
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}/;
+// Patrón para detectar códigos/enum: con guiones bajos O solo números/letras sin espacios
 const ENUM_VALUE_PATTERN = /^[A-Z0-9_]+$/;
 
-function shouldSkipValue(value: string): boolean {
-  return value.length <= 3 || ISO_DATE_PATTERN.test(value) || ENUM_VALUE_PATTERN.test(value);
+function shouldSkipValue(value: string, key: string): boolean {
+  // Si el valor es muy corto (<=2 chars), probablemente sea una sigla
+  if (value.length <= 2) return true;
+
+  // Si es una fecha ISO, no formatear
+  if (ISO_DATE_PATTERN.test(value)) return true;
+
+  // Si el valor NO tiene espacios Y es solo mayúsculas/números/guiones bajos
+  // probablemente sea un código o enum (ej: "STATUS_ACTIVE", "TIPO_A", "PVL")
+  if (!value.includes(" ") && ENUM_VALUE_PATTERN.test(value)) {
+    // PERO si es un campo de nombre, formatear de todas formas
+    const isNameField = /name|nombre|apellido|lastname/i.test(key);
+    if (isNameField) return false; // No saltear, formatear nombres aunque sean mayúsculas
+    return true; // Saltear si no es campo de nombre
+  }
+
+  return false;
 }
 
 function formatRecord<T extends object>(obj: T): T {
@@ -30,7 +46,17 @@ function formatRecord<T extends object>(obj: T): T {
 
     if (typeof value !== "string") continue;
     if (SKIP_KEYS_PATTERN.test(key)) continue;
-    if (shouldSkipValue(value)) continue;
+
+    // Los campos de nombre SIEMPRE se formatean, sin importar el valor
+    const isNameField = /name|nombre|apellido|lastname|entidad/i.test(key);
+    if (isNameField) {
+      console.log(`🔄 Formateando campo "${key}": "${value}" → "${toTitleCase(value)}"`);
+      result[key] = toTitleCase(value);
+      continue;
+    }
+
+    // Para otros campos, aplicar las reglas normales
+    if (shouldSkipValue(value, key)) continue;
 
     result[key] = ADDRESS_KEYS_PATTERN.test(key)
       ? formatDireccion(value)
