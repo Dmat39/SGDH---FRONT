@@ -88,6 +88,7 @@ const DEMO_USERS: Record<string, { password: string; user: DemoUserData }> = {
         "comedores_populares",
         "mapa_comedores",
         "all_servicios_sociales",
+        "ciam",
       ],
       subgerencia: "programas-sociales" as SubgerenciaType,
       cargo: "Operador de Programas Sociales",
