@@ -31,6 +31,8 @@ import {
   ToggleButtonGroup,
   CircularProgress,
   Chip,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import {
   Search,
@@ -39,9 +41,16 @@ import {
   FileDownload,
   Close,
   Visibility,
-  Edit,
-  Delete,
   Cake,
+  Person,
+  LocationOn,
+  Home,
+  Work,
+  LocalHospital,
+  Accessibility,
+  Psychology,
+  Warning,
+  Assignment,
 } from "@mui/icons-material";
 import * as XLSX from "xlsx";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -73,28 +82,160 @@ const formatearFecha = (fecha: string | null | undefined): string => {
   return `${dia}/${mes}/${anio}`;
 };
 
+// Traducciones de valores del backend
+const TRADUCCIONES: Record<string, Record<string, string>> = {
+  civil: {
+    SINGLE: "Soltero(a)",
+    MARRIED: "Casado(a)",
+    DIVORCED: "Divorciado(a)",
+    WIDOWED: "Viudo(a)",
+    COHABITANT: "Conviviente",
+  },
+  sex: {
+    MALE: "Masculino",
+    FEMALE: "Femenino",
+  },
+  health: {
+    SIS: "SIS",
+    ESSALUD: "EsSalud",
+    PRIVATE: "Privado",
+    NONE: "Sin seguro",
+    OTHER: "Otro",
+  },
+  housing_status: {
+    OWN: "Propia",
+    RENTED: "Alquilada",
+    BORROWED: "Prestada",
+    OTHER: "Otro",
+  },
+  mode: {
+    HIGH: "Alta",
+    MEDIUM: "Media",
+    LOW: "Baja",
+  },
+  disability: {
+    NONE: "Sin dificultad",
+    SOME: "Alguna dificultad",
+    SEVERE: "Mucha dificultad",
+    TOTAL: "No puede hacerlo",
+  },
+};
+
+const traducir = (categoria: string, valor: string | null | undefined): string => {
+  if (!valor) return "-";
+  return TRADUCCIONES[categoria]?.[valor] || valor;
+};
+
 // ============================================
-// INTERFACES
+// INTERFACES BACKEND
 // ============================================
-interface BeneficiarioBackend {
+interface RelatedEntity {
+  id: string;
+  name: string;
+}
+
+interface BeneficiarioListaBackend {
   id: string;
   name: string;
   lastname: string;
-  dni: string;
+  cellphone: string | null;
   birthday: string;
-  poverty_level: string;
-  health_insurance: string;
-  can_read_write: boolean;
-  profession: string;
-  address?: string;
-  phone?: string;
-  observation?: string;
+  civil: string;
+  doc_type: string;
+  health: string;
+  poverty_level: string | null;
+  housing_status: string;
+  mode: string;
+  sex: string;
+  country: RelatedEntity | null;
+  department_birth: RelatedEntity | null;
+  department_live: RelatedEntity | null;
+  district_live: RelatedEntity | null;
+  education: RelatedEntity | null;
+  ethnic: RelatedEntity | null;
+  housing: RelatedEntity | null;
+  language_learned: RelatedEntity | null;
+  language_native: RelatedEntity | null;
+  province_birth: RelatedEntity | null;
+  province_live: RelatedEntity | null;
 }
 
-interface BackendResponse {
+interface BeneficiarioDetalleBackend {
+  id: string;
+  doc_num: string;
+  name: string;
+  lastname: string;
+  children: number;
+  address: string;
+  cellphone: string | null;
+  telephone: string | null;
+  assessment_cognitive: number;
+  assessment_emotional: number;
+  assessment_functional: number;
+  assessment_sociofamily: number;
+  read_write: boolean;
+  profession: string | null;
+  housing_onservation: string | null;
+  state_services: boolean;
+  pension_65: boolean;
+  onp: boolean;
+  police_pension: boolean;
+  other_pension: string | null;
+  sisfoh: boolean;
+  works: boolean;
+  occupation_type: string | null;
+  occupation_other: string | null;
+  monthly_income: number;
+  other_income: string | null;
+  income_source: string | null;
+  income_amount: number;
+  health_problem: boolean;
+  health_condition: string | null;
+  treatment: boolean;
+  conadis: boolean;
+  disability_vision: string | null;
+  disability_hearing: string | null;
+  disability_walking: string | null;
+  disability_memory: string | null;
+  disability_selfcare: string | null;
+  disability_communication: string | null;
+  violence_by: string | null;
+  violence_type: string | null;
+  abused: boolean;
+  abuse_type: string | null;
+  registration_reason: string | null;
+  registration_reason_old: string | null;
+  expected_services: string | null;
+  birthday: string;
+  registered_at: string | null;
+  enrollmented_at: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  civil: string;
+  doc_type: string;
+  health: string;
+  poverty_level: string | null;
+  housing_status: string;
+  mode: string;
+  sex: string;
+  country: RelatedEntity | null;
+  department_birth: RelatedEntity | null;
+  department_live: RelatedEntity | null;
+  district_live: RelatedEntity | null;
+  education: RelatedEntity | null;
+  ethnic: RelatedEntity | null;
+  housing: RelatedEntity | null;
+  language_learned: RelatedEntity | null;
+  language_native: RelatedEntity | null;
+  province_birth: RelatedEntity | null;
+  province_live: RelatedEntity | null;
+}
+
+interface BackendListaResponse {
   message: string;
   data: {
-    data: BeneficiarioBackend[];
+    data: BeneficiarioListaBackend[];
     currentPage: number;
     pageCount: number;
     totalCount: number;
@@ -102,90 +243,47 @@ interface BackendResponse {
   };
 }
 
-interface BeneficiarioFrontend {
+interface BackendDetalleResponse {
+  message: string;
+  data: BeneficiarioDetalleBackend;
+}
+
+// Interface para la tabla (datos esenciales)
+interface BeneficiarioTabla {
   id: string;
-  nombre: string;
-  apellido: string;
-  dni: string;
-  fechaNacimiento: string;
+  nombreCompleto: string;
+  tipoDoc: string;
+  sexo: string;
   edad: number;
-  nivelPobreza: string;
+  fechaNacimiento: string;
+  estadoCivil: string;
   seguroSalud: string;
-  sabeLeerEscribir: boolean;
-  profesion: string;
-  direccion: string;
-  telefono: string;
-  observaciones: string | null;
+  distritoResidencia: string;
+  modo: string;
+  celular: string;
 }
 
 // ============================================
-// MAPEO BACKEND -> FRONTEND
+// MAPEO BACKEND -> FRONTEND (TABLA)
 // ============================================
-const mapBackendToFrontend = (item: BeneficiarioBackend): BeneficiarioFrontend => ({
+const mapListaToTabla = (item: BeneficiarioListaBackend): BeneficiarioTabla => ({
   id: item.id,
-  nombre: item.name,
-  apellido: item.lastname,
-  dni: item.dni,
-  fechaNacimiento: item.birthday,
+  nombreCompleto: `${item.name} ${item.lastname}`,
+  tipoDoc: item.doc_type || "DNI",
+  sexo: traducir("sex", item.sex),
   edad: calcularEdad(item.birthday),
-  nivelPobreza: item.poverty_level || "Sin clasificar",
-  seguroSalud: item.health_insurance || "Sin seguro",
-  sabeLeerEscribir: item.can_read_write,
-  profesion: item.profession || "Sin profesión",
-  direccion: item.address || "-",
-  telefono: item.phone || "-",
-  observaciones: item.observation || null,
+  fechaNacimiento: item.birthday,
+  estadoCivil: traducir("civil", item.civil),
+  seguroSalud: traducir("health", item.health),
+  distritoResidencia: item.district_live?.name || "-",
+  modo: traducir("mode", item.mode),
+  celular: item.cellphone || "-",
 });
-
-// ============================================
-// DATA DEMO
-// ============================================
-const generarDataDemo = (): BeneficiarioBackend[] => {
-  const nombres = ["María", "Rosa", "Carmen", "Julia", "Elena", "Ana", "Luisa", "Teresa", "Martha", "Gloria", "Pedro", "Juan", "Carlos", "José", "Manuel", "Luis", "Alberto", "Jorge", "Ricardo", "Francisco"];
-  const apellidos = ["García", "López", "Martínez", "Rodríguez", "Hernández", "Flores", "Torres", "Ramos", "Quispe", "Mamani", "Huamán", "Chávez", "Mendoza", "Sánchez", "Cruz", "Vargas", "Rojas", "Díaz", "Castillo", "Morales"];
-  const niveles = ["No pobre", "No pobre", "No pobre", "Pobre", "Pobre", "Pobre", "Pobre", "Pobre extremo", "Pobre extremo", "Sin clasificar"];
-  const seguros = ["SIS", "SIS", "SIS", "SIS", "SIS", "EsSalud", "EsSalud", "EsSalud", "Sin seguro", "Sin seguro", "Sin seguro", "Seguro privado", "Otro"];
-  const profesiones = [
-    "Ama de casa", "Ama de casa", "Ama de casa", "Ama de casa",
-    "Comerciante", "Comerciante", "Comerciante",
-    "Agricultor", "Agricultor",
-    "Albañil", "Albañil",
-    "Costurera", "Costurera",
-    "Carpintero", "Docente", "Chofer", "Mecánico", "Enfermera",
-    "Vendedor ambulante", "Sin profesión", "Sastre", "Zapatero",
-  ];
-  const direcciones = [
-    "Jr. Los Pinos 234", "Av. Canto Grande 1500", "Mz. A Lt. 5 Bayóvar", "Jr. Las Flores 890",
-    "Av. El Sol 445", "Psje. Los Olivos 12", "Jr. Huáscar 678", "Calle San Martín 321",
-    "Av. Próceres 1200", "Mz. C Lt. 10 Huayrona", "Jr. Tupac Amaru 555", "Av. Wiesse 2100",
-  ];
-
-  const data: BeneficiarioBackend[] = [];
-  for (let i = 0; i < 347; i++) {
-    const añoNac = 1935 + Math.floor(Math.random() * 30);
-    const mesNac = 1 + Math.floor(Math.random() * 12);
-    const diaNac = 1 + Math.floor(Math.random() * 28);
-    data.push({
-      id: `ciam-${String(i + 1).padStart(4, "0")}`,
-      name: nombres[Math.floor(Math.random() * nombres.length)],
-      lastname: apellidos[Math.floor(Math.random() * apellidos.length)],
-      dni: String(10000000 + Math.floor(Math.random() * 89999999)),
-      birthday: `${añoNac}-${String(mesNac).padStart(2, "0")}-${String(diaNac).padStart(2, "0")}`,
-      poverty_level: niveles[Math.floor(Math.random() * niveles.length)],
-      health_insurance: seguros[Math.floor(Math.random() * seguros.length)],
-      can_read_write: Math.random() > 0.28,
-      profession: profesiones[Math.floor(Math.random() * profesiones.length)],
-      address: direcciones[Math.floor(Math.random() * direcciones.length)],
-      phone: `9${String(Math.floor(Math.random() * 100000000)).padStart(8, "0")}`,
-    });
-  }
-  return data;
-};
 
 // ============================================
 // CONSTANTES
 // ============================================
-type FilterType = "edad" | "cumpleanos" | "pobreza" | "seguro";
+type FilterType = "edad" | "cumpleanos" | "sexo" | "seguro";
 type CumpleanosModo = "mes" | "dia";
 
 const MESES = [
@@ -193,23 +291,520 @@ const MESES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-const NIVELES_POBREZA = ["No pobre", "Pobre", "Pobre extremo", "Sin clasificar"];
-const SEGUROS_SALUD = ["SIS", "EsSalud", "Seguro privado", "Sin seguro", "Otro"];
+const SEXOS = ["Masculino", "Femenino"];
+const SEGUROS_SALUD = ["SIS", "EsSalud", "Privado", "Sin seguro", "Otro"];
 
-const POBREZA_CHIP_COLORS: Record<string, { bg: string; color: string }> = {
-  "No pobre": { bg: "#e8f5e9", color: "#2e7d32" },
-  "Pobre": { bg: "#fff3e0", color: "#e65100" },
-  "Pobre extremo": { bg: "#ffebee", color: "#c62828" },
-  "Sin clasificar": { bg: "#f5f5f5", color: "#757575" },
+const SEXO_CHIP_COLORS: Record<string, { bg: string; color: string }> = {
+  Masculino: { bg: "#e3f2fd", color: "#1565c0" },
+  Femenino: { bg: "#fce4ec", color: "#c2185b" },
 };
 
 const SEGURO_CHIP_COLORS: Record<string, { bg: string; color: string }> = {
   SIS: { bg: "#e3f2fd", color: "#1565c0" },
   EsSalud: { bg: "#e8f5e9", color: "#2e7d32" },
-  "Seguro privado": { bg: "#f3e5f5", color: "#7b1fa2" },
+  Privado: { bg: "#f3e5f5", color: "#7b1fa2" },
   "Sin seguro": { bg: "#ffebee", color: "#c62828" },
   Otro: { bg: "#fff3e0", color: "#e65100" },
 };
+
+const MODO_CHIP_COLORS: Record<string, { bg: string; color: string }> = {
+  Alta: { bg: "#e8f5e9", color: "#2e7d32" },
+  Media: { bg: "#fff3e0", color: "#e65100" },
+  Baja: { bg: "#ffebee", color: "#c62828" },
+};
+
+// ============================================
+// COMPONENTE DE DETALLE
+// ============================================
+interface DetalleProps {
+  beneficiario: BeneficiarioDetalleBackend | null;
+  loading: boolean;
+}
+
+function DetalleContent({ beneficiario, loading }: DetalleProps) {
+  const [tabValue, setTabValue] = useState(0);
+
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" py={4}>
+        <CircularProgress size={40} sx={{ color: CIAM_COLOR }} />
+      </Box>
+    );
+  }
+
+  if (!beneficiario) {
+    return (
+      <Typography color="text.secondary" textAlign="center" py={4}>
+        No se pudo cargar la información
+      </Typography>
+    );
+  }
+
+  const renderCampo = (label: string, valor: React.ReactNode) => (
+    <Box mb={2}>
+      <Typography variant="caption" color="text.secondary" display="block">
+        {label}
+      </Typography>
+      <Typography variant="body2" fontWeight={500}>
+        {valor || "-"}
+      </Typography>
+    </Box>
+  );
+
+  const renderChipBoolean = (valor: boolean, textoSi = "Sí", textoNo = "No") => (
+    <Chip
+      label={valor ? textoSi : textoNo}
+      size="small"
+      sx={{
+        backgroundColor: valor ? "#e8f5e9" : "#ffebee",
+        color: valor ? "#2e7d32" : "#c62828",
+        fontWeight: 600,
+      }}
+    />
+  );
+
+  const renderValoracion = (valor: number, label: string) => {
+    const colores = ["#e8f5e9", "#fff3e0", "#ffebee", "#ffcdd2"];
+    const textos = ["Bueno", "Regular", "Deficiente", "Muy deficiente"];
+    return (
+      <Box mb={2}>
+        <Typography variant="caption" color="text.secondary" display="block">
+          {label}
+        </Typography>
+        <Chip
+          label={`${valor} - ${textos[valor - 1] || "N/A"}`}
+          size="small"
+          sx={{
+            mt: 0.5,
+            backgroundColor: colores[valor - 1] || "#f5f5f5",
+            color: valor <= 2 ? "#2e7d32" : "#c62828",
+            fontWeight: 600,
+          }}
+        />
+      </Box>
+    );
+  };
+
+  const renderDiscapacidad = (nivel: string | null, label: string) => (
+    <Box mb={2}>
+      <Typography variant="caption" color="text.secondary" display="block">
+        {label}
+      </Typography>
+      <Chip
+        label={traducir("disability", nivel)}
+        size="small"
+        sx={{
+          mt: 0.5,
+          backgroundColor: nivel === "NONE" ? "#e8f5e9" : nivel === "SOME" ? "#fff3e0" : "#ffebee",
+          color: nivel === "NONE" ? "#2e7d32" : nivel === "SOME" ? "#e65100" : "#c62828",
+          fontWeight: 600,
+        }}
+      />
+    </Box>
+  );
+
+  const tabs = [
+    { label: "Personal", icon: <Person fontSize="small" /> },
+    { label: "Ubicación", icon: <LocationOn fontSize="small" /> },
+    { label: "Vivienda", icon: <Home fontSize="small" /> },
+    { label: "Economía", icon: <Work fontSize="small" /> },
+    { label: "Salud", icon: <LocalHospital fontSize="small" /> },
+    { label: "Discapacidad", icon: <Accessibility fontSize="small" /> },
+    { label: "Valoración", icon: <Psychology fontSize="small" /> },
+    { label: "Violencia", icon: <Warning fontSize="small" /> },
+    { label: "Registro", icon: <Assignment fontSize="small" /> },
+  ];
+
+  return (
+    <Box>
+      <Tabs
+        value={tabValue}
+        onChange={(_, v) => setTabValue(v)}
+        variant="scrollable"
+        scrollButtons="auto"
+        sx={{
+          borderBottom: 1,
+          borderColor: "divider",
+          mb: 3,
+          "& .MuiTab-root": {
+            textTransform: "none",
+            minHeight: 48,
+            fontSize: "0.8rem",
+          },
+          "& .Mui-selected": { color: CIAM_COLOR },
+          "& .MuiTabs-indicator": { backgroundColor: CIAM_COLOR },
+        }}
+      >
+        {tabs.map((tab, index) => (
+          <Tab key={index} label={tab.label} icon={tab.icon} iconPosition="start" />
+        ))}
+      </Tabs>
+
+      {/* Tab 0: Datos Personales */}
+      {tabValue === 0 && (
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Nombre", beneficiario.name)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Apellidos", beneficiario.lastname)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Tipo de Documento", beneficiario.doc_type)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Número de Documento", beneficiario.doc_num)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Fecha de Nacimiento", `${formatearFecha(beneficiario.birthday)} (${calcularEdad(beneficiario.birthday)} años)`)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Sexo", traducir("sex", beneficiario.sex))}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Estado Civil", traducir("civil", beneficiario.civil))}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Número de Hijos", beneficiario.children)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <Box mb={2}>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Sabe Leer y Escribir
+              </Typography>
+              {renderChipBoolean(beneficiario.read_write)}
+            </Box>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Etnia", beneficiario.ethnic?.name)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Idioma Materno", beneficiario.language_native?.name)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Idioma Aprendido", beneficiario.language_learned?.name)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Nivel Educativo", beneficiario.education?.name)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Celular", beneficiario.cellphone)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Teléfono Fijo", beneficiario.telephone)}
+          </Grid>
+        </Grid>
+      )}
+
+      {/* Tab 1: Ubicación */}
+      {tabValue === 1 && (
+        <Grid container spacing={2}>
+          <Grid size={12}>
+            <Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom>
+              Lugar de Nacimiento
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("País", beneficiario.country?.name)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Departamento", beneficiario.department_birth?.name)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Provincia", beneficiario.province_birth?.name)}
+          </Grid>
+
+          <Grid size={12}>
+            <Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom sx={{ mt: 2 }}>
+              Lugar de Residencia
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Departamento", beneficiario.department_live?.name)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Provincia", beneficiario.province_live?.name)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Distrito", beneficiario.district_live?.name)}
+          </Grid>
+          <Grid size={12}>
+            {renderCampo("Dirección", beneficiario.address)}
+          </Grid>
+        </Grid>
+      )}
+
+      {/* Tab 2: Vivienda */}
+      {tabValue === 2 && (
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Tipo de Vivienda", beneficiario.housing?.name)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Condición de Vivienda", traducir("housing_status", beneficiario.housing_status))}
+          </Grid>
+          <Grid size={12}>
+            {renderCampo("Observación de Vivienda", beneficiario.housing_onservation)}
+          </Grid>
+        </Grid>
+      )}
+
+      {/* Tab 3: Economía */}
+      {tabValue === 3 && (
+        <Grid container spacing={2}>
+          <Grid size={12}>
+            <Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom>
+              Situación Laboral
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <Box mb={2}>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Trabaja Actualmente
+              </Typography>
+              {renderChipBoolean(beneficiario.works)}
+            </Box>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Profesión", beneficiario.profession)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Tipo de Ocupación", beneficiario.occupation_type)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Otra Ocupación", beneficiario.occupation_other)}
+          </Grid>
+
+          <Grid size={12}>
+            <Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom sx={{ mt: 2 }}>
+              Ingresos
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Ingreso Mensual", beneficiario.monthly_income ? `S/ ${beneficiario.monthly_income}` : "-")}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Otros Ingresos", beneficiario.other_income)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Fuente de Ingreso", beneficiario.income_source)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Monto Adicional", beneficiario.income_amount ? `S/ ${beneficiario.income_amount}` : "-")}
+          </Grid>
+
+          <Grid size={12}>
+            <Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom sx={{ mt: 2 }}>
+              Pensiones y Programas Sociales
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Box mb={2}>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Pensión 65
+              </Typography>
+              {renderChipBoolean(beneficiario.pension_65)}
+            </Box>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Box mb={2}>
+              <Typography variant="caption" color="text.secondary" display="block">
+                ONP
+              </Typography>
+              {renderChipBoolean(beneficiario.onp)}
+            </Box>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Box mb={2}>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Pensión Policial
+              </Typography>
+              {renderChipBoolean(beneficiario.police_pension)}
+            </Box>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            {renderCampo("Otra Pensión", beneficiario.other_pension)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Box mb={2}>
+              <Typography variant="caption" color="text.secondary" display="block">
+                SISFOH
+              </Typography>
+              {renderChipBoolean(beneficiario.sisfoh)}
+            </Box>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Box mb={2}>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Servicios del Estado
+              </Typography>
+              {renderChipBoolean(beneficiario.state_services)}
+            </Box>
+          </Grid>
+        </Grid>
+      )}
+
+      {/* Tab 4: Salud */}
+      {tabValue === 4 && (
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Seguro de Salud", traducir("health", beneficiario.health))}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Nivel de Pobreza", beneficiario.poverty_level)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <Box mb={2}>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Problema de Salud
+              </Typography>
+              {renderChipBoolean(beneficiario.health_problem)}
+            </Box>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            {renderCampo("Condición de Salud", beneficiario.health_condition)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <Box mb={2}>
+              <Typography variant="caption" color="text.secondary" display="block">
+                En Tratamiento
+              </Typography>
+              {renderChipBoolean(beneficiario.treatment)}
+            </Box>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <Box mb={2}>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Inscrito en CONADIS
+              </Typography>
+              {renderChipBoolean(beneficiario.conadis)}
+            </Box>
+          </Grid>
+        </Grid>
+      )}
+
+      {/* Tab 5: Discapacidad */}
+      {tabValue === 5 && (
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderDiscapacidad(beneficiario.disability_vision, "Dificultad para Ver")}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderDiscapacidad(beneficiario.disability_hearing, "Dificultad para Oír")}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderDiscapacidad(beneficiario.disability_walking, "Dificultad para Caminar")}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderDiscapacidad(beneficiario.disability_memory, "Dificultad de Memoria")}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderDiscapacidad(beneficiario.disability_selfcare, "Dificultad para el Autocuidado")}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderDiscapacidad(beneficiario.disability_communication, "Dificultad para Comunicarse")}
+          </Grid>
+        </Grid>
+      )}
+
+      {/* Tab 6: Valoración */}
+      {tabValue === 6 && (
+        <Grid container spacing={2}>
+          <Grid size={12}>
+            <Typography variant="body2" color="text.secondary" mb={2}>
+              Valoración geriátrica integral (1: Bueno, 2: Regular, 3: Deficiente, 4: Muy deficiente)
+            </Typography>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            {renderValoracion(beneficiario.assessment_cognitive, "Valoración Cognitiva")}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            {renderValoracion(beneficiario.assessment_emotional, "Valoración Emocional")}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            {renderValoracion(beneficiario.assessment_functional, "Valoración Funcional")}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            {renderValoracion(beneficiario.assessment_sociofamily, "Valoración Sociofamiliar")}
+          </Grid>
+        </Grid>
+      )}
+
+      {/* Tab 7: Violencia */}
+      {tabValue === 7 && (
+        <Grid container spacing={2}>
+          <Grid size={12}>
+            <Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom>
+              Situación de Violencia
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Violencia por parte de", beneficiario.violence_by)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Tipo de Violencia", beneficiario.violence_type)}
+          </Grid>
+
+          <Grid size={12}>
+            <Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom sx={{ mt: 2 }}>
+              Situación de Abuso
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            <Box mb={2}>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Ha sufrido abuso
+              </Typography>
+              {renderChipBoolean(beneficiario.abused)}
+            </Box>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Tipo de Abuso", beneficiario.abuse_type)}
+          </Grid>
+        </Grid>
+      )}
+
+      {/* Tab 8: Registro */}
+      {tabValue === 8 && (
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            {renderCampo("Motivo de Registro", beneficiario.registration_reason)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            {renderCampo("Motivo Anterior", beneficiario.registration_reason_old)}
+          </Grid>
+          <Grid size={12}>
+            {renderCampo("Servicios Esperados", beneficiario.expected_services)}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Modo de Atención", traducir("mode", beneficiario.mode))}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Fecha de Registro", formatearFecha(beneficiario.registered_at))}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Fecha de Empadronamiento", formatearFecha(beneficiario.enrollmented_at))}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Fecha de Creación", formatearFecha(beneficiario.created_at))}
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+            {renderCampo("Última Actualización", formatearFecha(beneficiario.updated_at))}
+          </Grid>
+        </Grid>
+      )}
+    </Box>
+  );
+}
+
+const BATCH_SIZE = 500; // Cargar en lotes de 500 registros
 
 // ============================================
 // COMPONENTE PRINCIPAL
@@ -217,11 +812,11 @@ const SEGURO_CHIP_COLORS: Record<string, { bg: string; color: string }> = {
 export default function CIAMBeneficiariosPage() {
   const { getData } = useFetch();
 
-  const [allData, setAllData] = useState<BeneficiarioFrontend[]>([]);
+  const [allData, setAllData] = useState<BeneficiarioTabla[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [usandoDemo, setUsandoDemo] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
 
-  // Paginación
+  // Paginación local
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
@@ -232,41 +827,84 @@ export default function CIAMBeneficiariosPage() {
   const [mesesCumpleanos, setMesesCumpleanos] = useState<number[]>([]);
   const [cumpleanosModo, setCumpleanosModo] = useState<CumpleanosModo>("mes");
   const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
-  const [nivelesPobreza, setNivelesPobreza] = useState<string[]>([]);
+  const [sexosSeleccionados, setSexosSeleccionados] = useState<string[]>([]);
   const [segurosSeleccionados, setSegurosSeleccionados] = useState<string[]>([]);
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
 
   // Detalle
-  const [selectedBeneficiario, setSelectedBeneficiario] = useState<BeneficiarioFrontend | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [detalleData, setDetalleData] = useState<BeneficiarioDetalleBackend | null>(null);
+  const [detalleLoading, setDetalleLoading] = useState(false);
 
-  // Cargar datos
+  // Cargar lista de beneficiarios en lotes (como ULE)
   const fetchData = useCallback(async () => {
     setIsLoading(true);
+    setLoadingProgress(0);
+
     try {
-      const firstResponse = await getData<BackendResponse>(`ciam/beneficiary?page=1&limit=1`);
+      // Primero obtener el total
+      const firstResponse = await getData<BackendListaResponse>(`pam/benefited?page=1&limit=1`);
       const totalCount = firstResponse?.data?.totalCount || 0;
-      if (totalCount > 0) {
-        const response = await getData<BackendResponse>(`ciam/beneficiary?page=1&limit=${totalCount}`);
-        if (response?.data?.data) {
-          setAllData(response.data.data.map(mapBackendToFrontend));
-          setUsandoDemo(false);
-          return;
-        }
+
+      if (totalCount === 0) {
+        setAllData([]);
+        setIsLoading(false);
+        return;
       }
-      setAllData(generarDataDemo().map(mapBackendToFrontend));
-      setUsandoDemo(true);
-    } catch {
-      setAllData(generarDataDemo().map(mapBackendToFrontend));
-      setUsandoDemo(true);
+
+      // Calcular número de páginas necesarias
+      const totalPages = Math.ceil(totalCount / BATCH_SIZE);
+      const allBeneficiarios: BeneficiarioListaBackend[] = [];
+
+      // Cargar en lotes de 500
+      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+        const response = await getData<BackendListaResponse>(
+          `pam/benefited?page=${pageNum}&limit=${BATCH_SIZE}`
+        );
+
+        if (response?.data?.data) {
+          allBeneficiarios.push(...response.data.data);
+        }
+
+        // Actualizar progreso
+        setLoadingProgress(Math.round((pageNum / totalPages) * 100));
+      }
+
+      setAllData(allBeneficiarios.map(mapListaToTabla));
+    } catch (error) {
+      console.error("Error al cargar beneficiarios:", error);
+      setAllData([]);
     } finally {
       setIsLoading(false);
+    }
+  }, [getData]);
+
+  // Cargar detalle de un beneficiario
+  const fetchDetalle = useCallback(async (id: string) => {
+    setDetalleLoading(true);
+    try {
+      const response = await getData<BackendDetalleResponse>(`pam/benefited/${id}`);
+      if (response?.data) {
+        setDetalleData(response.data);
+      }
+    } catch (error) {
+      console.error("Error al cargar detalle:", error);
+      setDetalleData(null);
+    } finally {
+      setDetalleLoading(false);
     }
   }, [getData]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    if (selectedId && detailOpen) {
+      fetchDetalle(selectedId);
+    }
+  }, [selectedId, detailOpen, fetchDetalle]);
 
   // Handlers de filtros
   const handleFilterClick = (e: React.MouseEvent<HTMLButtonElement>) => setFilterAnchor(e.currentTarget);
@@ -278,8 +916,8 @@ export default function CIAMBeneficiariosPage() {
   const handleMesToggle = (mes: number) => {
     setMesesCumpleanos((prev) => prev.includes(mes) ? prev.filter((m) => m !== mes) : [...prev, mes]);
   };
-  const handlePobrezaToggle = (nivel: string) => {
-    setNivelesPobreza((prev) => prev.includes(nivel) ? prev.filter((n) => n !== nivel) : [...prev, nivel]);
+  const handleSexoToggle = (sexo: string) => {
+    setSexosSeleccionados((prev) => prev.includes(sexo) ? prev.filter((s) => s !== sexo) : [...prev, sexo]);
   };
   const handleSeguroToggle = (seguro: string) => {
     setSegurosSeleccionados((prev) => prev.includes(seguro) ? prev.filter((s) => s !== seguro) : [...prev, seguro]);
@@ -288,7 +926,7 @@ export default function CIAMBeneficiariosPage() {
   const filterOpen = Boolean(filterAnchor);
   const isEdadFiltered = edadRange[0] > 60 || edadRange[1] < 100;
   const isCumpleanosFiltered = cumpleanosModo === "mes" ? mesesCumpleanos.length > 0 : diaCumpleanos !== "";
-  const isPobrezaFiltered = nivelesPobreza.length > 0;
+  const isSexoFiltered = sexosSeleccionados.length > 0;
   const isSeguroFiltered = segurosSeleccionados.length > 0;
 
   const handleChangePage = (_: unknown, newPage: number) => setPage(newPage);
@@ -296,26 +934,27 @@ export default function CIAMBeneficiariosPage() {
     setRowsPerPage(parseInt(e.target.value, 10));
     setPage(0);
   };
-  const handleRowClick = (b: BeneficiarioFrontend) => {
-    setSelectedBeneficiario(b);
+  const handleRowClick = (id: string) => {
+    setSelectedId(id);
+    setDetalleData(null);
     setDetailOpen(true);
   };
   const handleDetailClose = () => {
     setDetailOpen(false);
-    setSelectedBeneficiario(null);
+    setSelectedId(null);
+    setDetalleData(null);
   };
 
   // Formatear datos
   const allDataFormateados = useFormatTableData(allData);
 
-  // Filtrar
-  const filteredData = allDataFormateados.filter((b: BeneficiarioFrontend) => {
+  // Filtrar TODOS los datos (ahora sí funciona porque tenemos todos los registros)
+  const filteredData = allDataFormateados.filter((b: BeneficiarioTabla) => {
     const term = searchTerm.toLowerCase();
     const matchesSearch =
-      b.nombre.toLowerCase().includes(term) ||
-      b.apellido.toLowerCase().includes(term) ||
-      b.dni.includes(searchTerm) ||
-      b.profesion.toLowerCase().includes(term);
+      b.nombreCompleto.toLowerCase().includes(term) ||
+      b.distritoResidencia.toLowerCase().includes(term) ||
+      b.celular.includes(searchTerm);
 
     const matchesEdad = b.edad >= edadRange[0] && b.edad <= edadRange[1];
 
@@ -337,35 +976,37 @@ export default function CIAMBeneficiariosPage() {
       }
     }
 
-    const matchesPobreza = nivelesPobreza.length === 0 || nivelesPobreza.includes(b.nivelPobreza);
+    const matchesSexo = sexosSeleccionados.length === 0 || sexosSeleccionados.includes(b.sexo);
     const matchesSeguro = segurosSeleccionados.length === 0 || segurosSeleccionados.includes(b.seguroSalud);
 
-    return matchesSearch && matchesEdad && matchesCumpleanos && matchesPobreza && matchesSeguro;
+    return matchesSearch && matchesEdad && matchesCumpleanos && matchesSexo && matchesSeguro;
   });
 
   // Resetear página al filtrar
   useEffect(() => {
     setPage(0);
-  }, [searchTerm, edadRange, mesesCumpleanos, cumpleanosModo, diaCumpleanos, nivelesPobreza, segurosSeleccionados]);
+  }, [searchTerm, edadRange, mesesCumpleanos, cumpleanosModo, diaCumpleanos, sexosSeleccionados, segurosSeleccionados]);
 
+  // Paginar los datos filtrados
   const paginatedData = filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
-  // Exportar a Excel
+  // Exportar a Excel (todos los datos filtrados)
   const handleExport = () => {
-    const exportData = filteredData.map((b: BeneficiarioFrontend) => ({
-      "Nombre": b.nombre,
-      "Apellido": b.apellido,
-      "DNI": b.dni,
-      "Fecha Nacimiento": formatearFecha(b.fechaNacimiento),
+    const exportData = filteredData.map((b: BeneficiarioTabla) => ({
+      "Nombre Completo": b.nombreCompleto,
+      "Tipo Doc": b.tipoDoc,
+      "Sexo": b.sexo,
       "Edad": b.edad,
-      "Nivel de Pobreza": b.nivelPobreza,
+      "Fecha Nacimiento": formatearFecha(b.fechaNacimiento),
+      "Estado Civil": b.estadoCivil,
       "Seguro de Salud": b.seguroSalud,
-      "Sabe Leer/Escribir": b.sabeLeerEscribir ? "Sí" : "No",
-      "Profesión": b.profesion,
-      "Dirección": b.direccion,
-      "Teléfono": b.telefono,
-      "Observaciones": b.observaciones || "-",
+      "Distrito": b.distritoResidencia,
+      "Modo": b.modo,
+      "Celular": b.celular,
     }));
+    if (exportData.length === 0) {
+      return;
+    }
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Beneficiarios CIAM");
@@ -378,7 +1019,7 @@ export default function CIAMBeneficiariosPage() {
     setMesesCumpleanos([]);
     setCumpleanosModo("mes");
     setDiaCumpleanos("");
-    setNivelesPobreza([]);
+    setSexosSeleccionados([]);
     setSegurosSeleccionados([]);
   };
 
@@ -409,20 +1050,6 @@ export default function CIAMBeneficiariosPage() {
         <Typography variant="body1" color="text.secondary" sx={{ ml: 7.5 }}>
           Listado de adultos mayores registrados en el programa CIAM
         </Typography>
-        {usandoDemo && !isLoading && (
-          <Chip
-            label="Mostrando datos de demostración"
-            size="small"
-            sx={{
-              mt: 1,
-              ml: 7.5,
-              backgroundColor: "#fff3e0",
-              color: "#e65100",
-              fontWeight: 600,
-              border: "1px solid #ffcc80",
-            }}
-          />
-        )}
       </Box>
 
       {/* Tarjeta principal */}
@@ -440,7 +1067,7 @@ export default function CIAMBeneficiariosPage() {
             {/* Buscador y Filtros */}
             <Box mb={3} display="flex" gap={1.5} alignItems="center" flexWrap="wrap">
               <TextField
-                placeholder="Buscar por nombre, DNI o profesión..."
+                placeholder="Buscar por nombre, distrito o celular..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 slotProps={{
@@ -514,23 +1141,23 @@ export default function CIAMBeneficiariosPage() {
                   </IconButton>
                 </Box>
               )}
-              {isPobrezaFiltered && (
-                <Box sx={{ backgroundColor: "#fff3e0", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
-                  <Typography variant="caption" color="#e65100">
-                    Pobreza: {nivelesPobreza.length}
+              {isSexoFiltered && (
+                <Box sx={{ backgroundColor: "#e3f2fd", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                  <Typography variant="caption" color="#1565c0">
+                    Sexo: {sexosSeleccionados.join(", ")}
                   </Typography>
-                  <IconButton size="small" onClick={() => setNivelesPobreza([])} sx={{ p: 0.25 }}>
-                    <Close sx={{ fontSize: 14, color: "#e65100" }} />
+                  <IconButton size="small" onClick={() => setSexosSeleccionados([])} sx={{ p: 0.25 }}>
+                    <Close sx={{ fontSize: 14, color: "#1565c0" }} />
                   </IconButton>
                 </Box>
               )}
               {isSeguroFiltered && (
-                <Box sx={{ backgroundColor: "#e3f2fd", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
-                  <Typography variant="caption" color="#1565c0">
+                <Box sx={{ backgroundColor: "#e8f5e9", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                  <Typography variant="caption" color="#2e7d32">
                     Seguro: {segurosSeleccionados.length}
                   </Typography>
                   <IconButton size="small" onClick={() => setSegurosSeleccionados([])} sx={{ p: 0.25 }}>
-                    <Close sx={{ fontSize: 14, color: "#1565c0" }} />
+                    <Close sx={{ fontSize: 14, color: "#2e7d32" }} />
                   </IconButton>
                 </Box>
               )}
@@ -567,10 +1194,10 @@ export default function CIAMBeneficiariosPage() {
                   <ToggleButton value="cumpleanos" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#fce7f3", color: "#be185d", "&:hover": { backgroundColor: "#fbcfe8" } } }}>
                     Cumple
                   </ToggleButton>
-                  <ToggleButton value="pobreza" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#fff3e0", color: "#e65100", "&:hover": { backgroundColor: "#ffe0b2" } } }}>
-                    Pobreza
+                  <ToggleButton value="sexo" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#e3f2fd", color: "#1565c0", "&:hover": { backgroundColor: "#bbdefb" } } }}>
+                    Sexo
                   </ToggleButton>
-                  <ToggleButton value="seguro" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#e3f2fd", color: "#1565c0", "&:hover": { backgroundColor: "#bbdefb" } } }}>
+                  <ToggleButton value="seguro" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#e8f5e9", color: "#2e7d32", "&:hover": { backgroundColor: "#c8e6c9" } } }}>
                     Seguro
                   </ToggleButton>
                 </ToggleButtonGroup>
@@ -674,33 +1301,33 @@ export default function CIAMBeneficiariosPage() {
                   </>
                 )}
 
-                {/* Filtro por nivel de pobreza */}
-                {filterType === "pobreza" && (
+                {/* Filtro por sexo */}
+                {filterType === "sexo" && (
                   <>
                     <Typography variant="body2" color="#475569" mb={1.5}>
-                      Nivel de pobreza
+                      Sexo
                     </Typography>
                     <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
-                      {NIVELES_POBREZA.map((nivel) => (
+                      {SEXOS.map((sexo) => (
                         <Button
-                          key={nivel}
+                          key={sexo}
                           size="small"
-                          variant={nivelesPobreza.includes(nivel) ? "contained" : "outlined"}
-                          onClick={() => handlePobrezaToggle(nivel)}
+                          variant={sexosSeleccionados.includes(sexo) ? "contained" : "outlined"}
+                          onClick={() => handleSexoToggle(sexo)}
                           sx={{
                             textTransform: "none",
                             fontSize: "0.8rem",
                             justifyContent: "flex-start",
-                            borderColor: nivelesPobreza.includes(nivel) ? "#e65100" : "#e2e8f0",
-                            backgroundColor: nivelesPobreza.includes(nivel) ? "#e65100" : "transparent",
-                            color: nivelesPobreza.includes(nivel) ? "white" : "#64748b",
+                            borderColor: sexosSeleccionados.includes(sexo) ? "#1565c0" : "#e2e8f0",
+                            backgroundColor: sexosSeleccionados.includes(sexo) ? "#1565c0" : "transparent",
+                            color: sexosSeleccionados.includes(sexo) ? "white" : "#64748b",
                             "&:hover": {
-                              backgroundColor: nivelesPobreza.includes(nivel) ? "#bf360c" : "#fff3e0",
-                              borderColor: "#e65100",
+                              backgroundColor: sexosSeleccionados.includes(sexo) ? "#0d47a1" : "#e3f2fd",
+                              borderColor: "#1565c0",
                             },
                           }}
                         >
-                          {nivel}
+                          {sexo}
                         </Button>
                       ))}
                     </Box>
@@ -724,12 +1351,12 @@ export default function CIAMBeneficiariosPage() {
                             textTransform: "none",
                             fontSize: "0.8rem",
                             justifyContent: "flex-start",
-                            borderColor: segurosSeleccionados.includes(seguro) ? "#1565c0" : "#e2e8f0",
-                            backgroundColor: segurosSeleccionados.includes(seguro) ? "#1565c0" : "transparent",
+                            borderColor: segurosSeleccionados.includes(seguro) ? "#2e7d32" : "#e2e8f0",
+                            backgroundColor: segurosSeleccionados.includes(seguro) ? "#2e7d32" : "transparent",
                             color: segurosSeleccionados.includes(seguro) ? "white" : "#64748b",
                             "&:hover": {
-                              backgroundColor: segurosSeleccionados.includes(seguro) ? "#0d47a1" : "#e3f2fd",
-                              borderColor: "#1565c0",
+                              backgroundColor: segurosSeleccionados.includes(seguro) ? "#1b5e20" : "#e8f5e9",
+                              borderColor: "#2e7d32",
                             },
                           }}
                         >
@@ -765,41 +1392,43 @@ export default function CIAMBeneficiariosPage() {
                 <TableHead>
                   <TableRow sx={{ backgroundColor: "#f8fafc" }}>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Nombre Completo</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>DNI</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Doc.</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Sexo</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Edad</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Nivel Pobreza</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Estado Civil</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Seguro</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Lee/Escribe</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Profesión</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Distrito</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Modo</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
                         <CircularProgress size={32} sx={{ color: CIAM_COLOR }} />
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                          Cargando beneficiarios...
+                          Cargando beneficiarios... {loadingProgress > 0 && `${loadingProgress}%`}
                         </Typography>
                       </TableCell>
                     </TableRow>
                   ) : paginatedData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">
                           No se encontraron beneficiarios
                         </Typography>
                       </TableCell>
                     </TableRow>
                   ) : (
-                    paginatedData.map((row: BeneficiarioFrontend, index: number) => {
-                      const pobrezaColors = POBREZA_CHIP_COLORS[row.nivelPobreza] || POBREZA_CHIP_COLORS["Sin clasificar"];
+                    paginatedData.map((row: BeneficiarioTabla, index: number) => {
+                      const sexoColors = SEXO_CHIP_COLORS[row.sexo] || { bg: "#f5f5f5", color: "#757575" };
                       const seguroColors = SEGURO_CHIP_COLORS[row.seguroSalud] || SEGURO_CHIP_COLORS["Otro"];
+                      const modoColors = MODO_CHIP_COLORS[row.modo] || { bg: "#f5f5f5", color: "#757575" };
                       return (
                         <TableRow
                           key={row.id}
-                          onClick={() => handleRowClick(row)}
+                          onClick={() => handleRowClick(row.id)}
                           sx={{
                             backgroundColor: index % 2 === 0 ? "white" : "#f8fafc",
                             "&:hover": { backgroundColor: "#f1f5f9", cursor: "pointer" },
@@ -807,57 +1436,31 @@ export default function CIAMBeneficiariosPage() {
                           }}
                         >
                           <TableCell sx={{ fontWeight: 500 }}>
-                            {row.nombre} {row.apellido}
+                            {row.nombreCompleto}
                           </TableCell>
-                          <TableCell>{row.dni}</TableCell>
+                          <TableCell>{row.tipoDoc}</TableCell>
+                          <TableCell align="center">
+                            <Chip label={row.sexo} size="small" sx={{ backgroundColor: sexoColors.bg, color: sexoColors.color, fontWeight: 600, fontSize: "0.7rem" }} />
+                          </TableCell>
                           <TableCell align="center">
                             <Chip label={`${row.edad} años`} size="small" sx={{ backgroundColor: "#f3e5f5", color: "#7b1fa2", fontWeight: 600, fontSize: "0.75rem" }} />
                           </TableCell>
-                          <TableCell>
-                            <Chip label={row.nivelPobreza} size="small" sx={{ backgroundColor: pobrezaColors.bg, color: pobrezaColors.color, fontWeight: 600, fontSize: "0.7rem" }} />
-                          </TableCell>
+                          <TableCell>{row.estadoCivil}</TableCell>
                           <TableCell>
                             <Chip label={row.seguroSalud} size="small" sx={{ backgroundColor: seguroColors.bg, color: seguroColors.color, fontWeight: 600, fontSize: "0.7rem" }} />
                           </TableCell>
+                          <TableCell>{row.distritoResidencia}</TableCell>
                           <TableCell align="center">
-                            <Chip
-                              label={row.sabeLeerEscribir ? "Sí" : "No"}
-                              size="small"
-                              sx={{
-                                backgroundColor: row.sabeLeerEscribir ? "#e8f5e9" : "#ffebee",
-                                color: row.sabeLeerEscribir ? "#2e7d32" : "#c62828",
-                                fontWeight: 600,
-                                fontSize: "0.75rem",
-                              }}
-                            />
+                            <Chip label={row.modo} size="small" sx={{ backgroundColor: modoColors.bg, color: modoColors.color, fontWeight: 600, fontSize: "0.7rem" }} />
                           </TableCell>
-                          <TableCell>{row.profesion}</TableCell>
                           <TableCell align="center">
                             <Tooltip title="Ver detalles">
                               <IconButton
                                 size="small"
-                                onClick={(e) => { e.stopPropagation(); handleRowClick(row); }}
+                                onClick={(e) => { e.stopPropagation(); handleRowClick(row.id); }}
                                 sx={{ color: "#64748b", "&:hover": { backgroundColor: "#f1f5f9" } }}
                               >
                                 <Visibility fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Editar">
-                              <IconButton
-                                size="small"
-                                onClick={(e) => { e.stopPropagation(); }}
-                                sx={{ color: "#0891b2", "&:hover": { backgroundColor: "rgba(8, 145, 178, 0.1)" } }}
-                              >
-                                <Edit fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Eliminar">
-                              <IconButton
-                                size="small"
-                                onClick={(e) => { e.stopPropagation(); }}
-                                sx={{ color: "#dc2626", "&:hover": { backgroundColor: "rgba(220, 38, 38, 0.1)" } }}
-                              >
-                                <Delete fontSize="small" />
                               </IconButton>
                             </Tooltip>
                           </TableCell>
@@ -894,9 +1497,9 @@ export default function CIAMBeneficiariosPage() {
       <Dialog
         open={detailOpen}
         onClose={handleDetailClose}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
-        PaperProps={{ sx: { borderRadius: "16px" } }}
+        PaperProps={{ sx: { borderRadius: "16px", maxHeight: "90vh" } }}
       >
         <DialogTitle
           sx={{
@@ -905,125 +1508,21 @@ export default function CIAMBeneficiariosPage() {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            py: 2,
           }}
         >
           <Box display="flex" alignItems="center" gap={1.5}>
             <Elderly sx={{ color: CIAM_COLOR }} />
             <Typography variant="h6" fontWeight={600} color="#334155">
-              Detalles del Adulto Mayor
+              Ficha del Adulto Mayor
             </Typography>
           </Box>
           <IconButton onClick={handleDetailClose} size="small">
             <Close />
           </IconButton>
         </DialogTitle>
-        <DialogContent sx={{ p: 3, mt: 1 }}>
-          {selectedBeneficiario && (
-            <Grid container spacing={3}>
-              {/* Datos Personales */}
-              <Grid size={12}>
-                <Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom>
-                  Datos Personales
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Nombre</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedBeneficiario.nombre}</Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Apellido</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedBeneficiario.apellido}</Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">DNI</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedBeneficiario.dni}</Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Fecha de Nacimiento</Typography>
-                <Typography variant="body2" fontWeight={500}>
-                  {formatearFecha(selectedBeneficiario.fechaNacimiento)} ({selectedBeneficiario.edad} años)
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Teléfono</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedBeneficiario.telefono}</Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Dirección</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedBeneficiario.direccion}</Typography>
-              </Grid>
-
-              {/* Situación Socioeconómica */}
-              <Grid size={12}>
-                <Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom sx={{ mt: 2 }}>
-                  Situación Socioeconómica
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Nivel de Pobreza</Typography>
-                <Box mt={0.5}>
-                  <Chip
-                    label={selectedBeneficiario.nivelPobreza}
-                    size="small"
-                    sx={{
-                      backgroundColor: (POBREZA_CHIP_COLORS[selectedBeneficiario.nivelPobreza] || POBREZA_CHIP_COLORS["Sin clasificar"]).bg,
-                      color: (POBREZA_CHIP_COLORS[selectedBeneficiario.nivelPobreza] || POBREZA_CHIP_COLORS["Sin clasificar"]).color,
-                      fontWeight: 600,
-                    }}
-                  />
-                </Box>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Seguro de Salud</Typography>
-                <Box mt={0.5}>
-                  <Chip
-                    label={selectedBeneficiario.seguroSalud}
-                    size="small"
-                    sx={{
-                      backgroundColor: (SEGURO_CHIP_COLORS[selectedBeneficiario.seguroSalud] || SEGURO_CHIP_COLORS["Otro"]).bg,
-                      color: (SEGURO_CHIP_COLORS[selectedBeneficiario.seguroSalud] || SEGURO_CHIP_COLORS["Otro"]).color,
-                      fontWeight: 600,
-                    }}
-                  />
-                </Box>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Sabe Leer y Escribir</Typography>
-                <Box mt={0.5}>
-                  <Chip
-                    label={selectedBeneficiario.sabeLeerEscribir ? "Sí" : "No"}
-                    size="small"
-                    sx={{
-                      backgroundColor: selectedBeneficiario.sabeLeerEscribir ? "#e8f5e9" : "#ffebee",
-                      color: selectedBeneficiario.sabeLeerEscribir ? "#2e7d32" : "#c62828",
-                      fontWeight: 600,
-                    }}
-                  />
-                </Box>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Profesión</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedBeneficiario.profesion}</Typography>
-              </Grid>
-
-              {/* Observaciones */}
-              {selectedBeneficiario.observaciones && (
-                <>
-                  <Grid size={12}>
-                    <Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom sx={{ mt: 2 }}>
-                      Observaciones
-                    </Typography>
-                    <Divider sx={{ mb: 2 }} />
-                  </Grid>
-                  <Grid size={12}>
-                    <Typography variant="body2">{selectedBeneficiario.observaciones}</Typography>
-                  </Grid>
-                </>
-              )}
-            </Grid>
-          )}
+        <DialogContent sx={{ p: 3 }}>
+          <DetalleContent beneficiario={detalleData} loading={detalleLoading} />
         </DialogContent>
         <DialogActions sx={{ p: 2, borderTop: "1px solid #e2e8f0" }}>
           <Button onClick={handleDetailClose} sx={{ textTransform: "none", color: "#64748b" }}>
