@@ -33,29 +33,20 @@ import {
   FilterList,
   Cake,
   Clear,
-  WhatsApp,
   Close,
 } from "@mui/icons-material";
-import { useRouter } from "next/navigation";
-import WhatsAppMessageDialog from "../mensajeria-whatsapp/components/WhatsAppMessageDialog";
-import { PersonaParaEnvio } from "../mensajeria-whatsapp/types";
-import { showSuccess, showError } from "@/lib/utils/swalConfig";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import * as XLSX from "xlsx";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
+const BATCH_SIZE = 500;
 
-// Tipos de módulos
-type ModuloType = "PVL" | "OLLAS_COMUNES" | "COMEDORES_POPULARES" | "ULE" | "CIAM";
-
-const MODULOS_CONFIG: { id: ModuloType; label: string; color: string }[] = [
-  { id: "PVL", label: "PVL", color: "#d81b7e" },
-  { id: "OLLAS_COMUNES", label: "Ollas Comunes", color: "#4caf50" },
-  { id: "COMEDORES_POPULARES", label: "Comedores Populares", color: "#ff9800" },
-  { id: "ULE", label: "ULE", color: "#2196f3" },
-  { id: "CIAM", label: "CIAM", color: "#9c27b0" },
+// Paleta de colores para módulos
+const MODULE_COLORS = [
+  "#d81b7e", "#4caf50", "#ff9800", "#2196f3", "#9c27b0",
+  "#00bcd4", "#e91e63", "#795548", "#607d8b", "#f44336",
 ];
 
 // Meses para el filtro
@@ -74,420 +65,275 @@ const MESES = [
   { value: 12, label: "Diciembre" },
 ];
 
-// Tipo de filtro
 type FilterType = "edad" | "cumpleanos";
 
-// Función para calcular edad desde fecha de nacimiento
-const calcularEdad = (fechaNacimiento: string): number => {
+// ============================================
+// UTILIDADES
+// ============================================
+const calcularEdad = (fechaNacimiento: string | null | undefined): number => {
+  if (!fechaNacimiento) return 0;
   const hoy = new Date();
   const nacimiento = new Date(fechaNacimiento);
-  let edad = hoy.getFullYear() - nacimiento.getFullYear();
-  const mesActual = hoy.getMonth();
-  const mesNacimiento = nacimiento.getMonth();
-
-  // Ajustar si aún no ha llegado el cumpleaños este año
-  if (mesActual < mesNacimiento ||
-      (mesActual === mesNacimiento && hoy.getDate() < nacimiento.getDate())) {
+  let edad = hoy.getUTCFullYear() - nacimiento.getUTCFullYear();
+  const mes = hoy.getUTCMonth() - nacimiento.getUTCMonth();
+  if (mes < 0 || (mes === 0 && hoy.getUTCDate() < nacimiento.getUTCDate())) {
     edad--;
   }
-
   return edad;
 };
 
-// Interface unificada para la lista
-interface PersonaUnificada {
+const formatearFecha = (fecha: string | null | undefined): string => {
+  if (!fecha) return "-";
+  const d = new Date(fecha);
+  const dia = d.getUTCDate().toString().padStart(2, "0");
+  const mes = (d.getUTCMonth() + 1).toString().padStart(2, "0");
+  const anio = d.getUTCFullYear();
+  return `${dia}/${mes}/${anio}`;
+};
+
+const formatearTelefono = (telefono: string | null | undefined): string => {
+  if (!telefono || !telefono.trim()) return "-";
+  const t = telefono.trim();
+  if (t.startsWith("+51")) return t;
+  if (t.startsWith("51") && t.length >= 11) return `+${t}`;
+  return `+51${t}`;
+};
+
+// ============================================
+// INTERFACES BACKEND
+// ============================================
+interface GeneralPersonBackend {
   id: string;
-  modulo: ModuloType;
-  moduloLabel: string;
-  entidadNombre: string;
-  entidadCodigo: string;
+  name: string;
+  lastname: string;
+  dni: string;
+  phone: string | null;
+  birthday: string | null;
+  message: string | null;
+  answer: string | null;
+  citizen_id: string;
+  module_id: string;
+  module: { id: string; name: string } | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  send: string | null;
+}
+
+interface BackendResponse {
+  message: string;
+  data: {
+    data: GeneralPersonBackend[];
+    totalCount: number;
+  };
+}
+
+// ============================================
+// INTERFACE FRONTEND
+// ============================================
+interface PersonaTabla {
+  id: string;
+  nombreCompleto: string;
   nombre: string;
   apellido: string;
   dni: string;
   telefono: string;
-  cumpleanos: string | null;
-  rol: string;
+  fechaNacimiento: string | null;
+  edad: number;
+  moduloId: string;
+  moduloNombre: string;
 }
 
-// Interfaces para los backends
-interface PVLCommittee {
-  id: string;
-  code: string;
-  name: string;
-  coordinator: {
-    id: string;
-    name: string;
-    lastname: string;
-    dni: string;
-    phone: string;
-    birthday?: string;
-  } | null;
-}
-
-interface PCACenter {
-  id: string;
-  code: string;
-  name: string;
-  modality: string;
-  president: {
-    id: string;
-    name: string;
-    lastname: string;
-    dni: string;
-    phone: string;
-    birthday: string;
-  } | null;
-}
-
-interface BackendResponsePVL {
-  message: string;
-  data: {
-    data: PVLCommittee[];
-    totalCount: number;
-  };
-}
-
-interface BackendResponsePCA {
-  message: string;
-  data: {
-    data: PCACenter[];
-    totalCount: number;
-  };
-}
-
-interface ULERegisteredPerson {
-  id: string;
-  fsu: string;
-  s100: string;
-  dni: string;
-  name: string;
-  lastname: string;
-  phone: string;
-  birthday: string;
-  format: string;
-  urban: { id: string; name: string } | null;
-}
-
-interface BackendResponseULE {
-  message: string;
-  data: {
-    data: ULERegisteredPerson[];
-    totalCount: number;
-  };
-}
-
-interface CIAMBeneficiary {
+interface ModuloInfo {
   id: string;
   name: string;
-  lastname: string;
-  cellphone: string | null;
-  birthday: string;
-  district_live: { id: string; name: string } | null;
+  color: string;
 }
 
-interface BackendResponseCIAM {
-  message: string;
-  data: {
-    data: CIAMBeneficiary[];
-    totalCount: number;
-    totalPages: number;
-  };
-}
-
+// ============================================
+// COMPONENTE PRINCIPAL
+// ============================================
 export default function ListaGeneralPage() {
-  const { getData, postData } = useFetch();
-  const router = useRouter();
+  const { getData } = useFetch();
+
+  // Datos
+  const [allData, setAllData] = useState<PersonaTabla[]>([]);
+  const [modulos, setModulos] = useState<ModuloInfo[]>([]);
+  const [moduloMap, setModuloMap] = useState<Record<string, ModuloInfo>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [personas, setPersonas] = useState<PersonaUnificada[]>([]);
-  const [whatsappDialogOpen, setWhatsappDialogOpen] = useState(false);
 
-  // Estados de filtros
-  const [filtroModulo, setFiltroModulo] = useState<ModuloType | "">("");
-  const [filtroDia, setFiltroDia] = useState<string>("");
-  const [filtroMes, setFiltroMes] = useState<number | "">("");
-  const [filtroBusqueda, setFiltroBusqueda] = useState("");
-  const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
-  const [filterType, setFilterType] = useState<FilterType>("edad");
-  const [edadRange, setEdadRange] = useState<number[]>([0, 100]);
-
-  // Estados de paginación
+  // Paginación
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
 
-  // Cargar todos los datos
+  // Filtros
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filtroModulo, setFiltroModulo] = useState("");
+  const [filterType, setFilterType] = useState<FilterType>("edad");
+  const [edadRange, setEdadRange] = useState<number[]>([0, 100]);
+  const [filtroMes, setFiltroMes] = useState<number | "">("");
+  const [filtroDia, setFiltroDia] = useState("");
+  const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
+
+  // Cargar datos
   const fetchAllData = useCallback(async () => {
     setIsLoading(true);
-    const todasLasPersonas: PersonaUnificada[] = [];
-
-    // Cargar PVL
     try {
-      const pvlFirst = await getData<BackendResponsePVL>(`pvl/committee?page=1&limit=1`);
-      const pvlTotal = pvlFirst?.data?.totalCount || 0;
-      if (pvlTotal > 0) {
-        const pvlResponse = await getData<BackendResponsePVL>(`pvl/committee?page=1&limit=${pvlTotal}`);
-        if (pvlResponse?.data?.data) {
-          pvlResponse.data.data.forEach((committee) => {
-            todasLasPersonas.push({
-              id: `pvl-${committee.id}-${committee.coordinator?.id || "sin-coord"}`,
-              modulo: "PVL",
-              moduloLabel: "PVL",
-              entidadNombre: committee.name,
-              entidadCodigo: committee.code,
-              nombre: committee.coordinator?.name || "",
-              apellido: committee.coordinator?.lastname || "",
-              dni: committee.coordinator?.dni || "",
-              telefono: committee.coordinator?.phone || "",
-              cumpleanos: committee.coordinator?.birthday || null,
-              rol: committee.coordinator ? "Coordinador/a" : "Sin asignar",
-            });
-          });
-        }
-      }
-    } catch (error) {
-      console.error("Error cargando PVL:", error);
-    }
+      const firstResponse = await getData<BackendResponse>("general?page=1&limit=1");
+      const totalCount = firstResponse?.data?.totalCount || 0;
 
-    // Cargar Ollas Comunes
-    try {
-      const ollasResponse = await getData<BackendResponsePCA>(`pca/center?page=0&modality=CPOT&limit=1000`);
-      if (ollasResponse?.data?.data) {
-        ollasResponse.data.data.forEach((center) => {
-          todasLasPersonas.push({
-            id: `ollas-${center.id}-${center.president?.id || "sin-pres"}`,
-            modulo: "OLLAS_COMUNES",
-            moduloLabel: "Ollas Comunes",
-            entidadNombre: center.name,
-            entidadCodigo: center.code,
-            nombre: center.president?.name || "",
-            apellido: center.president?.lastname || "",
-            dni: center.president?.dni || "",
-            telefono: center.president?.phone || "",
-            cumpleanos: center.president?.birthday || null,
-            rol: center.president ? "Presidente/a" : "Sin asignar",
-          });
-        });
-      }
-    } catch (error) {
-      console.error("Error cargando Ollas Comunes:", error);
-    }
-
-    // Cargar Comedores Populares
-    try {
-      const comedoresResponse = await getData<BackendResponsePCA>(`pca/center?page=0&modality=EATER&limit=1000`);
-      if (comedoresResponse?.data?.data) {
-        comedoresResponse.data.data.forEach((center) => {
-          todasLasPersonas.push({
-            id: `comedores-${center.id}-${center.president?.id || "sin-pres"}`,
-            modulo: "COMEDORES_POPULARES",
-            moduloLabel: "Comedores Populares",
-            entidadNombre: center.name,
-            entidadCodigo: center.code,
-            nombre: center.president?.name || "",
-            apellido: center.president?.lastname || "",
-            dni: center.president?.dni || "",
-            telefono: center.president?.phone || "",
-            cumpleanos: center.president?.birthday || null,
-            rol: center.president ? "Presidente/a" : "Sin asignar",
-          });
-        });
-      }
-    } catch (error) {
-      console.error("Error cargando Comedores Populares:", error);
-    }
-
-    // Cargar ULE (Empadronados) en lotes de 500
-    try {
-      const uleFirst = await getData<BackendResponseULE>(`ule/registered?page=1&limit=1`);
-      const uleTotal = uleFirst?.data?.totalCount || 0;
-      if (uleTotal > 0) {
-        const BATCH_SIZE = 500;
-        const totalPages = Math.ceil(uleTotal / BATCH_SIZE);
+      if (totalCount > 0) {
+        const totalPages = Math.ceil(totalCount / BATCH_SIZE);
+        const allItems: PersonaTabla[] = [];
+        const mMap: Record<string, ModuloInfo> = {};
+        let colorIndex = 0;
 
         for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-          const uleResponse = await getData<BackendResponseULE>(`ule/registered?page=${pageNum}&limit=${BATCH_SIZE}`);
-          if (uleResponse?.data?.data) {
-            uleResponse.data.data.forEach((person) => {
-              todasLasPersonas.push({
-                id: `ule-${person.id}`,
-                modulo: "ULE",
-                moduloLabel: "ULE",
-                entidadNombre: person.urban?.name || "Sin urbanización",
-                entidadCodigo: person.fsu || person.s100 || "-",
-                nombre: person.name || "",
-                apellido: person.lastname || "",
-                dni: person.dni || "",
-                telefono: person.phone || "",
-                cumpleanos: person.birthday || null,
-                rol: "Empadronado",
-              });
-            });
+          const response = await getData<BackendResponse>(
+            `general?page=${pageNum}&limit=${BATCH_SIZE}`
+          );
+          if (response?.data?.data) {
+            allItems.push(
+              ...response.data.data.map((item) => {
+                const modId = item.module?.id || item.module_id;
+                const modName = item.module?.name || "-";
+
+                // Registrar módulo si es nuevo
+                if (modId && !mMap[modId]) {
+                  mMap[modId] = {
+                    id: modId,
+                    name: modName,
+                    color: MODULE_COLORS[colorIndex % MODULE_COLORS.length],
+                  };
+                  colorIndex++;
+                }
+
+                return {
+                  id: item.id,
+                  nombreCompleto: `${item.name} ${item.lastname}`.trim(),
+                  nombre: item.name,
+                  apellido: item.lastname,
+                  dni: item.dni || "-",
+                  telefono: item.phone || "",
+                  fechaNacimiento: item.birthday,
+                  edad: calcularEdad(item.birthday),
+                  moduloId: modId,
+                  moduloNombre: modName,
+                };
+              })
+            );
           }
         }
+
+        setAllData(allItems);
+        setModuloMap(mMap);
+        setModulos(Object.values(mMap));
       }
     } catch (error) {
-      console.error("Error cargando ULE:", error);
+      console.error("Error cargando datos:", error);
+    } finally {
+      setIsLoading(false);
     }
-
-    // Cargar CIAM (Beneficiarios adultos mayores) en lotes de 500
-    try {
-      const ciamFirst = await getData<BackendResponseCIAM>(`pam/benefited?page=1&limit=1`);
-      const ciamTotal = ciamFirst?.data?.totalCount || 0;
-      if (ciamTotal > 0) {
-        const BATCH_SIZE = 500;
-        const totalPages = Math.ceil(ciamTotal / BATCH_SIZE);
-
-        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-          const ciamResponse = await getData<BackendResponseCIAM>(`pam/benefited?page=${pageNum}&limit=${BATCH_SIZE}`);
-          if (ciamResponse?.data?.data) {
-            ciamResponse.data.data.forEach((person) => {
-              todasLasPersonas.push({
-                id: `ciam-${person.id}`,
-                modulo: "CIAM",
-                moduloLabel: "CIAM",
-                entidadNombre: person.district_live?.name || "Sin distrito",
-                entidadCodigo: "-",
-                nombre: person.name || "",
-                apellido: person.lastname || "",
-                dni: "",
-                telefono: person.cellphone || "",
-                cumpleanos: person.birthday || null,
-                rol: "Adulto Mayor",
-              });
-            });
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error cargando CIAM:", error);
-    }
-
-    setPersonas(todasLasPersonas);
-    setIsLoading(false);
   }, [getData]);
 
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);
 
-  // Formatear strings del backend (Title Case, preservar siglas en direcciones)
-  const personasFormateadas = useFormatTableData(personas);
+  // Formatear strings (Title Case)
+  const formattedData = useFormatTableData(allData);
 
   // Filtrar datos
-  const personasFiltradas = useMemo(() => {
-    return personasFormateadas.filter((persona) => {
-      // Filtro por módulo
-      if (filtroModulo && persona.modulo !== filtroModulo) {
-        return false;
+  const filteredData = useMemo(() => {
+    return formattedData.filter((row: PersonaTabla) => {
+      // Búsqueda
+      if (searchTerm) {
+        const s = searchTerm.toLowerCase();
+        if (
+          !row.nombreCompleto.toLowerCase().includes(s) &&
+          !row.dni.includes(s) &&
+          !row.telefono.includes(s) &&
+          !row.moduloNombre.toLowerCase().includes(s)
+        ) {
+          return false;
+        }
       }
 
-      // Filtro por búsqueda
-      if (filtroBusqueda) {
-        const busqueda = filtroBusqueda.toLowerCase();
-        const coincide =
-          persona.nombre.toLowerCase().includes(busqueda) ||
-          persona.apellido.toLowerCase().includes(busqueda) ||
-          persona.dni.toLowerCase().includes(busqueda) ||
-          persona.entidadNombre.toLowerCase().includes(busqueda) ||
-          persona.entidadCodigo.toLowerCase().includes(busqueda);
-        if (!coincide) return false;
-      }
+      // Filtro por módulo
+      if (filtroModulo && row.moduloId !== filtroModulo) return false;
 
       // Filtro por edad
-      if (persona.cumpleanos) {
-        const edad = calcularEdad(persona.cumpleanos);
-        if (edad < edadRange[0] || edad > edadRange[1]) {
-          return false;
+      if (edadRange[0] > 0 || edadRange[1] < 100) {
+        if (row.fechaNacimiento) {
+          const edad = calcularEdad(row.fechaNacimiento);
+          if (edad < edadRange[0] || edad > edadRange[1]) return false;
         }
       }
 
       // Filtro por cumpleaños
       if (filtroDia || filtroMes) {
-        if (!persona.cumpleanos) return false;
-
-        const fecha = new Date(persona.cumpleanos);
-        const dia = fecha.getDate();
-        const mes = fecha.getMonth() + 1;
-
-        if (filtroDia && dia !== parseInt(filtroDia)) {
-          return false;
-        }
-
-        if (filtroMes && mes !== filtroMes) {
-          return false;
-        }
+        if (!row.fechaNacimiento) return false;
+        const fecha = new Date(row.fechaNacimiento);
+        if (filtroMes && fecha.getUTCMonth() + 1 !== filtroMes) return false;
+        if (filtroDia && fecha.getUTCDate() !== parseInt(filtroDia)) return false;
       }
 
       return true;
     });
-  }, [personasFormateadas, filtroModulo, filtroBusqueda, filtroDia, filtroMes, edadRange]);
+  }, [formattedData, searchTerm, filtroModulo, edadRange, filtroDia, filtroMes]);
 
-  // Paginación
-  const personasPaginadas = useMemo(() => {
-    return personasFiltradas.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-  }, [personasFiltradas, page, rowsPerPage]);
+  // Paginación local
+  const paginatedData = useMemo(() => {
+    return filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  }, [filteredData, page, rowsPerPage]);
 
-  // Función para descargar Excel
-  const descargarExcel = () => {
-    // Preparar datos para Excel
-    const datosExcel = personasFiltradas.map((persona) => ({
-      "Módulo": persona.moduloLabel,
-      "Código Entidad": persona.entidadCodigo,
-      "Nombre Entidad": persona.entidadNombre,
-      "Rol": persona.rol,
-      "Nombre": persona.nombre,
-      "Apellido": persona.apellido,
-      "DNI": persona.dni,
-      "Teléfono": formatearTelefono(persona.telefono),
-      "Cumpleaños": persona.cumpleanos
-        ? new Date(persona.cumpleanos).toLocaleDateString("es-PE")
-        : "",
-      "Edad": persona.cumpleanos ? calcularEdad(persona.cumpleanos) : "",
+  // Resetear página al cambiar filtros
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm, filtroModulo, edadRange, filtroDia, filtroMes]);
+
+  // Exportar Excel
+  const handleExport = () => {
+    const exportData = filteredData.map((row: PersonaTabla) => ({
+      "Nombre Completo": row.nombreCompleto,
+      DNI: row.dni,
+      Teléfono: formatearTelefono(row.telefono),
+      "Fecha de Nacimiento": formatearFecha(row.fechaNacimiento),
+      Edad: row.edad,
+      Módulo: row.moduloNombre,
     }));
 
-    // Crear workbook y worksheet
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(datosExcel);
-
-    // Ajustar ancho de columnas
-    const colWidths = [
-      { wch: 20 }, // Módulo
-      { wch: 15 }, // Código Entidad
-      { wch: 35 }, // Nombre Entidad
-      { wch: 15 }, // Rol
-      { wch: 20 }, // Nombre
-      { wch: 20 }, // Apellido
-      { wch: 12 }, // DNI
-      { wch: 12 }, // Teléfono
-      { wch: 12 }, // Cumpleaños
-      { wch: 6 },  // Edad
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    ws["!cols"] = [
+      { wch: 30 },
+      { wch: 12 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 6 },
+      { wch: 20 },
     ];
-    ws["!cols"] = colWidths;
-
-    // Agregar worksheet al workbook
     XLSX.utils.book_append_sheet(wb, ws, "Lista General");
 
-    // Nombre del archivo con filtros aplicados
     let fileName = "lista_general";
-    if (filtroModulo) fileName += `_${filtroModulo}`;
-    if (filtroMes) fileName += `_mes${filtroMes}`;
-    if (filtroDia) fileName += `_dia${filtroDia}`;
+    if (filtroModulo) fileName += `_${moduloMap[filtroModulo]?.name || "modulo"}`;
+    fileName += `_${new Date().toISOString().split("T")[0]}`;
     fileName += ".xlsx";
 
-    // Descargar archivo
     XLSX.writeFile(wb, fileName);
   };
 
   // Limpiar filtros
   const limpiarFiltros = () => {
+    setSearchTerm("");
     setFiltroModulo("");
+    setEdadRange([0, 100]);
     setFiltroDia("");
     setFiltroMes("");
-    setFiltroBusqueda("");
-    setEdadRange([0, 100]);
     setPage(0);
   };
 
-  // Handlers para filtros de edad y cumpleaños
+  // Handlers de filtro
   const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setFilterAnchor(event.currentTarget);
   };
@@ -500,9 +346,7 @@ export default function ListaGeneralPage() {
     _event: React.MouseEvent<HTMLElement>,
     newFilterType: FilterType | null
   ) => {
-    if (newFilterType !== null) {
-      setFilterType(newFilterType);
-    }
+    if (newFilterType !== null) setFilterType(newFilterType);
   };
 
   const handleEdadChange = (_event: unknown, newValue: number | number[]) => {
@@ -511,62 +355,16 @@ export default function ListaGeneralPage() {
 
   const filterOpen = Boolean(filterAnchor);
   const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 100;
+  const hayFiltrosActivos = searchTerm || filtroModulo || filtroDia || filtroMes || isEdadFiltered;
 
-  // Obtener color del módulo
-  const getModuloColor = (modulo: ModuloType) => {
-    return MODULOS_CONFIG.find((m) => m.id === modulo)?.color || "#666";
-  };
-
-  // Formatear fecha con edad
-  const formatearFecha = (fecha: string | null) => {
-    if (!fecha) return "-";
-    const fechaFormateada = new Date(fecha).toLocaleDateString("es-PE", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
+  // Estadísticas por módulo
+  const statsByModule = useMemo(() => {
+    const stats: Record<string, number> = {};
+    filteredData.forEach((row: PersonaTabla) => {
+      stats[row.moduloId] = (stats[row.moduloId] || 0) + 1;
     });
-    const edad = calcularEdad(fecha);
-    return `${fechaFormateada} (${edad} años)`;
-  };
-
-  // Formatear teléfono con prefijo +51
-  const formatearTelefono = (telefono: string | null | undefined): string => {
-    if (!telefono || telefono.trim() === "") return "";
-    const telefonoLimpio = telefono.trim();
-    if (telefonoLimpio.startsWith("+51")) {
-      return telefonoLimpio;
-    }
-    if (telefonoLimpio.startsWith("51") && telefonoLimpio.length >= 11) {
-      return `+${telefonoLimpio}`;
-    }
-    return `+51${telefonoLimpio}`;
-  };
-
-  const hayFiltrosActivos = filtroModulo || filtroDia || filtroMes || filtroBusqueda || isEdadFiltered;
-
-  // Filtrar personas con teléfono válido para WhatsApp
-  const personasConTelefono = useMemo(() => {
-    return personasFiltradas.filter(
-      (p) => p.telefono && p.telefono.trim() !== "" && p.cumpleanos
-    );
-  }, [personasFiltradas]);
-
-  // Enviar mensajes de WhatsApp
-  const handleEnviarWhatsApp = async (personas: PersonaParaEnvio[]) => {
-    try {
-      await postData("whatsapp/messages/send", { personas });
-      showSuccess(
-        "Mensajes enviados",
-        `Se han encolado ${personas.length} mensaje(s) para envío`
-      );
-      // Navegar al historial de mensajes
-      router.push("/programas-sociales/mensajeria-whatsapp");
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Error al enviar mensajes";
-      showError("Error", errorMessage);
-      throw error;
-    }
-  };
+    return stats;
+  }, [filteredData]);
 
   return (
     <Box>
@@ -584,7 +382,7 @@ export default function ListaGeneralPage() {
           Lista General
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Datos unificados de PVL, Ollas Comunes, Comedores Populares, ULE y CIAM
+          Listado general de personas registradas en todos los módulos
         </Typography>
       </Box>
 
@@ -608,13 +406,10 @@ export default function ListaGeneralPage() {
           {/* Búsqueda */}
           <TextField
             size="small"
-            placeholder="Buscar por nombre, DNI, entidad..."
-            value={filtroBusqueda}
-            onChange={(e) => {
-              setFiltroBusqueda(e.target.value);
-              setPage(0);
-            }}
-            sx={{ minWidth: 280 }}
+            placeholder="Buscar por nombre, DNI, teléfono, módulo..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            sx={{ minWidth: 300 }}
             slotProps={{
               input: {
                 startAdornment: (
@@ -632,37 +427,41 @@ export default function ListaGeneralPage() {
             size="small"
             label="Módulo"
             value={filtroModulo}
-            onChange={(e) => {
-              setFiltroModulo(e.target.value as ModuloType | "");
-              setPage(0);
-            }}
-            sx={{ minWidth: 180 }}
+            onChange={(e) => setFiltroModulo(e.target.value)}
+            sx={{ minWidth: 200 }}
           >
             <MenuItem value="">Todos los módulos</MenuItem>
-            {MODULOS_CONFIG.map((modulo) => (
-              <MenuItem key={modulo.id} value={modulo.id}>
+            {modulos.map((mod) => (
+              <MenuItem key={mod.id} value={mod.id}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Box
                     sx={{
                       width: 12,
                       height: 12,
                       borderRadius: "50%",
-                      backgroundColor: modulo.color,
+                      backgroundColor: mod.color,
                     }}
                   />
-                  {modulo.label}
+                  {mod.name}
                 </Box>
               </MenuItem>
             ))}
           </TextField>
 
-          {/* Botón para abrir filtros de edad y cumpleaños */}
+          {/* Botón filtros de edad/cumpleaños */}
           <Tooltip title="Filtros de edad y cumpleaños">
             <IconButton
               onClick={handleFilterClick}
               sx={{
-                backgroundColor: filterOpen || isEdadFiltered || filtroDia || filtroMes ? "#fce7f3" : "#f8fafc",
-                border: `1px solid ${filterOpen || isEdadFiltered || filtroDia || filtroMes ? subgerencia.color : "#e2e8f0"}`,
+                backgroundColor:
+                  filterOpen || isEdadFiltered || filtroDia || filtroMes
+                    ? "#fce7f3"
+                    : "#f8fafc",
+                border: `1px solid ${
+                  filterOpen || isEdadFiltered || filtroDia || filtroMes
+                    ? subgerencia.color
+                    : "#e2e8f0"
+                }`,
                 borderRadius: "8px",
                 "&:hover": {
                   backgroundColor: "#fce7f3",
@@ -670,11 +469,19 @@ export default function ListaGeneralPage() {
                 },
               }}
             >
-              <FilterList sx={{ color: filterOpen || isEdadFiltered || filtroDia || filtroMes ? subgerencia.color : "#64748b", fontSize: 20 }} />
+              <FilterList
+                sx={{
+                  color:
+                    filterOpen || isEdadFiltered || filtroDia || filtroMes
+                      ? subgerencia.color
+                      : "#64748b",
+                  fontSize: 20,
+                }}
+              />
             </IconButton>
           </Tooltip>
 
-          {/* Chip de filtro de edad activo */}
+          {/* Chips de filtros activos */}
           {isEdadFiltered && (
             <Box
               sx={{
@@ -699,8 +506,6 @@ export default function ListaGeneralPage() {
               </IconButton>
             </Box>
           )}
-
-          {/* Chip de filtro de cumpleaños activo */}
           {(filtroDia || filtroMes) && (
             <Box
               sx={{
@@ -715,7 +520,7 @@ export default function ListaGeneralPage() {
             >
               <Cake sx={{ fontSize: 14, color: "#be185d" }} />
               <Typography variant="caption" color="#be185d">
-                {filtroMes && !filtroDia && MESES.find(m => m.value === filtroMes)?.label}
+                {filtroMes && !filtroDia && MESES.find((m) => m.value === filtroMes)?.label}
                 {filtroDia && filtroMes && `${filtroDia}/${filtroMes}`}
                 {filtroDia && !filtroMes && `Día ${filtroDia}`}
               </Typography>
@@ -753,8 +558,8 @@ export default function ListaGeneralPage() {
           <Button
             variant="contained"
             startIcon={<Download />}
-            onClick={descargarExcel}
-            disabled={isLoading || personasFiltradas.length === 0}
+            onClick={handleExport}
+            disabled={isLoading || filteredData.length === 0}
             sx={{
               backgroundColor: subgerencia.color,
               "&:hover": { backgroundColor: "#b01668" },
@@ -762,40 +567,6 @@ export default function ListaGeneralPage() {
           >
             Descargar Excel
           </Button>
-
-          {/* Botón WhatsApp - solo visible cuando hay filtro de cumpleaños */}
-          {(filtroDia || filtroMes) && personasConTelefono.length > 0 && (
-            <Tooltip title={`Enviar saludo de cumpleaños a ${personasConTelefono.length} persona(s) con teléfono`}>
-              <Button
-                variant="contained"
-                startIcon={<WhatsApp />}
-                onClick={() => setWhatsappDialogOpen(true)}
-                sx={{
-                  backgroundColor: "#25D366",
-                  "&:hover": { backgroundColor: "#128C7E" },
-                }}
-              >
-                WhatsApp ({personasConTelefono.length})
-              </Button>
-            </Tooltip>
-          )}
-
-          {/* Botón Historial de WhatsApp */}
-          <Tooltip title="Ver historial de mensajes WhatsApp">
-            <IconButton
-              onClick={() => router.push("/programas-sociales/mensajeria-whatsapp")}
-              size="small"
-              sx={{
-                color: "#25D366",
-                border: "1px solid #25D366",
-                "&:hover": {
-                  backgroundColor: "#dcfce7",
-                },
-              }}
-            >
-              <WhatsApp fontSize="small" />
-            </IconButton>
-          </Tooltip>
         </Box>
 
         {/* Popover de filtro de edad y cumpleaños */}
@@ -803,18 +574,11 @@ export default function ListaGeneralPage() {
           open={filterOpen}
           anchorEl={filterAnchor}
           onClose={handleFilterClose}
-          anchorOrigin={{
-            vertical: "bottom",
-            horizontal: "left",
-          }}
-          transformOrigin={{
-            vertical: "top",
-            horizontal: "left",
-          }}
+          anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+          transformOrigin={{ vertical: "top", horizontal: "left" }}
           sx={{ mt: 1 }}
         >
           <Box sx={{ p: 2.5, width: 320 }}>
-            {/* Selector de tipo de filtro */}
             <Typography variant="subtitle2" fontWeight={600} color="#334155" mb={1.5}>
               Tipo de filtro
             </Typography>
@@ -872,12 +636,8 @@ export default function ListaGeneralPage() {
                   max={100}
                   sx={{
                     color: "#3b82f6",
-                    "& .MuiSlider-thumb": {
-                      backgroundColor: "#1e40af",
-                    },
-                    "& .MuiSlider-track": {
-                      backgroundColor: "#3b82f6",
-                    },
+                    "& .MuiSlider-thumb": { backgroundColor: "#1e40af" },
+                    "& .MuiSlider-track": { backgroundColor: "#3b82f6" },
                   }}
                 />
                 <Box display="flex" justifyContent="space-between" mt={1}>
@@ -897,17 +657,13 @@ export default function ListaGeneralPage() {
                 <Typography variant="body2" color="#475569" mb={1.5}>
                   Filtrar por cumpleaños
                 </Typography>
-
                 <TextField
                   select
                   size="small"
                   label="Mes"
                   fullWidth
                   value={filtroMes}
-                  onChange={(e) => {
-                    setFiltroMes(e.target.value as number | "");
-                    setPage(0);
-                  }}
+                  onChange={(e) => setFiltroMes(e.target.value as number | "")}
                   sx={{ mb: 2 }}
                 >
                   <MenuItem value="">Todos los meses</MenuItem>
@@ -917,7 +673,6 @@ export default function ListaGeneralPage() {
                     </MenuItem>
                   ))}
                 </TextField>
-
                 <TextField
                   size="small"
                   label="Día (opcional)"
@@ -928,7 +683,6 @@ export default function ListaGeneralPage() {
                     const value = e.target.value;
                     if (value === "" || (parseInt(value) >= 1 && parseInt(value) <= 31)) {
                       setFiltroDia(value);
-                      setPage(0);
                     }
                   }}
                   slotProps={{ htmlInput: { min: 1, max: 31 } }}
@@ -945,10 +699,7 @@ export default function ListaGeneralPage() {
                   setFiltroDia("");
                   setFiltroMes("");
                 }}
-                sx={{
-                  color: "#64748b",
-                  textTransform: "none",
-                }}
+                sx={{ color: "#64748b", textTransform: "none" }}
               >
                 Limpiar todo
               </Button>
@@ -968,7 +719,7 @@ export default function ListaGeneralPage() {
           </Box>
         </Popover>
 
-        {/* Resumen de filtros */}
+        {/* Chips de filtros activos */}
         {hayFiltrosActivos && (
           <Box sx={{ display: "flex", gap: 1, mt: 2, flexWrap: "wrap" }}>
             <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
@@ -977,9 +728,12 @@ export default function ListaGeneralPage() {
             {filtroModulo && (
               <Chip
                 size="small"
-                label={MODULOS_CONFIG.find((m) => m.id === filtroModulo)?.label}
+                label={moduloMap[filtroModulo]?.name || "Módulo"}
                 onDelete={() => setFiltroModulo("")}
-                sx={{ backgroundColor: getModuloColor(filtroModulo), color: "white" }}
+                sx={{
+                  backgroundColor: moduloMap[filtroModulo]?.color || "#666",
+                  color: "white",
+                }}
               />
             )}
             {filtroMes && (
@@ -999,11 +753,11 @@ export default function ListaGeneralPage() {
                 sx={{ backgroundColor: "#d81b7e", color: "white" }}
               />
             )}
-            {filtroBusqueda && (
+            {searchTerm && (
               <Chip
                 size="small"
-                label={`Búsqueda: "${filtroBusqueda}"`}
-                onDelete={() => setFiltroBusqueda("")}
+                label={`Búsqueda: "${searchTerm}"`}
+                onDelete={() => setSearchTerm("")}
               />
             )}
           </Box>
@@ -1011,14 +765,7 @@ export default function ListaGeneralPage() {
       </Paper>
 
       {/* Estadísticas rápidas */}
-      <Box
-        sx={{
-          display: "flex",
-          gap: 2,
-          mb: 3,
-          flexWrap: "wrap",
-        }}
-      >
+      <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
         <Paper
           sx={{
             px: 2,
@@ -1031,14 +778,14 @@ export default function ListaGeneralPage() {
         >
           <FilterList fontSize="small" color="action" />
           <Typography variant="body2">
-            <strong>{personasFiltradas.length}</strong> de {personas.length} registros
+            <strong>{filteredData.length}</strong> de {allData.length} registros
           </Typography>
         </Paper>
-        {MODULOS_CONFIG.map((modulo) => {
-          const count = personasFiltradas.filter((p) => p.modulo === modulo.id).length;
+        {modulos.map((mod) => {
+          const count = statsByModule[mod.id] || 0;
           return (
             <Paper
-              key={modulo.id}
+              key={mod.id}
               sx={{
                 px: 2,
                 py: 1,
@@ -1046,11 +793,11 @@ export default function ListaGeneralPage() {
                 display: "flex",
                 alignItems: "center",
                 gap: 1,
-                borderLeft: `4px solid ${modulo.color}`,
+                borderLeft: `4px solid ${mod.color}`,
               }}
             >
               <Typography variant="body2">
-                <strong>{count}</strong> {modulo.label}
+                <strong>{count}</strong> {mod.name}
               </Typography>
             </Paper>
           );
@@ -1069,12 +816,17 @@ export default function ListaGeneralPage() {
           <Box
             sx={{
               display: "flex",
+              flexDirection: "column",
               justifyContent: "center",
               alignItems: "center",
               height: 400,
+              gap: 2,
             }}
           >
             <CircularProgress sx={{ color: subgerencia.color }} />
+            <Typography variant="body2" color="text.secondary">
+              Cargando registros...
+            </Typography>
           </Box>
         ) : (
           <>
@@ -1082,18 +834,6 @@ export default function ListaGeneralPage() {
               <Table stickyHeader size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>
-                      Módulo
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>
-                      Código
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>
-                      Entidad
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>
-                      Rol
-                    </TableCell>
                     <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>
                       Nombre Completo
                     </TableCell>
@@ -1104,95 +844,106 @@ export default function ListaGeneralPage() {
                       Teléfono
                     </TableCell>
                     <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>
-                      Cumpleaños
+                      Cumpleaños / Edad
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>
+                      Módulo
                     </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {personasPaginadas.length === 0 ? (
+                  {paginatedData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">
                           No se encontraron registros con los filtros aplicados
                         </Typography>
                       </TableCell>
                     </TableRow>
                   ) : (
-                    personasPaginadas.map((persona) => (
-                      <TableRow
-                        key={persona.id}
-                        hover
-                        sx={{
-                          "&:hover": { backgroundColor: "#f8fafc" },
-                        }}
-                      >
-                        <TableCell>
-                          <Chip
-                            size="small"
-                            label={persona.moduloLabel}
-                            sx={{
-                              backgroundColor: getModuloColor(persona.modulo),
-                              color: "white",
-                              fontSize: "0.7rem",
-                              height: 24,
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
-                            {persona.entidadCodigo}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              maxWidth: 200,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {persona.entidadNombre}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" color="text.secondary">
-                            {persona.rol}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" fontWeight={500}>
-                            {persona.nombre} {persona.apellido}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
-                            {persona.dni}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">{formatearTelefono(persona.telefono) || "-"}</Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                            {persona.cumpleanos && (
-                              <Cake sx={{ fontSize: 14, color: "#d81b7e" }} />
-                            )}
-                            <Typography variant="body2">
-                              {formatearFecha(persona.cumpleanos)}
+                    paginatedData.map((row: PersonaTabla, index: number) => {
+                      const modColor = moduloMap[row.moduloId]?.color || "#666";
+                      return (
+                        <TableRow
+                          key={row.id}
+                          hover
+                          sx={{
+                            backgroundColor: index % 2 === 0 ? "white" : "#f8fafc",
+                            "&:hover": { backgroundColor: "#f1f5f9" },
+                          }}
+                        >
+                          <TableCell>
+                            <Typography variant="body2" fontWeight={500}>
+                              {row.nombreCompleto}
                             </Typography>
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
+                              {row.dni}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2">
+                              {formatearTelefono(row.telefono)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            {row.fechaNacimiento ? (
+                              <Box display="flex" flexDirection="column" gap={0.25}>
+                                <Chip
+                                  label={`${row.edad} años`}
+                                  size="small"
+                                  sx={{
+                                    backgroundColor: "#dbeafe",
+                                    color: "#1e40af",
+                                    fontWeight: 600,
+                                    fontSize: "0.75rem",
+                                    height: 22,
+                                    width: "fit-content",
+                                  }}
+                                />
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                  <Cake sx={{ fontSize: 12, color: "#d81b7e" }} />
+                                  <Typography variant="caption" color="text.secondary">
+                                    {formatearFecha(row.fechaNacimiento)}
+                                  </Typography>
+                                </Box>
+                              </Box>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">
+                                -
+                              </Typography>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {row.moduloNombre && row.moduloNombre !== "-" ? (
+                              <Chip
+                                size="small"
+                                label={row.moduloNombre}
+                                sx={{
+                                  backgroundColor: modColor,
+                                  color: "white",
+                                  fontSize: "0.7rem",
+                                  height: 24,
+                                  fontWeight: 600,
+                                }}
+                              />
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">
+                                -
+                              </Typography>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
             </TableContainer>
             <TablePagination
               component="div"
-              count={personasFiltradas.length}
+              count={filteredData.length}
               page={page}
               onPageChange={(_, newPage) => setPage(newPage)}
               rowsPerPage={rowsPerPage}
@@ -1209,15 +960,6 @@ export default function ListaGeneralPage() {
           </>
         )}
       </Paper>
-
-      {/* Dialog de WhatsApp */}
-      <WhatsAppMessageDialog
-        open={whatsappDialogOpen}
-        onClose={() => setWhatsappDialogOpen(false)}
-        personas={personasFiltradas}
-        onConfirm={handleEnviarWhatsApp}
-        calcularEdad={calcularEdad}
-      />
     </Box>
   );
 }
