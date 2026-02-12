@@ -48,7 +48,6 @@ import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 const OMAPED_COLOR = subgerencia.color;
-const BATCH_SIZE = 500;
 
 // ============================================
 // UTILIDADES
@@ -57,9 +56,9 @@ const calcularEdad = (fechaNacimiento: string | null | undefined): number => {
   if (!fechaNacimiento) return 0;
   const hoy = new Date();
   const nacimiento = new Date(fechaNacimiento);
-  let edad = hoy.getUTCFullYear() - nacimiento.getUTCFullYear();
-  const mes = hoy.getUTCMonth() - nacimiento.getUTCMonth();
-  if (mes < 0 || (mes === 0 && hoy.getUTCDate() < nacimiento.getUTCDate())) {
+  let edad = hoy.getFullYear() - nacimiento.getUTCFullYear();
+  const mes = hoy.getMonth() - nacimiento.getUTCMonth();
+  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getUTCDate())) {
     edad--;
   }
   return edad;
@@ -76,38 +75,11 @@ const formatearFecha = (fecha: string | null | undefined): string => {
 
 // Traducciones
 const TRADUCCIONES: Record<string, Record<string, string>> = {
-  sex: {
-    MALE: "Masculino",
-    FEMALE: "Femenino",
-  },
-  civil: {
-    SINGLE: "Soltero(a)",
-    MARRIED: "Casado(a)",
-    DIVORCED: "Divorciado(a)",
-    WIDOWED: "Viudo(a)",
-    COHABITANT: "Conviviente",
-  },
-  health: {
-    SIS: "SIS",
-    ESSALUD: "EsSalud",
-    PRIVATE: "Privado",
-    NONE: "Sin seguro",
-    OTHER: "Otro",
-  },
-  disability_grade: {
+  degree: {
     MILD: "Leve",
     MODERATE: "Moderado",
     SEVERE: "Severo",
     VERY_SEVERE: "Muy Severo",
-  },
-  disability_type: {
-    PHYSICAL: "Física",
-    VISUAL: "Visual",
-    HEARING: "Auditiva",
-    MENTAL: "Mental",
-    INTELLECTUAL: "Intelectual",
-    MULTIPLE: "Múltiple",
-    OTHER: "Otra",
   },
 };
 
@@ -117,10 +89,10 @@ const traducir = (categoria: string, valor: string | null | undefined): string =
 };
 
 // Colores para grado de discapacidad
-const DISABILITY_GRADE_COLORS: Record<string, { bg: string; color: string }> = {
-  "Leve": { bg: "#fef9c3", color: "#854d0e" },
-  "Moderado": { bg: "#fed7aa", color: "#9a3412" },
-  "Severo": { bg: "#fecaca", color: "#991b1b" },
+const DEGREE_COLORS: Record<string, { bg: string; color: string }> = {
+  Leve: { bg: "#fef9c3", color: "#854d0e" },
+  Moderado: { bg: "#fed7aa", color: "#9a3412" },
+  Severo: { bg: "#fecaca", color: "#991b1b" },
   "Muy Severo": { bg: "#e9d5ff", color: "#6b21a8" },
 };
 
@@ -133,35 +105,51 @@ const MESES = [
 // ============================================
 // INTERFACES BACKEND
 // ============================================
-interface RelatedEntity {
-  id: string;
-  name: string;
-}
-
 interface BeneficiarioOMAPEDBackend {
   id: string;
-  doc_num: string;
   name: string;
   lastname: string;
-  birthday: string;
-  cellphone: string | null;
-  telephone: string | null;
+  doc_num: string;
+  doc_type: string | null;
+  phone: string | null;
   address: string | null;
-  sex: string;
-  civil: string;
-  health: string | null;
-  disability_grade: string | null;
-  disability_type: string | null;
-  conadis: boolean;
-  conadis_code: string | null;
-  observation: string | null;
+  birthday: string;
+  certificate: string | null;
+  diagnostic1: string | null;
+  conadis: string | null;
+  folio: string | null;
+  degree: string | null;
+}
+
+// Interfaz completa del GET ONE (más campos que el listado)
+interface BeneficiarioOMAPEDDetalle extends BeneficiarioOMAPEDBackend {
+  diagnostic2: string | null;
+  atention: string | null;
+  cert_disc: string | null;
+  beca: string | null;
+  job_placement: boolean | null;
+  entrepreneurship: string | null;
+  therapy: string | null;
+  therapy_schedule: string | null;
+  reniec: string | null;
+  reniec_shift: string | null;
+  fair: string | null;
+  conadis_date: string | null;
+  conadis_procedure: string | null;
+  conadis_validity: string | null;
+  unnamed: string | null;
+  contigo: string | null;
+  pc1000: string | null;
+  fad: string | null;
+  census_taker: string | null;
+  state: string | null;
+  commune: string | null;
+  wheelchair: boolean | null;
   registered_at: string | null;
-  created_at: string;
-  district_live: RelatedEntity | null;
-  province_live: RelatedEntity | null;
-  department_live: RelatedEntity | null;
-  education: RelatedEntity | null;
-  ethnic: RelatedEntity | null;
+  change_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  deleted_at: string | null;
 }
 
 interface BackendResponse {
@@ -181,51 +169,112 @@ interface BackendResponse {
 interface BeneficiarioTabla {
   id: string;
   docNum: string;
+  docType: string;
   nombreCompleto: string;
-  celular: string;
+  telefono: string;
   fechaNacimiento: string;
   edad: number;
-  gradoDiscapacidad: string;
-  tipoDiscapacidad: string;
+  grado: string;
+  diagnostico: string;
+  certificado: string;
+  conadis: string;
+  folio: string;
   direccion: string;
-  sexo: string;
-  estadoCivil: string;
-  salud: string;
-  conadis: boolean;
-  conadisCode: string;
-  observacion: string;
-  distrito: string;
-  provincia: string;
-  departamento: string;
-  educacion: string;
-  etnia: string;
-  telefono: string;
-  fechaRegistro: string;
 }
+
+// Interfaz detalle frontend
+interface BeneficiarioDetalleView {
+  id: string;
+  nombreCompleto: string;
+  docNum: string;
+  docType: string;
+  telefono: string;
+  direccion: string;
+  fechaNacimiento: string;
+  edad: number;
+  grado: string;
+  diagnostico1: string;
+  diagnostico2: string;
+  certificado: string;
+  certDiscapacidad: string;
+  conadis: string;
+  conadisFecha: string;
+  conadisTramite: string;
+  conadisVigencia: string;
+  folio: string;
+  atencion: string;
+  terapia: string;
+  horarioTerapia: string;
+  beca: string;
+  insercionLaboral: string;
+  emprendimiento: string;
+  feria: string;
+  reniec: string;
+  turnoReniec: string;
+  contigo: string;
+  pc1000: string;
+  fad: string;
+  empadronador: string;
+  estado: string;
+  comuna: string;
+  sillaDeRuedas: string;
+  fechaRegistro: string;
+  fechaCambio: string;
+}
+
+const mapDetalleToView = (item: BeneficiarioOMAPEDDetalle): BeneficiarioDetalleView => ({
+  id: item.id,
+  nombreCompleto: `${item.name} ${item.lastname}`.trim(),
+  docNum: item.doc_num || "-",
+  docType: item.doc_type || "DNI",
+  telefono: item.phone || "-",
+  direccion: item.address || "-",
+  fechaNacimiento: item.birthday,
+  edad: calcularEdad(item.birthday),
+  grado: traducir("degree", item.degree),
+  diagnostico1: item.diagnostic1 || "-",
+  diagnostico2: item.diagnostic2 || "-",
+  certificado: item.certificate || "-",
+  certDiscapacidad: item.cert_disc || "-",
+  conadis: item.conadis || "-",
+  conadisFecha: item.conadis_date ? formatearFecha(item.conadis_date) : "-",
+  conadisTramite: item.conadis_procedure || "-",
+  conadisVigencia: item.conadis_validity || "-",
+  folio: item.folio || "-",
+  atencion: item.atention || "-",
+  terapia: item.therapy || "-",
+  horarioTerapia: item.therapy_schedule || "-",
+  beca: item.beca || "-",
+  insercionLaboral: item.job_placement === true ? "Sí" : item.job_placement === false ? "No" : "-",
+  emprendimiento: item.entrepreneurship || "-",
+  feria: item.fair || "-",
+  reniec: item.reniec || "-",
+  turnoReniec: item.reniec_shift || "-",
+  contigo: item.contigo || "-",
+  pc1000: item.pc1000 || "-",
+  fad: item.fad || "-",
+  empadronador: item.census_taker || "-",
+  estado: item.state || "-",
+  comuna: item.commune || "-",
+  sillaDeRuedas: item.wheelchair === true ? "Sí" : item.wheelchair === false ? "No" : "-",
+  fechaRegistro: item.registered_at ? formatearFecha(item.registered_at) : "-",
+  fechaCambio: item.change_at ? formatearFecha(item.change_at) : "-",
+});
 
 const mapBackendToTabla = (item: BeneficiarioOMAPEDBackend): BeneficiarioTabla => ({
   id: item.id,
   docNum: item.doc_num || "-",
+  docType: item.doc_type || "DNI",
   nombreCompleto: `${item.name} ${item.lastname}`.trim(),
-  celular: item.cellphone || "-",
+  telefono: item.phone || "-",
   fechaNacimiento: item.birthday,
   edad: calcularEdad(item.birthday),
-  gradoDiscapacidad: traducir("disability_grade", item.disability_grade),
-  tipoDiscapacidad: traducir("disability_type", item.disability_type),
+  grado: traducir("degree", item.degree),
+  diagnostico: item.diagnostic1 || "-",
+  certificado: item.certificate || "-",
+  conadis: item.conadis || "-",
+  folio: item.folio || "-",
   direccion: item.address || "-",
-  sexo: traducir("sex", item.sex),
-  estadoCivil: traducir("civil", item.civil),
-  salud: traducir("health", item.health),
-  conadis: item.conadis,
-  conadisCode: item.conadis_code || "-",
-  observacion: item.observation || "-",
-  distrito: item.district_live?.name || "-",
-  provincia: item.province_live?.name || "-",
-  departamento: item.department_live?.name || "-",
-  educacion: item.education?.name || "-",
-  etnia: item.ethnic?.name || "-",
-  telefono: item.telephone || "-",
-  fechaRegistro: item.registered_at || item.created_at,
 });
 
 // Tipo de filtro
@@ -239,188 +288,176 @@ export default function OMAPEDBeneficiariosPage() {
   const { getData } = useFetch();
 
   // Estados para datos
-  const [allData, setAllData] = useState<BeneficiarioTabla[]>([]);
+  const [data, setData] = useState<BeneficiarioTabla[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Estados para paginación local
+  // Paginación server-side
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [fetchKey, setFetchKey] = useState(0);
 
   // Estados para búsqueda y filtros
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("edad");
-  const [edadRange, setEdadRange] = useState<number[]>([0, 100]);
-  const [mesesCumpleanos, setMesesCumpleanos] = useState<number[]>([]);
+  const [edadRange, setEdadRange] = useState<number[]>([0, 110]);
+  const [mesSeleccionado, setMesSeleccionado] = useState<number | null>(null);
   const [cumpleanosModo, setCumpleanosModo] = useState<CumpleanosModo>("mes");
   const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
 
   // Estados para detalle
-  const [selectedRow, setSelectedRow] = useState<BeneficiarioTabla | null>(null);
+  const [detailData, setDetailData] = useState<BeneficiarioDetalleView | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
 
-  // Cargar todos los datos del backend en lotes
-  const fetchAllData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const firstResponse = await getData<BackendResponse>(`omaped/benefited?page=1&limit=1`);
-      const totalCount = firstResponse?.data?.totalCount || 0;
+  // Cargar datos con paginación y filtros server-side
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const params = new URLSearchParams();
+        params.set("page", String(page + 1));
+        params.set("limit", String(rowsPerPage));
 
-      if (totalCount > 0) {
-        const totalPages = Math.ceil(totalCount / BATCH_SIZE);
-        const allItems: BeneficiarioTabla[] = [];
-
-        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-          const response = await getData<BackendResponse>(
-            `omaped/benefited?page=${pageNum}&limit=${BATCH_SIZE}`
-          );
-          if (response?.data?.data) {
-            allItems.push(...response.data.data.map(mapBackendToTabla));
-          }
+        // Filtro de edad (server-side)
+        if (edadRange[0] > 0 || edadRange[1] < 110) {
+          params.set("age_min", String(edadRange[0]));
+          params.set("age_max", String(edadRange[1]));
         }
 
-        setAllData(allItems);
+        // Filtro de cumpleaños/mes (server-side)
+        if (cumpleanosModo === "mes" && mesSeleccionado !== null) {
+          params.set("month", String(mesSeleccionado + 1));
+        } else if (cumpleanosModo === "dia" && diaCumpleanos) {
+          const parts = diaCumpleanos.split("-"); // YYYY-MM-DD
+          params.set("birthday", `${parts[1]}-${parts[2]}`);
+        }
+
+        const response = await getData<BackendResponse>(
+          `omaped/disabled?${params.toString()}`
+        );
+
+        if (response?.data) {
+          setData(response.data.data.map(mapBackendToTabla));
+          setTotalCount(response.data.totalCount);
+        }
+      } catch (error) {
+        console.error("Error fetching OMAPED beneficiarios:", error);
+        setData([]);
+        setTotalCount(0);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error("Error fetching OMAPED beneficiarios:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [getData]);
+    };
 
-  useEffect(() => {
-    fetchAllData();
-  }, [fetchAllData]);
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, rowsPerPage, fetchKey, getData]);
 
+  // Handlers de filtros
   const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setFilterAnchor(event.currentTarget);
   };
-
-  const handleFilterClose = () => {
-    setFilterAnchor(null);
-  };
-
+  const handleFilterClose = () => setFilterAnchor(null);
   const handleFilterTypeChange = (
     _event: React.MouseEvent<HTMLElement>,
     newFilterType: FilterType | null
   ) => {
     if (newFilterType !== null) setFilterType(newFilterType);
   };
-
   const handleEdadChange = (_event: Event, newValue: number | number[]) => {
     setEdadRange(newValue as number[]);
   };
-
   const handleMesToggle = (mes: number) => {
-    setMesesCumpleanos((prev) =>
-      prev.includes(mes) ? prev.filter((m) => m !== mes) : [...prev, mes]
-    );
+    setMesSeleccionado((prev) => (prev === mes ? null : mes));
   };
 
   const filterOpen = Boolean(filterAnchor);
-
-  const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 100;
+  const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 110;
   const isCumpleanosFiltered =
-    cumpleanosModo === "mes" ? mesesCumpleanos.length > 0 : diaCumpleanos !== "";
+    cumpleanosModo === "mes" ? mesSeleccionado !== null : diaCumpleanos !== "";
 
-  const handleChangePage = (_event: unknown, newPage: number) => {
-    setPage(newPage);
-  };
-
+  const handleChangePage = (_event: unknown, newPage: number) => setPage(newPage);
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
-
-  const handleRowClick = (row: BeneficiarioTabla) => {
-    setSelectedRow(row);
+  const handleRowClick = async (row: BeneficiarioTabla) => {
     setDetailOpen(true);
+    setDetailLoading(true);
+    try {
+      const response = await getData<{ message: string; data: BeneficiarioOMAPEDDetalle }>(
+        `omaped/disabled/${row.id}`
+      );
+      if (response?.data) {
+        setDetailData(mapDetalleToView(response.data));
+      } else {
+        setDetailData(null);
+      }
+    } catch (error) {
+      console.error("Error fetching detalle OMAPED:", error);
+      setDetailData(null);
+    } finally {
+      setDetailLoading(false);
+    }
   };
-
   const handleDetailClose = () => {
     setDetailOpen(false);
-    setSelectedRow(null);
+    setDetailData(null);
   };
 
   // Formatear strings del backend (Title Case)
-  const allDataFormateados = useFormatTableData(allData);
+  const dataFormateados = useFormatTableData(data);
 
-  // Filtrar datos localmente
-  const filteredData = allDataFormateados.filter((row: BeneficiarioTabla) => {
-    const matchesSearch =
-      row.nombreCompleto.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  // Filtrado client-side (solo búsqueda - edad/cumpleaños se filtran en el servidor)
+  const filteredData = dataFormateados.filter((row: BeneficiarioTabla) => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      row.nombreCompleto.toLowerCase().includes(term) ||
       row.docNum.includes(searchTerm) ||
-      row.celular.includes(searchTerm);
-
-    const matchesEdad = row.edad >= edadRange[0] && row.edad <= edadRange[1];
-
-    let matchesCumpleanos = true;
-    if (cumpleanosModo === "mes" && mesesCumpleanos.length > 0) {
-      if (row.fechaNacimiento) {
-        const mesCumple = new Date(row.fechaNacimiento).getUTCMonth();
-        matchesCumpleanos = mesesCumpleanos.includes(mesCumple);
-      } else {
-        matchesCumpleanos = false;
-      }
-    } else if (cumpleanosModo === "dia" && diaCumpleanos) {
-      if (row.fechaNacimiento) {
-        const fechaNac = new Date(row.fechaNacimiento);
-        const [, mes, dia] = diaCumpleanos.split("-").map(Number);
-        matchesCumpleanos =
-          fechaNac.getUTCMonth() + 1 === mes && fechaNac.getUTCDate() === dia;
-      } else {
-        matchesCumpleanos = false;
-      }
-    }
-
-    return matchesSearch && matchesEdad && matchesCumpleanos;
+      row.telefono.includes(searchTerm)
+    );
   });
-
-  // Resetear página al cambiar filtros
-  useEffect(() => {
-    setPage(0);
-  }, [searchTerm, edadRange, mesesCumpleanos, cumpleanosModo, diaCumpleanos]);
-
-  // Datos paginados
-  const paginatedData = filteredData.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
 
   // Exportar a Excel
   const handleExport = () => {
     const exportData = filteredData.map((row: BeneficiarioTabla) => ({
       "Nombre Completo": row.nombreCompleto,
-      DNI: row.docNum,
-      Celular: row.celular,
+      "Tipo Doc": row.docType,
+      "Nro. Doc": row.docNum,
+      Teléfono: row.telefono,
       "Fecha de Nacimiento": formatearFecha(row.fechaNacimiento),
       Edad: row.edad,
-      "Grado de Discapacidad": row.gradoDiscapacidad,
-      "Tipo de Discapacidad": row.tipoDiscapacidad,
+      Grado: row.grado,
+      Diagnóstico: row.diagnostico,
+      Certificado: row.certificado,
+      CONADIS: row.conadis,
+      Folio: row.folio,
       Dirección: row.direccion,
-      Sexo: row.sexo,
-      "Estado Civil": row.estadoCivil,
-      Salud: row.salud,
-      CONADIS: row.conadis ? "Sí" : "No",
-      "Código CONADIS": row.conadisCode,
-      Distrito: row.distrito,
-      Provincia: row.provincia,
-      Departamento: row.departamento,
-      Educación: row.educacion,
-      Observación: row.observacion,
     }));
+
+    if (exportData.length === 0) return;
 
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "OMAPED Beneficiarios");
-
-    const colWidths = Object.keys(exportData[0] || {}).map(() => ({ wch: 20 }));
-    worksheet["!cols"] = colWidths;
-
+    worksheet["!cols"] = Object.keys(exportData[0] || {}).map(() => ({ wch: 20 }));
     XLSX.writeFile(
       workbook,
       `omaped_beneficiarios_${new Date().toISOString().split("T")[0]}.xlsx`
     );
+  };
+
+  // Limpiar filtros
+  const limpiarFiltros = () => {
+    setEdadRange([0, 110]);
+    setMesSeleccionado(null);
+    setCumpleanosModo("mes");
+    setDiaCumpleanos("");
+    setPage(0);
+    setFetchKey((k) => k + 1);
   };
 
   return (
@@ -448,7 +485,7 @@ export default function OMAPEDBeneficiariosPage() {
           </Typography>
         </Box>
         <Typography variant="body1" color="text.secondary" sx={{ ml: 7.5 }}>
-          Listado de personas registradas en OMAPED
+          Listado de personas con discapacidad registradas en OMAPED
         </Typography>
       </Box>
 
@@ -467,7 +504,7 @@ export default function OMAPEDBeneficiariosPage() {
             {/* Buscador y Filtros */}
             <Box mb={3} display="flex" gap={1.5} alignItems="center" flexWrap="wrap">
               <TextField
-                placeholder="Buscar por nombre, DNI o celular..."
+                placeholder="Buscar por nombre, DNI o teléfono..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 slotProps={{
@@ -490,7 +527,7 @@ export default function OMAPEDBeneficiariosPage() {
                   },
                 }}
               />
-              <Tooltip title="Filtrar por edad y cumpleaños">
+              <Tooltip title="Filtros avanzados">
                 <IconButton
                   onClick={handleFilterClick}
                   sx={{
@@ -510,10 +547,7 @@ export default function OMAPEDBeneficiariosPage() {
                     backgroundColor: "#f8fafc",
                     border: "1px solid #e2e8f0",
                     borderRadius: "8px",
-                    "&:hover": {
-                      backgroundColor: "#dcfce7",
-                      borderColor: "#22c55e",
-                    },
+                    "&:hover": { backgroundColor: "#dcfce7", borderColor: "#22c55e" },
                   }}
                 >
                   <FileDownload sx={{ color: "#22c55e", fontSize: 20 }} />
@@ -522,66 +556,35 @@ export default function OMAPEDBeneficiariosPage() {
 
               {/* Chips de filtros activos */}
               {isEdadFiltered && (
-                <Box
-                  sx={{
-                    backgroundColor: "#dbeafe",
-                    borderRadius: "16px",
-                    px: 1.5,
-                    py: 0.5,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                  }}
-                >
-                  <Typography variant="caption" color="#1e40af">
+                <Box sx={{ backgroundColor: "#f3e5f5", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                  <Typography variant="caption" color="#7b1fa2">
                     Edad: {edadRange[0]} - {edadRange[1]} años
                   </Typography>
-                  <IconButton
-                    size="small"
-                    onClick={() => setEdadRange([0, 100])}
-                    sx={{ p: 0.25 }}
-                  >
-                    <Close sx={{ fontSize: 14, color: "#1e40af" }} />
+                  <IconButton size="small" onClick={() => { setEdadRange([0, 110]); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                    <Close sx={{ fontSize: 14, color: "#7b1fa2" }} />
                   </IconButton>
                 </Box>
               )}
               {isCumpleanosFiltered && (
-                <Box
-                  sx={{
-                    backgroundColor: "#fce7f3",
-                    borderRadius: "16px",
-                    px: 1.5,
-                    py: 0.5,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                  }}
-                >
+                <Box sx={{ backgroundColor: "#fce7f3", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
                   <Cake sx={{ fontSize: 14, color: "#be185d" }} />
                   <Typography variant="caption" color="#be185d">
-                    {cumpleanosModo === "mes"
-                      ? mesesCumpleanos.map((m) => MESES[m].slice(0, 3)).join(", ")
+                    {cumpleanosModo === "mes" && mesSeleccionado !== null
+                      ? MESES[mesSeleccionado].slice(0, 3)
                       : diaCumpleanos.split("-").slice(1).reverse().join("/")}
                   </Typography>
-                  <IconButton
-                    size="small"
-                    onClick={() => {
-                      setMesesCumpleanos([]);
-                      setDiaCumpleanos("");
-                    }}
-                    sx={{ p: 0.25 }}
-                  >
+                  <IconButton size="small" onClick={() => { setMesSeleccionado(null); setDiaCumpleanos(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
                     <Close sx={{ fontSize: 14, color: "#be185d" }} />
                   </IconButton>
                 </Box>
               )}
 
               <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
-                {filteredData.length.toLocaleString()} de {allData.length.toLocaleString()} beneficiario(s)
+                {totalCount.toLocaleString()} beneficiario(s)
               </Typography>
             </Box>
 
-            {/* Popover de filtros */}
+            {/* Popover de filtros (igual al diseño de CIAM) */}
             <Popover
               open={filterOpen}
               anchorEl={filterAnchor}
@@ -602,32 +605,10 @@ export default function OMAPEDBeneficiariosPage() {
                   fullWidth
                   sx={{ mb: 2.5 }}
                 >
-                  <ToggleButton
-                    value="edad"
-                    sx={{
-                      textTransform: "none",
-                      fontSize: "0.75rem",
-                      "&.Mui-selected": {
-                        backgroundColor: "#dbeafe",
-                        color: "#1e40af",
-                        "&:hover": { backgroundColor: "#bfdbfe" },
-                      },
-                    }}
-                  >
+                  <ToggleButton value="edad" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#f3e5f5", color: "#7b1fa2", "&:hover": { backgroundColor: "#e1bee7" } } }}>
                     Edad
                   </ToggleButton>
-                  <ToggleButton
-                    value="cumpleanos"
-                    sx={{
-                      textTransform: "none",
-                      fontSize: "0.75rem",
-                      "&.Mui-selected": {
-                        backgroundColor: "#fce7f3",
-                        color: "#be185d",
-                        "&:hover": { backgroundColor: "#fbcfe8" },
-                      },
-                    }}
-                  >
+                  <ToggleButton value="cumpleanos" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#fce7f3", color: "#be185d", "&:hover": { backgroundColor: "#fbcfe8" } } }}>
                     Cumpleaños
                   </ToggleButton>
                 </ToggleButtonGroup>
@@ -638,14 +619,14 @@ export default function OMAPEDBeneficiariosPage() {
                 {filterType === "edad" && (
                   <>
                     <Typography variant="body2" color="#475569" mb={1.5}>
-                      Rango de edad del beneficiario
+                      Rango de edad
                     </Typography>
                     <Slider
                       value={edadRange}
                       onChange={handleEdadChange}
                       valueLabelDisplay="auto"
                       min={0}
-                      max={100}
+                      max={110}
                       sx={{
                         color: OMAPED_COLOR,
                         "& .MuiSlider-thumb": { backgroundColor: OMAPED_COLOR },
@@ -653,12 +634,8 @@ export default function OMAPEDBeneficiariosPage() {
                       }}
                     />
                     <Box display="flex" justifyContent="space-between" mt={1}>
-                      <Typography variant="caption" color="text.secondary">
-                        {edadRange[0]} años
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {edadRange[1]} años
-                      </Typography>
+                      <Typography variant="caption" color="text.secondary">{edadRange[0]} años</Typography>
+                      <Typography variant="caption" color="text.secondary">{edadRange[1]} años</Typography>
                     </Box>
                   </>
                 )}
@@ -672,55 +649,27 @@ export default function OMAPEDBeneficiariosPage() {
                     <ToggleButtonGroup
                       value={cumpleanosModo}
                       exclusive
-                      onChange={(_, value) => value && setCumpleanosModo(value)}
+                      onChange={(_, v) => v && setCumpleanosModo(v)}
                       size="small"
                       fullWidth
                       sx={{ mb: 2 }}
                     >
-                      <ToggleButton
-                        value="mes"
-                        sx={{
-                          textTransform: "none",
-                          fontSize: "0.75rem",
-                          "&.Mui-selected": {
-                            backgroundColor: "#fce7f3",
-                            color: "#be185d",
-                            "&:hover": { backgroundColor: "#fbcfe8" },
-                          },
-                        }}
-                      >
+                      <ToggleButton value="mes" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fce7f3", color: "#be185d", "&:hover": { backgroundColor: "#fbcfe8" } } }}>
                         Por mes
                       </ToggleButton>
-                      <ToggleButton
-                        value="dia"
-                        sx={{
-                          textTransform: "none",
-                          fontSize: "0.75rem",
-                          "&.Mui-selected": {
-                            backgroundColor: "#fce7f3",
-                            color: "#be185d",
-                            "&:hover": { backgroundColor: "#fbcfe8" },
-                          },
-                        }}
-                      >
+                      <ToggleButton value="dia" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fce7f3", color: "#be185d", "&:hover": { backgroundColor: "#fbcfe8" } } }}>
                         Día específico
                       </ToggleButton>
                     </ToggleButtonGroup>
 
                     {cumpleanosModo === "mes" ? (
                       <>
-                        <Box
-                          sx={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(3, 1fr)",
-                            gap: 0.75,
-                          }}
-                        >
+                        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0.75 }}>
                           {MESES.map((mes, index) => (
                             <Button
                               key={mes}
                               size="small"
-                              variant={mesesCumpleanos.includes(index) ? "contained" : "outlined"}
+                              variant={mesSeleccionado === index ? "contained" : "outlined"}
                               onClick={() => handleMesToggle(index)}
                               sx={{
                                 textTransform: "none",
@@ -728,15 +677,11 @@ export default function OMAPEDBeneficiariosPage() {
                                 py: 0.5,
                                 px: 1,
                                 minWidth: 0,
-                                borderColor: mesesCumpleanos.includes(index) ? "#be185d" : "#e2e8f0",
-                                backgroundColor: mesesCumpleanos.includes(index)
-                                  ? "#be185d"
-                                  : "transparent",
-                                color: mesesCumpleanos.includes(index) ? "white" : "#64748b",
+                                borderColor: mesSeleccionado === index ? "#be185d" : "#e2e8f0",
+                                backgroundColor: mesSeleccionado === index ? "#be185d" : "transparent",
+                                color: mesSeleccionado === index ? "white" : "#64748b",
                                 "&:hover": {
-                                  backgroundColor: mesesCumpleanos.includes(index)
-                                    ? "#9d174d"
-                                    : "#fce7f3",
+                                  backgroundColor: mesSeleccionado === index ? "#9d174d" : "#fce7f3",
                                   borderColor: "#be185d",
                                 },
                               }}
@@ -745,13 +690,9 @@ export default function OMAPEDBeneficiariosPage() {
                             </Button>
                           ))}
                         </Box>
-                        {mesesCumpleanos.length > 0 && (
-                          <Typography
-                            variant="caption"
-                            color="#be185d"
-                            sx={{ mt: 1, display: "block" }}
-                          >
-                            {mesesCumpleanos.length} mes(es) seleccionado(s)
+                        {mesSeleccionado !== null && (
+                          <Typography variant="caption" color="#be185d" sx={{ mt: 1, display: "block" }}>
+                            Mes seleccionado: {MESES[mesSeleccionado]}
                           </Typography>
                         )}
                       </>
@@ -762,7 +703,7 @@ export default function OMAPEDBeneficiariosPage() {
                         onChange={(e) => setDiaCumpleanos(e.target.value)}
                         fullWidth
                         size="small"
-                        helperText="Selecciona una fecha para filtrar por día y mes"
+                        helperText="Filtra por día y mes de nacimiento"
                         sx={{
                           "& .MuiOutlinedInput-root": {
                             borderRadius: "8px",
@@ -775,27 +716,14 @@ export default function OMAPEDBeneficiariosPage() {
                 )}
 
                 <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
-                  <Button
-                    size="small"
-                    onClick={() => {
-                      setEdadRange([0, 100]);
-                      setMesesCumpleanos([]);
-                      setCumpleanosModo("mes");
-                      setDiaCumpleanos("");
-                    }}
-                    sx={{ color: "#64748b", textTransform: "none" }}
-                  >
+                  <Button size="small" onClick={limpiarFiltros} sx={{ color: "#64748b", textTransform: "none" }}>
                     Limpiar todo
                   </Button>
                   <Button
                     size="small"
                     variant="contained"
-                    onClick={handleFilterClose}
-                    sx={{
-                      backgroundColor: OMAPED_COLOR,
-                      textTransform: "none",
-                      "&:hover": { backgroundColor: "#1565c0" },
-                    }}
+                    onClick={() => { setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
+                    sx={{ backgroundColor: OMAPED_COLOR, textTransform: "none", "&:hover": { backgroundColor: "#b01668" } }}
                   >
                     Aplicar
                   </Button>
@@ -806,130 +734,80 @@ export default function OMAPEDBeneficiariosPage() {
             {/* Tabla */}
             <TableContainer
               component={Paper}
-              sx={{
-                borderRadius: "12px",
-                boxShadow: "none",
-                border: "1px solid #e2e8f0",
-                overflow: "hidden",
-              }}
+              sx={{ borderRadius: "12px", boxShadow: "none", border: "1px solid #e2e8f0", overflow: "hidden" }}
             >
               <Table>
                 <TableHead>
                   <TableRow sx={{ backgroundColor: "#f8fafc" }}>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Nombre Completo</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>DNI</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Celular</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Edad</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Grado Discapacidad</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Dirección</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>
-                      Acciones
-                    </TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Teléfono</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Edad</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Grado</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Diagnóstico</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>CONADIS</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                         <CircularProgress size={32} sx={{ color: OMAPED_COLOR }} />
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{ mt: 1 }}
-                        >
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                           Cargando beneficiarios...
                         </Typography>
                       </TableCell>
                     </TableRow>
-                  ) : paginatedData.length === 0 ? (
+                  ) : filteredData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">
                           No se encontraron beneficiarios
                         </Typography>
                       </TableCell>
                     </TableRow>
                   ) : (
-                    paginatedData.map((row: BeneficiarioTabla, index: number) => {
-                      const gradeColors = DISABILITY_GRADE_COLORS[row.gradoDiscapacidad] || {
-                        bg: "#f1f5f9",
-                        color: "#475569",
-                      };
+                    filteredData.map((row: BeneficiarioTabla, index: number) => {
+                      const gradeColors = DEGREE_COLORS[row.grado] || { bg: "#f1f5f9", color: "#475569" };
                       return (
                         <TableRow
                           key={row.id}
                           onClick={() => handleRowClick(row)}
                           sx={{
                             backgroundColor: index % 2 === 0 ? "white" : "#f8fafc",
-                            "&:hover": {
-                              backgroundColor: "#f1f5f9",
-                              cursor: "pointer",
-                            },
+                            "&:hover": { backgroundColor: "#f1f5f9", cursor: "pointer" },
                             transition: "background-color 0.2s",
                           }}
                         >
                           <TableCell sx={{ fontWeight: 500 }}>{row.nombreCompleto}</TableCell>
                           <TableCell>{row.docNum}</TableCell>
-                          <TableCell>{row.celular}</TableCell>
-                          <TableCell>
-                            <Box display="flex" flexDirection="column" gap={0.25}>
-                              <Chip
-                                label={`${row.edad} años`}
-                                size="small"
-                                sx={{
-                                  backgroundColor: "#dbeafe",
-                                  color: "#1e40af",
-                                  fontWeight: 600,
-                                  fontSize: "0.75rem",
-                                  height: 22,
-                                  width: "fit-content",
-                                }}
-                              />
-                              <Typography variant="caption" color="text.secondary">
+                          <TableCell>{row.telefono}</TableCell>
+                          <TableCell align="center">
+                            <Box display="flex" flexDirection="column" alignItems="center" gap={0.3}>
+                              <Chip label={`${row.edad} años`} size="small" sx={{ backgroundColor: "#f3e5f5", color: "#7b1fa2", fontWeight: 600, fontSize: "0.75rem" }} />
+                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem" }}>
                                 {formatearFecha(row.fechaNacimiento)}
                               </Typography>
                             </Box>
                           </TableCell>
                           <TableCell>
-                            {row.gradoDiscapacidad !== "-" ? (
-                              <Chip
-                                label={row.gradoDiscapacidad}
-                                size="small"
-                                sx={{
-                                  backgroundColor: gradeColors.bg,
-                                  color: gradeColors.color,
-                                  fontWeight: 600,
-                                  fontSize: "0.75rem",
-                                }}
-                              />
+                            {row.grado !== "-" ? (
+                              <Chip label={row.grado} size="small" sx={{ backgroundColor: gradeColors.bg, color: gradeColors.color, fontWeight: 600, fontSize: "0.7rem" }} />
                             ) : (
-                              <Typography variant="body2" color="text.secondary">
-                                -
-                              </Typography>
+                              "-"
                             )}
                           </TableCell>
-                          <TableCell
-                            sx={{
-                              maxWidth: 200,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {row.direccion}
+                          <TableCell sx={{ maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {row.diagnostico}
                           </TableCell>
+                          <TableCell>{row.conadis}</TableCell>
                           <TableCell align="center">
                             <Tooltip title="Ver detalles">
                               <IconButton
                                 size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRowClick(row);
-                                }}
-                                sx={{
-                                  color: "#64748b",
-                                  "&:hover": { backgroundColor: "#f1f5f9" },
-                                }}
+                                onClick={(e) => { e.stopPropagation(); handleRowClick(row); }}
+                                sx={{ color: "#64748b", "&:hover": { backgroundColor: "#f1f5f9" } }}
                               >
                                 <Visibility fontSize="small" />
                               </IconButton>
@@ -946,7 +824,7 @@ export default function OMAPEDBeneficiariosPage() {
             {/* Paginación */}
             <TablePagination
               component="div"
-              count={filteredData.length}
+              count={totalCount}
               page={page}
               onPageChange={handleChangePage}
               rowsPerPage={rowsPerPage}
@@ -970,9 +848,7 @@ export default function OMAPEDBeneficiariosPage() {
         onClose={handleDetailClose}
         maxWidth="md"
         fullWidth
-        PaperProps={{
-          sx: { borderRadius: "16px" },
-        }}
+        PaperProps={{ sx: { borderRadius: "16px" } }}
       >
         <DialogTitle
           sx={{
@@ -995,266 +871,229 @@ export default function OMAPEDBeneficiariosPage() {
         </DialogTitle>
 
         <DialogContent sx={{ p: 3, mt: 1 }}>
-          {selectedRow && (
-            <Grid container spacing={3}>
+          {detailLoading ? (
+            <Box display="flex" justifyContent="center" alignItems="center" py={6}>
+              <CircularProgress size={32} sx={{ color: OMAPED_COLOR }} />
+              <Typography variant="body2" color="text.secondary" sx={{ ml: 2 }}>
+                Cargando detalle...
+              </Typography>
+            </Box>
+          ) : detailData && (
+            <Grid container spacing={2}>
               {/* Datos Personales */}
               <Grid size={12}>
-                <Typography
-                  variant="subtitle2"
-                  fontWeight={600}
-                  color="#475569"
-                  gutterBottom
-                >
+                <Typography variant="subtitle2" fontWeight={600} color={OMAPED_COLOR} gutterBottom>
                   Datos Personales
                 </Typography>
-                <Divider sx={{ mb: 2 }} />
+                <Divider sx={{ mb: 1 }} />
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Nombre Completo
-                </Typography>
-                <Typography variant="body2" fontWeight={500}>
-                  {selectedRow.nombreCompleto}
-                </Typography>
+                <Typography variant="caption" color="text.secondary">Nombre Completo</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.nombreCompleto}</Typography>
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">
-                  DNI
-                </Typography>
-                <Typography variant="body2" fontWeight={500}>
-                  {selectedRow.docNum}
-                </Typography>
+                <Typography variant="caption" color="text.secondary">Tipo de Documento</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.docType}</Typography>
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Sexo
-                </Typography>
+                <Typography variant="caption" color="text.secondary">Nro. Documento</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.docNum}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" color="text.secondary">Fecha de Nacimiento</Typography>
                 <Typography variant="body2" fontWeight={500}>
-                  {selectedRow.sexo}
+                  {formatearFecha(detailData.fechaNacimiento)}{" "}
+                  <span style={{ color: "#64748b", fontWeight: 400 }}>({detailData.edad} años)</span>
                 </Typography>
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Estado Civil
-                </Typography>
-                <Typography variant="body2" fontWeight={500}>
-                  {selectedRow.estadoCivil}
-                </Typography>
+                <Typography variant="caption" color="text.secondary">Teléfono</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.telefono}</Typography>
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Fecha de Nacimiento
-                </Typography>
-                <Typography variant="body2" fontWeight={500}>
-                  {formatearFecha(selectedRow.fechaNacimiento)}{" "}
-                  <span style={{ color: "#64748b", fontWeight: 400 }}>
-                    ({selectedRow.edad} años)
-                  </span>
-                </Typography>
+                <Typography variant="caption" color="text.secondary">Estado</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.estado}</Typography>
               </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Seguro de Salud
-                </Typography>
-                <Typography variant="body2" fontWeight={500}>
-                  {selectedRow.salud}
-                </Typography>
+              <Grid size={12}>
+                <Typography variant="caption" color="text.secondary">Dirección</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.direccion}</Typography>
               </Grid>
 
-              {/* Contacto y Ubicación */}
+              {/* Información de Discapacidad */}
               <Grid size={12}>
-                <Typography
-                  variant="subtitle2"
-                  fontWeight={600}
-                  color="#475569"
-                  gutterBottom
-                  sx={{ mt: 2 }}
-                >
-                  Contacto y Ubicación
+                <Typography variant="subtitle2" fontWeight={600} color={OMAPED_COLOR} gutterBottom sx={{ mt: 2 }}>
+                  Información de Discapacidad
                 </Typography>
-                <Divider sx={{ mb: 2 }} />
+                <Divider sx={{ mb: 1 }} />
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Celular
-                </Typography>
-                <Typography variant="body2" fontWeight={500}>
-                  {selectedRow.celular}
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Teléfono
-                </Typography>
-                <Typography variant="body2" fontWeight={500}>
-                  {selectedRow.telefono}
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Distrito
-                </Typography>
-                <Typography variant="body2" fontWeight={500}>
-                  {selectedRow.distrito}
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Provincia
-                </Typography>
-                <Typography variant="body2" fontWeight={500}>
-                  {selectedRow.provincia}
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Departamento
-                </Typography>
-                <Typography variant="body2" fontWeight={500}>
-                  {selectedRow.departamento}
-                </Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Dirección
-                </Typography>
-                <Typography variant="body2" fontWeight={500}>
-                  {selectedRow.direccion}
-                </Typography>
-              </Grid>
-
-              {/* Discapacidad */}
-              <Grid size={12}>
-                <Typography
-                  variant="subtitle2"
-                  fontWeight={600}
-                  color="#475569"
-                  gutterBottom
-                  sx={{ mt: 2 }}
-                >
-                  Información sobre Discapacidad
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Grado de Discapacidad
-                </Typography>
+                <Typography variant="caption" color="text.secondary">Grado</Typography>
                 <Box mt={0.5}>
-                  {selectedRow.gradoDiscapacidad !== "-" ? (
+                  {detailData.grado !== "-" ? (
                     <Chip
-                      label={selectedRow.gradoDiscapacidad}
+                      label={detailData.grado}
                       size="small"
                       sx={{
-                        backgroundColor:
-                          DISABILITY_GRADE_COLORS[selectedRow.gradoDiscapacidad]?.bg || "#f1f5f9",
-                        color:
-                          DISABILITY_GRADE_COLORS[selectedRow.gradoDiscapacidad]?.color ||
-                          "#475569",
+                        backgroundColor: DEGREE_COLORS[detailData.grado]?.bg || "#f1f5f9",
+                        color: DEGREE_COLORS[detailData.grado]?.color || "#475569",
                         fontWeight: 600,
                       }}
                     />
                   ) : (
-                    <Typography variant="body2" fontWeight={500}>
-                      -
-                    </Typography>
+                    <Typography variant="body2" fontWeight={500}>-</Typography>
                   )}
                 </Box>
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Tipo de Discapacidad
-                </Typography>
-                <Typography variant="body2" fontWeight={500}>
-                  {selectedRow.tipoDiscapacidad}
-                </Typography>
+                <Typography variant="caption" color="text.secondary">Diagnóstico 1</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.diagnostico1}</Typography>
               </Grid>
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Registrado en CONADIS
-                </Typography>
-                <Typography variant="body2" fontWeight={500}>
-                  {selectedRow.conadis ? "Sí" : "No"}
-                </Typography>
+                <Typography variant="caption" color="text.secondary">Diagnóstico 2</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.diagnostico2}</Typography>
               </Grid>
-              {selectedRow.conadis && (
-                <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Código CONADIS
-                  </Typography>
-                  <Typography variant="body2" fontWeight={500}>
-                    {selectedRow.conadisCode}
-                  </Typography>
-                </Grid>
-              )}
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" color="text.secondary">Certificado</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.certificado}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" color="text.secondary">Cert. Discapacidad</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.certDiscapacidad}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" color="text.secondary">Silla de Ruedas</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.sillaDeRuedas}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" color="text.secondary">Folio</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.folio}</Typography>
+              </Grid>
 
-              {/* Información adicional */}
+              {/* CONADIS */}
               <Grid size={12}>
-                <Typography
-                  variant="subtitle2"
-                  fontWeight={600}
-                  color="#475569"
-                  gutterBottom
-                  sx={{ mt: 2 }}
-                >
-                  Información Adicional
+                <Typography variant="subtitle2" fontWeight={600} color={OMAPED_COLOR} gutterBottom sx={{ mt: 2 }}>
+                  CONADIS
                 </Typography>
-                <Divider sx={{ mb: 2 }} />
+                <Divider sx={{ mb: 1 }} />
               </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Educación
-                </Typography>
-                <Typography variant="body2" fontWeight={500}>
-                  {selectedRow.educacion}
-                </Typography>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <Typography variant="caption" color="text.secondary">Nro. CONADIS</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.conadis}</Typography>
               </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Etnia
-                </Typography>
-                <Typography variant="body2" fontWeight={500}>
-                  {selectedRow.etnia}
-                </Typography>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <Typography variant="caption" color="text.secondary">Fecha</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.conadisFecha}</Typography>
               </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">
-                  Fecha de Registro
-                </Typography>
-                <Typography variant="body2" fontWeight={500}>
-                  {formatearFecha(selectedRow.fechaRegistro)}
-                </Typography>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <Typography variant="caption" color="text.secondary">Trámite</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.conadisTramite}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <Typography variant="caption" color="text.secondary">Vigencia</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.conadisVigencia}</Typography>
               </Grid>
 
-              {/* Observaciones */}
-              {selectedRow.observacion !== "-" && (
-                <>
-                  <Grid size={12}>
-                    <Typography
-                      variant="subtitle2"
-                      fontWeight={600}
-                      color="#475569"
-                      gutterBottom
-                      sx={{ mt: 2 }}
-                    >
-                      Observaciones
-                    </Typography>
-                    <Divider sx={{ mb: 2 }} />
-                  </Grid>
-                  <Grid size={12}>
-                    <Typography variant="body2">{selectedRow.observacion}</Typography>
-                  </Grid>
-                </>
-              )}
+              {/* Atención y Servicios */}
+              <Grid size={12}>
+                <Typography variant="subtitle2" fontWeight={600} color={OMAPED_COLOR} gutterBottom sx={{ mt: 2 }}>
+                  Atención y Servicios
+                </Typography>
+                <Divider sx={{ mb: 1 }} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" color="text.secondary">Atención</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.atencion}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" color="text.secondary">Terapia</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.terapia}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" color="text.secondary">Horario de Terapia</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.horarioTerapia}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" color="text.secondary">Beca</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.beca}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" color="text.secondary">Inserción Laboral</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.insercionLaboral}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" color="text.secondary">Emprendimiento</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.emprendimiento}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" color="text.secondary">Feria</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.feria}</Typography>
+              </Grid>
+
+              {/* RENIEC */}
+              <Grid size={12}>
+                <Typography variant="subtitle2" fontWeight={600} color={OMAPED_COLOR} gutterBottom sx={{ mt: 2 }}>
+                  RENIEC
+                </Typography>
+                <Divider sx={{ mb: 1 }} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography variant="caption" color="text.secondary">RENIEC</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.reniec}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography variant="caption" color="text.secondary">Turno RENIEC</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.turnoReniec}</Typography>
+              </Grid>
+
+              {/* Programas */}
+              <Grid size={12}>
+                <Typography variant="subtitle2" fontWeight={600} color={OMAPED_COLOR} gutterBottom sx={{ mt: 2 }}>
+                  Programas
+                </Typography>
+                <Divider sx={{ mb: 1 }} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <Typography variant="caption" color="text.secondary">Contigo</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.contigo}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <Typography variant="caption" color="text.secondary">PC1000</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.pc1000}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <Typography variant="caption" color="text.secondary">FAD</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.fad}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <Typography variant="caption" color="text.secondary">Comuna</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.comuna}</Typography>
+              </Grid>
+
+              {/* Otros */}
+              <Grid size={12}>
+                <Typography variant="subtitle2" fontWeight={600} color={OMAPED_COLOR} gutterBottom sx={{ mt: 2 }}>
+                  Otros
+                </Typography>
+                <Divider sx={{ mb: 1 }} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" color="text.secondary">Empadronador</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.empadronador}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" color="text.secondary">Fecha de Registro</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.fechaRegistro}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+                <Typography variant="caption" color="text.secondary">Fecha de Cambio</Typography>
+                <Typography variant="body2" fontWeight={500}>{detailData.fechaCambio}</Typography>
+              </Grid>
             </Grid>
           )}
         </DialogContent>
 
         <DialogActions sx={{ p: 2, borderTop: "1px solid #e2e8f0" }}>
-          <Button
-            onClick={handleDetailClose}
-            sx={{ textTransform: "none", color: "#64748b" }}
-          >
+          <Button onClick={handleDetailClose} sx={{ textTransform: "none", color: "#64748b" }}>
             Cerrar
           </Button>
         </DialogActions>
