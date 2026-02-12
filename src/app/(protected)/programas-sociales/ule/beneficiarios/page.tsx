@@ -204,12 +204,12 @@ export default function ULEBeneficiariosPage() {
   const calcularEdad = (fechaNacimiento: string): number => {
     const hoy = new Date();
     const nacimiento = new Date(fechaNacimiento);
-    let edad = hoy.getFullYear() - nacimiento.getFullYear();
+    let edad = hoy.getFullYear() - nacimiento.getUTCFullYear();
     const mesActual = hoy.getMonth();
-    const mesNacimiento = nacimiento.getMonth();
+    const mesNacimiento = nacimiento.getUTCMonth();
 
     if (mesActual < mesNacimiento ||
-        (mesActual === mesNacimiento && hoy.getDate() < nacimiento.getDate())) {
+        (mesActual === mesNacimiento && hoy.getDate() < nacimiento.getUTCDate())) {
       edad--;
     }
 
@@ -232,11 +232,11 @@ export default function ULEBeneficiariosPage() {
   // Formatear fecha
   const formatearFecha = (fecha: string | null) => {
     if (!fecha) return "-";
-    return new Date(fecha).toLocaleDateString("es-PE", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    const d = new Date(fecha);
+    const dia = d.getUTCDate().toString().padStart(2, "0");
+    const mes = (d.getUTCMonth() + 1).toString().padStart(2, "0");
+    const anio = d.getUTCFullYear();
+    return `${dia}/${mes}/${anio}`;
   };
 
   // Limpiar filtros

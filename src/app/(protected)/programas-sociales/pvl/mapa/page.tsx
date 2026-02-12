@@ -58,9 +58,9 @@ import type { Feature, Polygon, MultiPolygon, FeatureCollection } from "geojson"
 const calcularEdad = (fechaNacimiento: string): number => {
   const hoy = new Date();
   const nacimiento = new Date(fechaNacimiento);
-  let edad = hoy.getFullYear() - nacimiento.getFullYear();
-  const mes = hoy.getMonth() - nacimiento.getMonth();
-  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) {
+  let edad = hoy.getFullYear() - nacimiento.getUTCFullYear();
+  const mes = hoy.getMonth() - nacimiento.getUTCMonth();
+  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getUTCDate())) {
     edad--;
   }
   return edad;
@@ -69,9 +69,9 @@ const calcularEdad = (fechaNacimiento: string): number => {
 // Función para formatear fecha a DD/MM/YYYY
 const formatearFecha = (fecha: string): string => {
   const date = new Date(fecha);
-  const dia = date.getDate().toString().padStart(2, "0");
-  const mes = (date.getMonth() + 1).toString().padStart(2, "0");
-  const anio = date.getFullYear();
+  const dia = date.getUTCDate().toString().padStart(2, "0");
+  const mes = (date.getUTCMonth() + 1).toString().padStart(2, "0");
+  const anio = date.getUTCFullYear();
   return `${dia}/${mes}/${anio}`;
 };
 

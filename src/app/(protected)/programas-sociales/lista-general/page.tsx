@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   Box,
   Typography,
@@ -41,7 +41,6 @@ import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import * as XLSX from "xlsx";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
-const BATCH_SIZE = 500;
 
 // Paleta de colores para módulos
 const MODULE_COLORS = [
@@ -157,140 +156,144 @@ export default function ListaGeneralPage() {
   const { getData } = useFetch();
 
   // Datos
-  const [allData, setAllData] = useState<PersonaTabla[]>([]);
+  const [data, setData] = useState<PersonaTabla[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [modulos, setModulos] = useState<ModuloInfo[]>([]);
-  const [moduloMap, setModuloMap] = useState<Record<string, ModuloInfo>>({});
   const [isLoading, setIsLoading] = useState(true);
 
-  // Paginación
+  // Paginación server-side
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [fetchKey, setFetchKey] = useState(0);
+
+  // Módulos acumulados (ref para evitar loops en useEffect)
+  const allModulosRef = useRef<ModuloInfo[]>([]);
+  const moduloIdsRef = useRef<Set<string>>(new Set());
+  const colorIndexRef = useRef(0);
+
+  // Mapa de módulos derivado del estado
+  const moduloMap = useMemo(() => {
+    const map: Record<string, ModuloInfo> = {};
+    modulos.forEach((m) => { map[m.id] = m; });
+    return map;
+  }, [modulos]);
 
   // Filtros
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filtroModulo, setFiltroModulo] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("edad");
-  const [edadRange, setEdadRange] = useState<number[]>([0, 100]);
+  const [edadRange, setEdadRange] = useState<number[]>([0, 110]);
   const [filtroMes, setFiltroMes] = useState<number | "">("");
   const [filtroDia, setFiltroDia] = useState("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
 
-  // Cargar datos
-  const fetchAllData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const firstResponse = await getData<BackendResponse>("general?page=1&limit=1");
-      const totalCount = firstResponse?.data?.totalCount || 0;
+  // Debounce de búsqueda (400ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(0);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-      if (totalCount > 0) {
-        const totalPages = Math.ceil(totalCount / BATCH_SIZE);
-        const allItems: PersonaTabla[] = [];
-        const mMap: Record<string, ModuloInfo> = {};
-        let colorIndex = 0;
+  // Cargar datos con paginación y filtros server-side
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const params = new URLSearchParams();
+        params.set("page", String(page + 1));
+        params.set("limit", String(rowsPerPage));
 
-        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-          const response = await getData<BackendResponse>(
-            `general?page=${pageNum}&limit=${BATCH_SIZE}`
-          );
-          if (response?.data?.data) {
-            allItems.push(
-              ...response.data.data.map((item) => {
-                const modId = item.module?.id || item.module_id;
-                const modName = item.module?.name || "-";
+        // Búsqueda server-side
+        if (debouncedSearch) {
+          params.set("search", debouncedSearch);
+        }
 
-                // Registrar módulo si es nuevo
-                if (modId && !mMap[modId]) {
-                  mMap[modId] = {
-                    id: modId,
-                    name: modName,
-                    color: MODULE_COLORS[colorIndex % MODULE_COLORS.length],
-                  };
-                  colorIndex++;
-                }
+        // Filtro de edad server-side
+        if (edadRange[0] > 0 || edadRange[1] < 110) {
+          params.set("age_min", String(edadRange[0]));
+          params.set("age_max", String(edadRange[1]));
+        }
 
-                return {
-                  id: item.id,
-                  nombreCompleto: `${item.name} ${item.lastname}`.trim(),
-                  nombre: item.name,
-                  apellido: item.lastname,
-                  dni: item.dni || "-",
-                  telefono: item.phone || "",
-                  fechaNacimiento: item.birthday,
-                  edad: calcularEdad(item.birthday),
-                  moduloId: modId,
-                  moduloNombre: modName,
-                };
-              })
-            );
+        // Filtro de cumpleaños/mes server-side
+        if (filtroMes && filtroDia) {
+          const mm = String(filtroMes).padStart(2, "0");
+          const dd = String(filtroDia).padStart(2, "0");
+          params.set("birthday", `${mm}-${dd}`);
+        } else if (filtroMes) {
+          params.set("month", String(filtroMes));
+        }
+
+        const response = await getData<BackendResponse>(
+          `general?${params.toString()}`
+        );
+
+        if (response?.data) {
+          const newModulos: ModuloInfo[] = [];
+
+          const items = response.data.data.map((item) => {
+            const modId = item.module?.id || item.module_id;
+            const modName = item.module?.name || "-";
+
+            // Acumular módulos nuevos
+            if (modId && !moduloIdsRef.current.has(modId)) {
+              moduloIdsRef.current.add(modId);
+              newModulos.push({
+                id: modId,
+                name: modName,
+                color: MODULE_COLORS[colorIndexRef.current % MODULE_COLORS.length],
+              });
+              colorIndexRef.current++;
+            }
+
+            return {
+              id: item.id,
+              nombreCompleto: `${item.name} ${item.lastname}`.trim(),
+              nombre: item.name,
+              apellido: item.lastname,
+              dni: item.dni || "-",
+              telefono: item.phone || "",
+              fechaNacimiento: item.birthday,
+              edad: calcularEdad(item.birthday),
+              moduloId: modId,
+              moduloNombre: modName,
+            };
+          });
+
+          setData(items);
+          setTotalCount(response.data.totalCount);
+
+          // Actualizar lista de módulos si hay nuevos
+          if (newModulos.length > 0) {
+            allModulosRef.current = [...allModulosRef.current, ...newModulos];
+            setModulos(allModulosRef.current);
           }
         }
-
-        setAllData(allItems);
-        setModuloMap(mMap);
-        setModulos(Object.values(mMap));
+      } catch (error) {
+        console.error("Error cargando datos:", error);
+        setData([]);
+        setTotalCount(0);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error("Error cargando datos:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [getData]);
+    };
 
-  useEffect(() => {
-    fetchAllData();
-  }, [fetchAllData]);
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, rowsPerPage, fetchKey, debouncedSearch, getData]);
 
   // Formatear strings (Title Case)
-  const formattedData = useFormatTableData(allData);
+  const formattedData = useFormatTableData(data);
 
-  // Filtrar datos
+  // Filtrado client-side (solo módulo - búsqueda/edad/cumpleaños se filtran en el servidor)
   const filteredData = useMemo(() => {
     return formattedData.filter((row: PersonaTabla) => {
-      // Búsqueda
-      if (searchTerm) {
-        const s = searchTerm.toLowerCase();
-        if (
-          !row.nombreCompleto.toLowerCase().includes(s) &&
-          !row.dni.includes(s) &&
-          !row.telefono.includes(s) &&
-          !row.moduloNombre.toLowerCase().includes(s)
-        ) {
-          return false;
-        }
-      }
-
-      // Filtro por módulo
       if (filtroModulo && row.moduloId !== filtroModulo) return false;
-
-      // Filtro por edad
-      if (edadRange[0] > 0 || edadRange[1] < 100) {
-        if (row.fechaNacimiento) {
-          const edad = calcularEdad(row.fechaNacimiento);
-          if (edad < edadRange[0] || edad > edadRange[1]) return false;
-        }
-      }
-
-      // Filtro por cumpleaños
-      if (filtroDia || filtroMes) {
-        if (!row.fechaNacimiento) return false;
-        const fecha = new Date(row.fechaNacimiento);
-        if (filtroMes && fecha.getUTCMonth() + 1 !== filtroMes) return false;
-        if (filtroDia && fecha.getUTCDate() !== parseInt(filtroDia)) return false;
-      }
-
       return true;
     });
-  }, [formattedData, searchTerm, filtroModulo, edadRange, filtroDia, filtroMes]);
-
-  // Paginación local
-  const paginatedData = useMemo(() => {
-    return filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-  }, [filteredData, page, rowsPerPage]);
-
-  // Resetear página al cambiar filtros
-  useEffect(() => {
-    setPage(0);
-  }, [searchTerm, filtroModulo, edadRange, filtroDia, filtroMes]);
+  }, [formattedData, filtroModulo]);
 
   // Exportar Excel
   const handleExport = () => {
@@ -326,11 +329,19 @@ export default function ListaGeneralPage() {
   // Limpiar filtros
   const limpiarFiltros = () => {
     setSearchTerm("");
+    setDebouncedSearch("");
     setFiltroModulo("");
-    setEdadRange([0, 100]);
+    setEdadRange([0, 110]);
     setFiltroDia("");
     setFiltroMes("");
     setPage(0);
+    setFetchKey((k) => k + 1);
+  };
+
+  // Refrescar datos
+  const handleRefresh = () => {
+    setPage(0);
+    setFetchKey((k) => k + 1);
   };
 
   // Handlers de filtro
@@ -354,17 +365,8 @@ export default function ListaGeneralPage() {
   };
 
   const filterOpen = Boolean(filterAnchor);
-  const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 100;
+  const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 110;
   const hayFiltrosActivos = searchTerm || filtroModulo || filtroDia || filtroMes || isEdadFiltered;
-
-  // Estadísticas por módulo
-  const statsByModule = useMemo(() => {
-    const stats: Record<string, number> = {};
-    filteredData.forEach((row: PersonaTabla) => {
-      stats[row.moduloId] = (stats[row.moduloId] || 0) + 1;
-    });
-    return stats;
-  }, [filteredData]);
 
   return (
     <Box>
@@ -499,7 +501,7 @@ export default function ListaGeneralPage() {
               </Typography>
               <IconButton
                 size="small"
-                onClick={() => setEdadRange([0, 100])}
+                onClick={() => { setEdadRange([0, 110]); setPage(0); setFetchKey((k) => k + 1); }}
                 sx={{ p: 0.25 }}
               >
                 <Close sx={{ fontSize: 14, color: "#1e40af" }} />
@@ -529,6 +531,8 @@ export default function ListaGeneralPage() {
                 onClick={() => {
                   setFiltroDia("");
                   setFiltroMes("");
+                  setPage(0);
+                  setFetchKey((k) => k + 1);
                 }}
                 sx={{ p: 0.25 }}
               >
@@ -550,7 +554,7 @@ export default function ListaGeneralPage() {
           )}
 
           <Tooltip title="Actualizar datos">
-            <IconButton onClick={fetchAllData} disabled={isLoading} size="small">
+            <IconButton onClick={handleRefresh} disabled={isLoading} size="small">
               <Refresh />
             </IconButton>
           </Tooltip>
@@ -633,7 +637,7 @@ export default function ListaGeneralPage() {
                   onChange={handleEdadChange}
                   valueLabelDisplay="auto"
                   min={0}
-                  max={100}
+                  max={110}
                   sx={{
                     color: "#3b82f6",
                     "& .MuiSlider-thumb": { backgroundColor: "#1e40af" },
@@ -695,9 +699,11 @@ export default function ListaGeneralPage() {
               <Button
                 size="small"
                 onClick={() => {
-                  setEdadRange([0, 100]);
+                  setEdadRange([0, 110]);
                   setFiltroDia("");
                   setFiltroMes("");
+                  setPage(0);
+                  setFetchKey((k) => k + 1);
                 }}
                 sx={{ color: "#64748b", textTransform: "none" }}
               >
@@ -706,7 +712,7 @@ export default function ListaGeneralPage() {
               <Button
                 size="small"
                 variant="contained"
-                onClick={handleFilterClose}
+                onClick={() => { setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
                 sx={{
                   backgroundColor: subgerencia.color,
                   textTransform: "none",
@@ -740,7 +746,7 @@ export default function ListaGeneralPage() {
               <Chip
                 size="small"
                 label={`Mes: ${MESES.find((m) => m.value === filtroMes)?.label}`}
-                onDelete={() => setFiltroMes("")}
+                onDelete={() => { setFiltroMes(""); setPage(0); setFetchKey((k) => k + 1); }}
                 icon={<Cake sx={{ color: "white !important", fontSize: 16 }} />}
                 sx={{ backgroundColor: "#d81b7e", color: "white" }}
               />
@@ -749,7 +755,7 @@ export default function ListaGeneralPage() {
               <Chip
                 size="small"
                 label={`Día: ${filtroDia}`}
-                onDelete={() => setFiltroDia("")}
+                onDelete={() => { setFiltroDia(""); setPage(0); setFetchKey((k) => k + 1); }}
                 sx={{ backgroundColor: "#d81b7e", color: "white" }}
               />
             )}
@@ -778,30 +784,27 @@ export default function ListaGeneralPage() {
         >
           <FilterList fontSize="small" color="action" />
           <Typography variant="body2">
-            <strong>{filteredData.length}</strong> de {allData.length} registros
+            <strong>{totalCount.toLocaleString()}</strong> registros
           </Typography>
         </Paper>
-        {modulos.map((mod) => {
-          const count = statsByModule[mod.id] || 0;
-          return (
-            <Paper
-              key={mod.id}
-              sx={{
-                px: 2,
-                py: 1,
-                borderRadius: "12px",
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                borderLeft: `4px solid ${mod.color}`,
-              }}
-            >
-              <Typography variant="body2">
-                <strong>{count}</strong> {mod.name}
-              </Typography>
-            </Paper>
-          );
-        })}
+        {modulos.map((mod) => (
+          <Paper
+            key={mod.id}
+            sx={{
+              px: 2,
+              py: 1,
+              borderRadius: "12px",
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              borderLeft: `4px solid ${mod.color}`,
+            }}
+          >
+            <Typography variant="body2">
+              {mod.name}
+            </Typography>
+          </Paper>
+        ))}
       </Box>
 
       {/* Tabla */}
@@ -852,7 +855,7 @@ export default function ListaGeneralPage() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {paginatedData.length === 0 ? (
+                  {filteredData.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">
@@ -861,7 +864,7 @@ export default function ListaGeneralPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    paginatedData.map((row: PersonaTabla, index: number) => {
+                    filteredData.map((row: PersonaTabla, index: number) => {
                       const modColor = moduloMap[row.moduloId]?.color || "#666";
                       return (
                         <TableRow
@@ -943,7 +946,7 @@ export default function ListaGeneralPage() {
             </TableContainer>
             <TablePagination
               component="div"
-              count={filteredData.length}
+              count={totalCount}
               page={page}
               onPageChange={(_, newPage) => setPage(newPage)}
               rowsPerPage={rowsPerPage}

@@ -53,9 +53,9 @@ const calcularEdad = (fechaNacimiento: string | null | undefined): number => {
   if (!fechaNacimiento) return 0;
   const hoy = new Date();
   const nacimiento = new Date(fechaNacimiento);
-  let edad = hoy.getFullYear() - nacimiento.getFullYear();
-  const mes = hoy.getMonth() - nacimiento.getMonth();
-  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) {
+  let edad = hoy.getFullYear() - nacimiento.getUTCFullYear();
+  const mes = hoy.getMonth() - nacimiento.getUTCMonth();
+  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getUTCDate())) {
     edad--;
   }
   return edad;
@@ -65,9 +65,9 @@ const calcularEdad = (fechaNacimiento: string | null | undefined): number => {
 const formatearFecha = (fecha: string | null | undefined): string => {
   if (!fecha) return "-";
   const date = new Date(fecha);
-  const dia = date.getDate().toString().padStart(2, "0");
-  const mes = (date.getMonth() + 1).toString().padStart(2, "0");
-  const anio = date.getFullYear();
+  const dia = date.getUTCDate().toString().padStart(2, "0");
+  const mes = (date.getUTCMonth() + 1).toString().padStart(2, "0");
+  const anio = date.getUTCFullYear();
   return `${dia}/${mes}/${anio}`;
 };
 
