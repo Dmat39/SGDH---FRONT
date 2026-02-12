@@ -65,9 +65,9 @@ const calcularEdad = (fechaNacimiento: string | null | undefined): number => {
   if (!fechaNacimiento) return 0;
   const hoy = new Date();
   const nacimiento = new Date(fechaNacimiento);
-  let edad = hoy.getUTCFullYear() - nacimiento.getUTCFullYear();
-  const mes = hoy.getUTCMonth() - nacimiento.getUTCMonth();
-  if (mes < 0 || (mes === 0 && hoy.getUTCDate() < nacimiento.getUTCDate())) {
+  let edad = hoy.getFullYear() - nacimiento.getUTCFullYear();
+  const mes = hoy.getMonth() - nacimiento.getUTCMonth();
+  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getUTCDate())) {
     edad--;
   }
   return edad;
@@ -813,27 +813,26 @@ function DetalleContent({ beneficiario, loading }: DetalleProps) {
   );
 }
 
-const BATCH_SIZE = 500; // Cargar en lotes de 500 registros
-
 // ============================================
 // COMPONENTE PRINCIPAL
 // ============================================
 export default function CIAMBeneficiariosPage() {
   const { getData } = useFetch();
 
-  const [allData, setAllData] = useState<BeneficiarioTabla[]>([]);
+  const [data, setData] = useState<BeneficiarioTabla[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadingProgress, setLoadingProgress] = useState(0);
 
-  // Paginación local
+  // Paginación server-side
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [fetchKey, setFetchKey] = useState(0);
 
   // Búsqueda y filtros
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("edad");
-  const [edadRange, setEdadRange] = useState<number[]>([60, 100]);
-  const [mesesCumpleanos, setMesesCumpleanos] = useState<number[]>([]);
+  const [edadRange, setEdadRange] = useState<number[]>([60, 110]);
+  const [mesSeleccionado, setMesSeleccionado] = useState<number | null>(null);
   const [cumpleanosModo, setCumpleanosModo] = useState<CumpleanosModo>("mes");
   const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
   const [sexosSeleccionados, setSexosSeleccionados] = useState<string[]>([]);
@@ -846,48 +845,49 @@ export default function CIAMBeneficiariosPage() {
   const [detalleData, setDetalleData] = useState<BeneficiarioDetalleBackend | null>(null);
   const [detalleLoading, setDetalleLoading] = useState(false);
 
-  // Cargar lista de beneficiarios en lotes (como ULE)
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    setLoadingProgress(0);
+  // Cargar lista de beneficiarios con paginación y filtros server-side
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const params = new URLSearchParams();
+        params.set("page", String(page + 1));
+        params.set("limit", String(rowsPerPage));
 
-    try {
-      // Primero obtener el total
-      const firstResponse = await getData<BackendListaResponse>(`pam/benefited?page=1&limit=1`);
-      const totalCount = firstResponse?.data?.totalCount || 0;
-
-      if (totalCount === 0) {
-        setAllData([]);
-        setIsLoading(false);
-        return;
-      }
-
-      // Calcular número de páginas necesarias
-      const totalPages = Math.ceil(totalCount / BATCH_SIZE);
-      const allBeneficiarios: BeneficiarioListaBackend[] = [];
-
-      // Cargar en lotes de 500
-      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-        const response = await getData<BackendListaResponse>(
-          `pam/benefited?page=${pageNum}&limit=${BATCH_SIZE}`
-        );
-
-        if (response?.data?.data) {
-          allBeneficiarios.push(...response.data.data);
+        // Filtro de edad (server-side)
+        if (edadRange[0] > 60 || edadRange[1] < 110) {
+          params.set("age_min", String(edadRange[0]));
+          params.set("age_max", String(edadRange[1]));
         }
 
-        // Actualizar progreso
-        setLoadingProgress(Math.round((pageNum / totalPages) * 100));
-      }
+        // Filtro de cumpleaños/mes (server-side)
+        if (cumpleanosModo === "mes" && mesSeleccionado !== null) {
+          params.set("month", String(mesSeleccionado + 1));
+        } else if (cumpleanosModo === "dia" && diaCumpleanos) {
+          const parts = diaCumpleanos.split("-"); // YYYY-MM-DD
+          params.set("birthday", `${parts[1]}-${parts[2]}`);
+        }
 
-      setAllData(allBeneficiarios.map(mapListaToTabla));
-    } catch (error) {
-      console.error("Error al cargar beneficiarios:", error);
-      setAllData([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [getData]);
+        const response = await getData<BackendListaResponse>(
+          `pam/benefited?${params.toString()}`
+        );
+
+        if (response?.data) {
+          setData(response.data.data.map(mapListaToTabla));
+          setTotalCount(response.data.totalCount);
+        }
+      } catch (error) {
+        console.error("Error al cargar beneficiarios:", error);
+        setData([]);
+        setTotalCount(0);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, rowsPerPage, fetchKey, getData]);
 
   // Cargar detalle de un beneficiario
   const fetchDetalle = useCallback(async (id: string) => {
@@ -906,10 +906,6 @@ export default function CIAMBeneficiariosPage() {
   }, [getData]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  useEffect(() => {
     if (selectedId && detailOpen) {
       fetchDetalle(selectedId);
     }
@@ -923,7 +919,7 @@ export default function CIAMBeneficiariosPage() {
   };
   const handleEdadChange = (_: Event, v: number | number[]) => setEdadRange(v as number[]);
   const handleMesToggle = (mes: number) => {
-    setMesesCumpleanos((prev) => prev.includes(mes) ? prev.filter((m) => m !== mes) : [...prev, mes]);
+    setMesSeleccionado((prev) => prev === mes ? null : mes);
   };
   const handleSexoToggle = (sexo: string) => {
     setSexosSeleccionados((prev) => prev.includes(sexo) ? prev.filter((s) => s !== sexo) : [...prev, sexo]);
@@ -933,8 +929,8 @@ export default function CIAMBeneficiariosPage() {
   };
 
   const filterOpen = Boolean(filterAnchor);
-  const isEdadFiltered = edadRange[0] > 60 || edadRange[1] < 100;
-  const isCumpleanosFiltered = cumpleanosModo === "mes" ? mesesCumpleanos.length > 0 : diaCumpleanos !== "";
+  const isEdadFiltered = edadRange[0] > 60 || edadRange[1] < 110;
+  const isCumpleanosFiltered = cumpleanosModo === "mes" ? mesSeleccionado !== null : diaCumpleanos !== "";
   const isSexoFiltered = sexosSeleccionados.length > 0;
   const isSeguroFiltered = segurosSeleccionados.length > 0;
 
@@ -954,50 +950,22 @@ export default function CIAMBeneficiariosPage() {
     setDetalleData(null);
   };
 
-  // Formatear datos
-  const allDataFormateados = useFormatTableData(allData);
+  // Formatear datos de la página actual
+  const dataFormateados = useFormatTableData(data);
 
-  // Filtrar TODOS los datos (ahora sí funciona porque tenemos todos los registros)
-  const filteredData = allDataFormateados.filter((b: BeneficiarioTabla) => {
+  // Filtrado client-side (solo sexo, seguro y búsqueda - edad/cumpleaños se filtran en el servidor)
+  const filteredData = dataFormateados.filter((b: BeneficiarioTabla) => {
     const term = searchTerm.toLowerCase();
-    const matchesSearch =
+    const matchesSearch = !term ||
       b.nombreCompleto.toLowerCase().includes(term) ||
       b.distritoResidencia.toLowerCase().includes(term) ||
       b.celular.includes(searchTerm);
 
-    const matchesEdad = b.edad >= edadRange[0] && b.edad <= edadRange[1];
-
-    let matchesCumpleanos = true;
-    if (cumpleanosModo === "mes" && mesesCumpleanos.length > 0) {
-      if (b.fechaNacimiento) {
-        const mesCumple = new Date(b.fechaNacimiento).getUTCMonth();
-        matchesCumpleanos = mesesCumpleanos.includes(mesCumple);
-      } else {
-        matchesCumpleanos = false;
-      }
-    } else if (cumpleanosModo === "dia" && diaCumpleanos) {
-      if (b.fechaNacimiento) {
-        const fechaNac = new Date(b.fechaNacimiento);
-        const [, mes, dia] = diaCumpleanos.split("-").map(Number);
-        matchesCumpleanos = fechaNac.getUTCMonth() + 1 === mes && fechaNac.getUTCDate() === dia;
-      } else {
-        matchesCumpleanos = false;
-      }
-    }
-
     const matchesSexo = sexosSeleccionados.length === 0 || sexosSeleccionados.includes(b.sexo);
     const matchesSeguro = segurosSeleccionados.length === 0 || segurosSeleccionados.includes(b.seguroSalud);
 
-    return matchesSearch && matchesEdad && matchesCumpleanos && matchesSexo && matchesSeguro;
+    return matchesSearch && matchesSexo && matchesSeguro;
   });
-
-  // Resetear página al filtrar
-  useEffect(() => {
-    setPage(0);
-  }, [searchTerm, edadRange, mesesCumpleanos, cumpleanosModo, diaCumpleanos, sexosSeleccionados, segurosSeleccionados]);
-
-  // Paginar los datos filtrados
-  const paginatedData = filteredData.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   // Exportar a Excel (todos los datos filtrados)
   const handleExport = () => {
@@ -1023,12 +991,14 @@ export default function CIAMBeneficiariosPage() {
   };
 
   const limpiarFiltros = () => {
-    setEdadRange([60, 100]);
-    setMesesCumpleanos([]);
+    setEdadRange([60, 110]);
+    setMesSeleccionado(null);
     setCumpleanosModo("mes");
     setDiaCumpleanos("");
     setSexosSeleccionados([]);
     setSegurosSeleccionados([]);
+    setPage(0);
+    setFetchKey((k) => k + 1);
   };
 
   return (
@@ -1131,7 +1101,7 @@ export default function CIAMBeneficiariosPage() {
                   <Typography variant="caption" color="#7b1fa2">
                     Edad: {edadRange[0]} - {edadRange[1]} años
                   </Typography>
-                  <IconButton size="small" onClick={() => setEdadRange([60, 100])} sx={{ p: 0.25 }}>
+                  <IconButton size="small" onClick={() => { setEdadRange([60, 110]); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
                     <Close sx={{ fontSize: 14, color: "#7b1fa2" }} />
                   </IconButton>
                 </Box>
@@ -1140,11 +1110,11 @@ export default function CIAMBeneficiariosPage() {
                 <Box sx={{ backgroundColor: "#fce7f3", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
                   <Cake sx={{ fontSize: 14, color: "#be185d" }} />
                   <Typography variant="caption" color="#be185d">
-                    {cumpleanosModo === "mes"
-                      ? mesesCumpleanos.map((m) => MESES[m].slice(0, 3)).join(", ")
+                    {cumpleanosModo === "mes" && mesSeleccionado !== null
+                      ? MESES[mesSeleccionado].slice(0, 3)
                       : diaCumpleanos.split("-").slice(1).reverse().join("/")}
                   </Typography>
-                  <IconButton size="small" onClick={() => { setMesesCumpleanos([]); setDiaCumpleanos(""); }} sx={{ p: 0.25 }}>
+                  <IconButton size="small" onClick={() => { setMesSeleccionado(null); setDiaCumpleanos(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
                     <Close sx={{ fontSize: 14, color: "#be185d" }} />
                   </IconButton>
                 </Box>
@@ -1171,7 +1141,7 @@ export default function CIAMBeneficiariosPage() {
               )}
 
               <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
-                {filteredData.length.toLocaleString()} de {allData.length.toLocaleString()} beneficiario(s)
+                {totalCount.toLocaleString()} beneficiario(s)
               </Typography>
             </Box>
 
@@ -1223,7 +1193,7 @@ export default function CIAMBeneficiariosPage() {
                       onChange={handleEdadChange}
                       valueLabelDisplay="auto"
                       min={60}
-                      max={100}
+                      max={110}
                       sx={{
                         color: CIAM_COLOR,
                         "& .MuiSlider-thumb": { backgroundColor: "#7b1fa2" },
@@ -1266,7 +1236,7 @@ export default function CIAMBeneficiariosPage() {
                             <Button
                               key={mes}
                               size="small"
-                              variant={mesesCumpleanos.includes(index) ? "contained" : "outlined"}
+                              variant={mesSeleccionado === index ? "contained" : "outlined"}
                               onClick={() => handleMesToggle(index)}
                               sx={{
                                 textTransform: "none",
@@ -1274,11 +1244,11 @@ export default function CIAMBeneficiariosPage() {
                                 py: 0.5,
                                 px: 1,
                                 minWidth: 0,
-                                borderColor: mesesCumpleanos.includes(index) ? "#be185d" : "#e2e8f0",
-                                backgroundColor: mesesCumpleanos.includes(index) ? "#be185d" : "transparent",
-                                color: mesesCumpleanos.includes(index) ? "white" : "#64748b",
+                                borderColor: mesSeleccionado === index ? "#be185d" : "#e2e8f0",
+                                backgroundColor: mesSeleccionado === index ? "#be185d" : "transparent",
+                                color: mesSeleccionado === index ? "white" : "#64748b",
                                 "&:hover": {
-                                  backgroundColor: mesesCumpleanos.includes(index) ? "#9d174d" : "#fce7f3",
+                                  backgroundColor: mesSeleccionado === index ? "#9d174d" : "#fce7f3",
                                   borderColor: "#be185d",
                                 },
                               }}
@@ -1287,9 +1257,9 @@ export default function CIAMBeneficiariosPage() {
                             </Button>
                           ))}
                         </Box>
-                        {mesesCumpleanos.length > 0 && (
+                        {mesSeleccionado !== null && (
                           <Typography variant="caption" color="#be185d" sx={{ mt: 1, display: "block" }}>
-                            {mesesCumpleanos.length} mes(es) seleccionado(s)
+                            Mes seleccionado: {MESES[mesSeleccionado]}
                           </Typography>
                         )}
                       </>
@@ -1382,7 +1352,7 @@ export default function CIAMBeneficiariosPage() {
                   <Button
                     size="small"
                     variant="contained"
-                    onClick={handleFilterClose}
+                    onClick={() => { setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
                     sx={{ backgroundColor: "#475569", textTransform: "none", "&:hover": { backgroundColor: "#334155" } }}
                   >
                     Aplicar
@@ -1416,11 +1386,11 @@ export default function CIAMBeneficiariosPage() {
                       <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
                         <CircularProgress size={32} sx={{ color: CIAM_COLOR }} />
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                          Cargando beneficiarios... {loadingProgress > 0 && `${loadingProgress}%`}
+                          Cargando beneficiarios...
                         </Typography>
                       </TableCell>
                     </TableRow>
-                  ) : paginatedData.length === 0 ? (
+                  ) : filteredData.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">
@@ -1429,7 +1399,7 @@ export default function CIAMBeneficiariosPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    paginatedData.map((row: BeneficiarioTabla, index: number) => {
+                    filteredData.map((row: BeneficiarioTabla, index: number) => {
                       const sexoColors = SEXO_CHIP_COLORS[row.sexo] || { bg: "#f5f5f5", color: "#757575" };
                       const seguroColors = SEGURO_CHIP_COLORS[row.seguroSalud] || SEGURO_CHIP_COLORS["Otro"];
                       return (
@@ -1487,7 +1457,7 @@ export default function CIAMBeneficiariosPage() {
             {/* Paginación */}
             <TablePagination
               component="div"
-              count={filteredData.length}
+              count={totalCount}
               page={page}
               onPageChange={handleChangePage}
               rowsPerPage={rowsPerPage}

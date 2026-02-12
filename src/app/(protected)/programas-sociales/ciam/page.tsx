@@ -152,9 +152,9 @@ const AGE_RANGE_COLORS = [
 const calcularEdad = (birthday: string): number => {
   const hoy = new Date();
   const nacimiento = new Date(birthday);
-  let edad = hoy.getUTCFullYear() - nacimiento.getUTCFullYear();
-  const m = hoy.getUTCMonth() - nacimiento.getUTCMonth();
-  if (m < 0 || (m === 0 && hoy.getUTCDate() < nacimiento.getUTCDate())) {
+  let edad = hoy.getFullYear() - nacimiento.getUTCFullYear();
+  const m = hoy.getMonth() - nacimiento.getUTCMonth();
+  if (m < 0 || (m === 0 && hoy.getDate() < nacimiento.getUTCDate())) {
     edad--;
   }
   return edad;

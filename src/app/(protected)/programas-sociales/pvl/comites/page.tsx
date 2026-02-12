@@ -53,9 +53,9 @@ const calcularEdad = (fechaNacimiento: string | null | undefined): number => {
   if (!fechaNacimiento) return 0;
   const hoy = new Date();
   const nacimiento = new Date(fechaNacimiento);
-  let edad = hoy.getUTCFullYear() - nacimiento.getUTCFullYear();
-  const mes = hoy.getUTCMonth() - nacimiento.getUTCMonth();
-  if (mes < 0 || (mes === 0 && hoy.getUTCDate() < nacimiento.getUTCDate())) {
+  let edad = hoy.getFullYear() - nacimiento.getUTCFullYear();
+  const mes = hoy.getMonth() - nacimiento.getUTCMonth();
+  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getUTCDate())) {
     edad--;
   }
   return edad;
