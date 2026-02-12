@@ -78,9 +78,9 @@ type FilterType = "edad" | "cumpleanos";
 const calcularEdad = (fechaNacimiento: string): number => {
   const hoy = new Date();
   const nacimiento = new Date(fechaNacimiento);
-  let edad = hoy.getFullYear() - nacimiento.getFullYear();
-  const mes = hoy.getMonth() - nacimiento.getMonth();
-  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) {
+  let edad = hoy.getFullYear() - nacimiento.getUTCFullYear();
+  const mes = hoy.getMonth() - nacimiento.getUTCMonth();
+  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getUTCDate())) {
     edad--;
   }
   return edad;
@@ -305,11 +305,11 @@ export default function ULEEmpadronadosPage() {
   // Formatear fecha
   const formatearFecha = (fecha: string | null) => {
     if (!fecha) return "-";
-    return new Date(fecha).toLocaleDateString("es-PE", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
+    const d = new Date(fecha);
+    const dia = d.getUTCDate().toString().padStart(2, "0");
+    const mes = (d.getUTCMonth() + 1).toString().padStart(2, "0");
+    const anio = d.getUTCFullYear();
+    return `${dia}/${mes}/${anio}`;
   };
 
   // Limpiar filtros

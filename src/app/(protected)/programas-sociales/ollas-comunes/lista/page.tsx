@@ -212,9 +212,9 @@ export default function OllasListaPage() {
     if (!fechaNacimiento) return 0;
     const hoy = new Date();
     const nacimiento = new Date(fechaNacimiento);
-    let edad = hoy.getFullYear() - nacimiento.getFullYear();
-    const mes = hoy.getMonth() - nacimiento.getMonth();
-    if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) {
+    let edad = hoy.getFullYear() - nacimiento.getUTCFullYear();
+    const mes = hoy.getMonth() - nacimiento.getUTCMonth();
+    if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getUTCDate())) {
       edad--;
     }
     return edad;
