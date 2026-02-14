@@ -42,10 +42,13 @@ import * as XLSX from "xlsx";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 
-// Paleta de colores para módulos
-const MODULE_COLORS = [
-  "#d81b7e", "#4caf50", "#ff9800", "#2196f3", "#9c27b0",
-  "#00bcd4", "#e91e63", "#795548", "#607d8b", "#f44336",
+// Lista fija de módulos con colores
+const MODULOS_FIJOS = [
+  { name: "ULE", color: "#d81b7e" },
+  { name: "PVL", color: "#4caf50" },
+  { name: "CIAM", color: "#ff9800" },
+  { name: "Ollas Comunes", color: "#2196f3" },
+  { name: "Comedores Populares", color: "#9c27b0" },
 ];
 
 // Meses para el filtro
@@ -158,7 +161,6 @@ export default function ListaGeneralPage() {
   // Datos
   const [data, setData] = useState<PersonaTabla[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [modulos, setModulos] = useState<ModuloInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Paginación server-side
@@ -166,17 +168,12 @@ export default function ListaGeneralPage() {
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [fetchKey, setFetchKey] = useState(0);
 
-  // Módulos acumulados (ref para evitar loops en useEffect)
-  const allModulosRef = useRef<ModuloInfo[]>([]);
-  const moduloIdsRef = useRef<Set<string>>(new Set());
-  const colorIndexRef = useRef(0);
-
-  // Mapa de módulos derivado del estado
+  // Mapa de módulos fijo (por nombre)
   const moduloMap = useMemo(() => {
-    const map: Record<string, ModuloInfo> = {};
-    modulos.forEach((m) => { map[m.id] = m; });
+    const map: Record<string, { name: string; color: string }> = {};
+    MODULOS_FIJOS.forEach((m) => { map[m.name] = m; });
     return map;
-  }, [modulos]);
+  }, []);
 
   // Filtros
   const [searchTerm, setSearchTerm] = useState("");
@@ -215,6 +212,11 @@ export default function ListaGeneralPage() {
         if (edadRange[0] > 0 || edadRange[1] < 110) {
           params.set("age_min", String(edadRange[0]));
           params.set("age_max", String(edadRange[1]));
+        }
+
+        // Filtro de módulo server-side
+        if (filtroModulo) {
+          params.set("module_name", filtroModulo);
         }
 
         // Filtro de cumpleaños/mes server-side
@@ -282,18 +284,13 @@ export default function ListaGeneralPage() {
 
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, rowsPerPage, fetchKey, debouncedSearch, getData]);
+  }, [page, rowsPerPage, fetchKey, debouncedSearch, filtroModulo, getData]);
 
   // Formatear strings (Title Case)
   const formattedData = useFormatTableData(data);
 
-  // Filtrado client-side (solo módulo - búsqueda/edad/cumpleaños se filtran en el servidor)
-  const filteredData = useMemo(() => {
-    return formattedData.filter((row: PersonaTabla) => {
-      if (filtroModulo && row.moduloId !== filtroModulo) return false;
-      return true;
-    });
-  }, [formattedData, filtroModulo]);
+  // Todos los filtros ahora son server-side
+  const filteredData = formattedData;
 
   // Exportar Excel
   const handleExport = () => {
@@ -319,7 +316,7 @@ export default function ListaGeneralPage() {
     XLSX.utils.book_append_sheet(wb, ws, "Lista General");
 
     let fileName = "lista_general";
-    if (filtroModulo) fileName += `_${moduloMap[filtroModulo]?.name || "modulo"}`;
+    if (filtroModulo) fileName += `_${filtroModulo}`;
     fileName += `_${new Date().toISOString().split("T")[0]}`;
     fileName += ".xlsx";
 
@@ -429,12 +426,12 @@ export default function ListaGeneralPage() {
             size="small"
             label="Módulo"
             value={filtroModulo}
-            onChange={(e) => setFiltroModulo(e.target.value)}
+            onChange={(e) => { setFiltroModulo(e.target.value); setPage(0); }}
             sx={{ minWidth: 200 }}
           >
             <MenuItem value="">Todos los módulos</MenuItem>
             {modulos.map((mod) => (
-              <MenuItem key={mod.id} value={mod.id}>
+              <MenuItem key={mod.id} value={mod.name}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Box
                     sx={{
@@ -734,8 +731,8 @@ export default function ListaGeneralPage() {
             {filtroModulo && (
               <Chip
                 size="small"
-                label={moduloMap[filtroModulo]?.name || "Módulo"}
-                onDelete={() => setFiltroModulo("")}
+                label={filtroModulo}
+                onDelete={() => { setFiltroModulo(""); setPage(0); }}
                 sx={{
                   backgroundColor: moduloMap[filtroModulo]?.color || "#666",
                   color: "white",
@@ -865,7 +862,7 @@ export default function ListaGeneralPage() {
                     </TableRow>
                   ) : (
                     filteredData.map((row: PersonaTabla, index: number) => {
-                      const modColor = moduloMap[row.moduloId]?.color || "#666";
+                      const modColor = moduloMap[row.moduloNombre]?.color || "#666";
                       return (
                         <TableRow
                           key={row.id}
