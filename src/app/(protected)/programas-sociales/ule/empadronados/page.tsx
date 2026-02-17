@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -37,7 +37,6 @@ import {
 import {
   Search,
   People,
-  Refresh,
   Download,
   Clear,
   Visibility,
@@ -60,7 +59,6 @@ import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import * as XLSX from "xlsx";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
-const BATCH_SIZE = 500; // Cargar en lotes de 500 registros
 
 // Nombres de los meses en español
 const MESES = [
@@ -134,160 +132,93 @@ interface BackendResponse {
 export default function ULEEmpadronadosPage() {
   const { getData } = useFetch();
   const [isLoading, setIsLoading] = useState(true);
-  const [empadronados, setEmpadronados] = useState<RegisteredPerson[]>([]);
+  const [data, setData] = useState<RegisteredPerson[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [loadingProgress, setLoadingProgress] = useState(0);
-  const hasFetched = useRef(false);
 
-  // Estados de paginación
+  // Paginación server-side
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [fetchKey, setFetchKey] = useState(0);
 
   // Estados de filtros
   const [searchTerm, setSearchTerm] = useState("");
   const [filtroFormato, setFiltroFormato] = useState<string>("");
-  const [filtroUrban, setFiltroUrban] = useState<string>("");
 
   // Estados para filtros de edad y cumpleaños
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
   const [filterType, setFilterType] = useState<FilterType>("edad");
   const [edadRange, setEdadRange] = useState<number[]>([0, 100]);
   const [cumpleanosModo, setCumpleanosModo] = useState<CumpleanosModo>("mes");
-  const [mesesCumpleanos, setMesesCumpleanos] = useState<number[]>([]);
+  const [mesSeleccionado, setMesSeleccionado] = useState<number | null>(null);
   const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
 
   // Estados para el dialog de detalles
   const [selectedEmpadronado, setSelectedEmpadronado] = useState<RegisteredPerson | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
-  // Cargar datos en lotes
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    setLoadingProgress(0);
+  // Cargar datos con paginación y filtros server-side
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
 
-    try {
-      // Primero obtener el total
-      const firstResponse = await getData<BackendResponse>(`ule/registered?page=1&limit=1`, { showErrorAlert: false });
-      const totalCount = firstResponse?.data?.totalCount || 0;
+      try {
+        const params = new URLSearchParams();
+        params.set("page", String(page + 1));
+        params.set("limit", String(rowsPerPage));
 
-      if (totalCount === 0) {
-        setEmpadronados([]);
-        setIsLoading(false);
-        return;
-      }
+        // Filtro por búsqueda (server-side)
+        if (searchTerm.trim()) {
+          params.set("search", searchTerm.trim());
+        }
 
-      // Calcular número de páginas necesarias
-      const totalPages = Math.ceil(totalCount / BATCH_SIZE);
-      const allData: RegisteredPerson[] = [];
+        // Filtro por formato (server-side)
+        if (filtroFormato) {
+          params.set("format", filtroFormato);
+        }
 
-      // Cargar en lotes
-      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+        // Filtro de edad (server-side)
+        if (edadRange[0] > 0 || edadRange[1] < 100) {
+          params.set("age_min", String(edadRange[0]));
+          params.set("age_max", String(edadRange[1]));
+        }
+
+        // Filtro de cumpleaños (server-side)
+        if (cumpleanosModo === "mes" && mesSeleccionado !== null) {
+          params.set("birthday_month", String(mesSeleccionado + 1));
+        } else if (cumpleanosModo === "dia" && diaCumpleanos) {
+          const parts = diaCumpleanos.split("-"); // YYYY-MM-DD
+          params.set("birthday_day", `${parts[1]}-${parts[2]}`);
+        }
+
         const response = await getData<BackendResponse>(
-          `ule/registered?page=${pageNum}&limit=${BATCH_SIZE}`,
-          { showErrorAlert: false }
+          `ule/registered?${params.toString()}`
         );
 
-        if (response?.data?.data) {
-          allData.push(...response.data.data);
+        if (response?.data) {
+          setData(response.data.data);
+          setTotalCount(response.data.totalCount);
         }
-
-        // Actualizar progreso
-        setLoadingProgress(Math.round((pageNum / totalPages) * 100));
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        setError("Error al cargar los datos. Por favor, intenta de nuevo.");
+        setData([]);
+        setTotalCount(0);
+      } finally {
+        setIsLoading(false);
       }
+    };
 
-      setEmpadronados(allData);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-      setError("Error al cargar los datos. Por favor, intenta de nuevo.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [getData]);
-
-  useEffect(() => {
-    if (!hasFetched.current) {
-      hasFetched.current = true;
-      fetchData();
-    }
-  }, [fetchData]);
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, rowsPerPage, filtroFormato, searchTerm, fetchKey, getData]);
 
   // Formatear strings del backend (Title Case, preservar siglas en direcciones)
-  const empadronadosFormateados = useFormatTableData(empadronados);
+  const dataFormateados = useFormatTableData(data);
 
-  // Obtener lista única de urbanizaciones para el filtro
-  const urbanizaciones = useMemo(() => {
-    const uniqueUrban = new Map<string, string>();
-    empadronadosFormateados.forEach((e) => {
-      if (e.urban) {
-        uniqueUrban.set(e.urban.id, e.urban.name);
-      }
-    });
-    return Array.from(uniqueUrban.entries())
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [empadronadosFormateados]);
-
-  // Filtrar datos
-  const empadronadosFiltrados = useMemo(() => {
-    return empadronadosFormateados.filter((e) => {
-      // Filtro por búsqueda
-      if (searchTerm) {
-        const busqueda = searchTerm.toLowerCase();
-        const coincide =
-          e.name.toLowerCase().includes(busqueda) ||
-          e.lastname.toLowerCase().includes(busqueda) ||
-          e.dni.toLowerCase().includes(busqueda) ||
-          e.fsu?.toLowerCase().includes(busqueda) ||
-          e.s100?.toLowerCase().includes(busqueda) ||
-          e.urban?.name.toLowerCase().includes(busqueda) ||
-          e.enumerator?.name.toLowerCase().includes(busqueda) ||
-          e.enumerator?.lastname.toLowerCase().includes(busqueda);
-        if (!coincide) return false;
-      }
-
-      // Filtro por formato
-      if (filtroFormato && e.format !== filtroFormato) {
-        return false;
-      }
-
-      // Filtro por urbanización
-      if (filtroUrban && e.urban?.id !== filtroUrban) {
-        return false;
-      }
-
-      // Filtro por edad
-      const edad = e.birthday ? calcularEdad(e.birthday) : 0;
-      if (edad < edadRange[0] || edad > edadRange[1]) {
-        return false;
-      }
-
-      // Filtro por cumpleaños
-      if (cumpleanosModo === "mes" && mesesCumpleanos.length > 0) {
-        if (e.birthday) {
-          const mesCumple = new Date(e.birthday).getMonth();
-          if (!mesesCumpleanos.includes(mesCumple)) return false;
-        } else {
-          return false;
-        }
-      } else if (cumpleanosModo === "dia" && diaCumpleanos) {
-        if (e.birthday) {
-          const fechaNac = new Date(e.birthday);
-          const [, mes, dia] = diaCumpleanos.split("-").map(Number);
-          if (!(fechaNac.getMonth() + 1 === mes && fechaNac.getDate() === dia)) return false;
-        } else {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [empadronadosFormateados, searchTerm, filtroFormato, filtroUrban, edadRange, cumpleanosModo, mesesCumpleanos, diaCumpleanos]);
-
-  // Paginación
-  const empadronadosPaginados = useMemo(() => {
-    return empadronadosFiltrados.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-  }, [empadronadosFiltrados, page, rowsPerPage]);
+  // Los datos ya vienen filtrados del backend
+  const empadronadosFiltrados = dataFormateados;
 
   // Formatear teléfono con prefijo +51
   const formatearTelefono = (telefono: string | null | undefined): string => {
@@ -316,11 +247,12 @@ export default function ULEEmpadronadosPage() {
   const limpiarFiltros = () => {
     setSearchTerm("");
     setFiltroFormato("");
-    setFiltroUrban("");
     setEdadRange([0, 100]);
-    setMesesCumpleanos([]);
+    setMesSeleccionado(null);
     setDiaCumpleanos("");
+    setCumpleanosModo("mes");
     setPage(0);
+    setFetchKey((k) => k + 1);
   };
 
   // Handlers para filtro de cumpleaños
@@ -346,14 +278,12 @@ export default function ULEEmpadronadosPage() {
   };
 
   const handleMesToggle = (mes: number) => {
-    setMesesCumpleanos((prev) =>
-      prev.includes(mes) ? prev.filter((m) => m !== mes) : [...prev, mes]
-    );
+    setMesSeleccionado((prev) => (prev === mes ? null : mes));
   };
 
   const filterOpen = Boolean(filterAnchor);
   const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 100;
-  const isCumpleanosFiltered = cumpleanosModo === "mes" ? mesesCumpleanos.length > 0 : diaCumpleanos !== "";
+  const isCumpleanosFiltered = cumpleanosModo === "mes" ? mesSeleccionado !== null : diaCumpleanos !== "";
 
   // Handlers para el dialog
   const handleRowClick = (empadronado: RegisteredPerson) => {
@@ -410,16 +340,12 @@ export default function ULEEmpadronadosPage() {
 
     let fileName = "empadronados_ule";
     if (filtroFormato) fileName += `_${filtroFormato}`;
-    if (filtroUrban) {
-      const urban = urbanizaciones.find((u) => u.id === filtroUrban);
-      if (urban) fileName += `_${urban.name.replace(/\s+/g, "_")}`;
-    }
     fileName += ".xlsx";
 
     XLSX.writeFile(wb, fileName);
   };
 
-  const hayFiltrosActivos = searchTerm || filtroFormato || filtroUrban || isEdadFiltered || isCumpleanosFiltered;
+  const hayFiltrosActivos = searchTerm || filtroFormato || isEdadFiltered || isCumpleanosFiltered;
 
   // Color por formato
   const getFormatoColor = (formato: string) => {
@@ -497,7 +423,6 @@ export default function ULEEmpadronadosPage() {
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
-                setPage(0);
               }}
               slotProps={{
                 input: {
@@ -532,25 +457,6 @@ export default function ULEEmpadronadosPage() {
               <MenuItem value="">Todos</MenuItem>
               <MenuItem value="FSU">FSU</MenuItem>
               <MenuItem value="S100">S100</MenuItem>
-            </TextField>
-
-            <TextField
-              select
-              size="small"
-              label="Urbanización"
-              value={filtroUrban}
-              onChange={(e) => {
-                setFiltroUrban(e.target.value);
-                setPage(0);
-              }}
-              sx={{ minWidth: 200 }}
-            >
-              <MenuItem value="">Todas</MenuItem>
-              {urbanizaciones.map((urban) => (
-                <MenuItem key={urban.id} value={urban.id}>
-                  {urban.name}
-                </MenuItem>
-              ))}
             </TextField>
 
             <Tooltip title="Filtros de edad y cumpleaños">
@@ -588,7 +494,7 @@ export default function ULEEmpadronadosPage() {
                 </Typography>
                 <IconButton
                   size="small"
-                  onClick={() => setEdadRange([0, 100])}
+                  onClick={() => { setEdadRange([0, 100]); setPage(0); setFetchKey((k) => k + 1); }}
                   sx={{ p: 0.25 }}
                 >
                   <Close sx={{ fontSize: 14, color: "#1e40af" }} />
@@ -611,16 +517,13 @@ export default function ULEEmpadronadosPage() {
               >
                 <Cake sx={{ fontSize: 14, color: "#be185d" }} />
                 <Typography variant="caption" color="#be185d">
-                  {cumpleanosModo === "mes"
-                    ? mesesCumpleanos.map((m) => MESES[m].slice(0, 3)).join(", ")
+                  {cumpleanosModo === "mes" && mesSeleccionado !== null
+                    ? MESES[mesSeleccionado].slice(0, 3)
                     : diaCumpleanos.split("-").slice(1).reverse().join("/")}
                 </Typography>
                 <IconButton
                   size="small"
-                  onClick={() => {
-                    setMesesCumpleanos([]);
-                    setDiaCumpleanos("");
-                  }}
+                  onClick={() => { setMesSeleccionado(null); setDiaCumpleanos(""); setPage(0); setFetchKey((k) => k + 1); }}
                   sx={{ p: 0.25 }}
                 >
                   <Close sx={{ fontSize: 14, color: "#be185d" }} />
@@ -637,12 +540,6 @@ export default function ULEEmpadronadosPage() {
                 </IconButton>
               </Tooltip>
             )}
-
-            <Tooltip title="Actualizar datos">
-              <IconButton onClick={() => { hasFetched.current = false; fetchData(); }} disabled={isLoading} size="small">
-                <Refresh />
-              </IconButton>
-            </Tooltip>
 
             <Button
               variant="contained"
@@ -810,7 +707,7 @@ export default function ULEEmpadronadosPage() {
                           <Button
                             key={mes}
                             size="small"
-                            variant={mesesCumpleanos.includes(index) ? "contained" : "outlined"}
+                            variant={mesSeleccionado === index ? "contained" : "outlined"}
                             onClick={() => handleMesToggle(index)}
                             sx={{
                               textTransform: "none",
@@ -818,11 +715,11 @@ export default function ULEEmpadronadosPage() {
                               py: 0.5,
                               px: 1,
                               minWidth: 0,
-                              borderColor: mesesCumpleanos.includes(index) ? "#be185d" : "#e2e8f0",
-                              backgroundColor: mesesCumpleanos.includes(index) ? "#be185d" : "transparent",
-                              color: mesesCumpleanos.includes(index) ? "white" : "#64748b",
+                              borderColor: mesSeleccionado === index ? "#be185d" : "#e2e8f0",
+                              backgroundColor: mesSeleccionado === index ? "#be185d" : "transparent",
+                              color: mesSeleccionado === index ? "white" : "#64748b",
                               "&:hover": {
-                                backgroundColor: mesesCumpleanos.includes(index) ? "#9d174d" : "#fce7f3",
+                                backgroundColor: mesSeleccionado === index ? "#9d174d" : "#fce7f3",
                                 borderColor: "#be185d",
                               },
                             }}
@@ -831,9 +728,9 @@ export default function ULEEmpadronadosPage() {
                           </Button>
                         ))}
                       </Box>
-                      {mesesCumpleanos.length > 0 && (
+                      {mesSeleccionado !== null && (
                         <Typography variant="caption" color="#be185d" sx={{ mt: 1, display: "block" }}>
-                          {mesesCumpleanos.length} mes(es) seleccionado(s)
+                          Mes seleccionado: {MESES[mesSeleccionado]}
                         </Typography>
                       )}
                     </>
@@ -863,8 +760,11 @@ export default function ULEEmpadronadosPage() {
                   size="small"
                   onClick={() => {
                     setEdadRange([0, 100]);
-                    setMesesCumpleanos([]);
+                    setMesSeleccionado(null);
                     setDiaCumpleanos("");
+                    setCumpleanosModo("mes");
+                    setPage(0);
+                    setFetchKey((k) => k + 1);
                   }}
                   sx={{
                     color: "#64748b",
@@ -876,7 +776,7 @@ export default function ULEEmpadronadosPage() {
                 <Button
                   size="small"
                   variant="contained"
-                  onClick={handleFilterClose}
+                  onClick={() => { setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
                   sx={{
                     backgroundColor: subgerencia.color,
                     textTransform: "none",
@@ -892,7 +792,7 @@ export default function ULEEmpadronadosPage() {
           {/* Resumen */}
           <Box mb={2} display="flex" gap={2} flexWrap="wrap">
             <Chip
-              label={`${empadronadosFiltrados.length} de ${empadronados.length} registros`}
+              label={`${totalCount.toLocaleString()} registros`}
               size="small"
               sx={{ backgroundColor: "#f1f5f9" }}
             />
@@ -904,24 +804,15 @@ export default function ULEEmpadronadosPage() {
                 sx={{ backgroundColor: getFormatoColor(filtroFormato), color: "white" }}
               />
             )}
-            {filtroUrban && (
-              <Chip
-                label={`Urbanización: ${urbanizaciones.find((u) => u.id === filtroUrban)?.name}`}
-                size="small"
-                onDelete={() => setFiltroUrban("")}
-              />
-            )}
           </Box>
 
           {/* Tabla */}
           {isLoading ? (
             <Box display="flex" flexDirection="column" justifyContent="center" alignItems="center" height={400} gap={1}>
               <CircularProgress sx={{ color: subgerencia.color }} />
-              {loadingProgress > 0 && (
-                <Typography variant="caption" color="text.secondary">
-                  Cargando... {loadingProgress}%
-                </Typography>
-              )}
+              <Typography variant="caption" color="text.secondary">
+                Cargando empadronados...
+              </Typography>
             </Box>
           ) : (
             <>
@@ -944,13 +835,13 @@ export default function ULEEmpadronadosPage() {
                       <TableCell sx={{ fontWeight: 600, color: "#334155" }}>FSU / S100</TableCell>
                       <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Nivel</TableCell>
                       <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Miembros</TableCell>
-                      <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Fecha Nacimiento</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Edad</TableCell>
                       <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Empadronador</TableCell>
                       <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {empadronadosPaginados.length === 0 ? (
+                    {empadronadosFiltrados.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                           <Typography variant="body2" color="text.secondary">
@@ -959,7 +850,7 @@ export default function ULEEmpadronadosPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      empadronadosPaginados.map((empadronado, index) => (
+                      empadronadosFiltrados.map((empadronado, index) => (
                         <TableRow
                           key={empadronado.id}
                           onClick={() => handleRowClick(empadronado)}
@@ -1010,12 +901,15 @@ export default function ULEEmpadronadosPage() {
                               {empadronado.members}
                             </Typography>
                           </TableCell>
-                          <TableCell>
-                            <Typography variant="body2">
-                              {empadronado.birthday
-                                ? `${formatearFecha(empadronado.birthday)} (${calcularEdad(empadronado.birthday)})`
-                                : "-"}
-                            </Typography>
+                          <TableCell align="center">
+                            {empadronado.birthday ? (
+                              <Box display="flex" flexDirection="column" alignItems="center" gap={0.3}>
+                                <Chip label={`${calcularEdad(empadronado.birthday)} años`} size="small" sx={{ backgroundColor: "#f3e5f5", color: "#7b1fa2", fontWeight: 600, fontSize: "0.75rem" }} />
+                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem" }}>
+                                  {formatearFecha(empadronado.birthday)}
+                                </Typography>
+                              </Box>
+                            ) : "-"}
                           </TableCell>
                           <TableCell>
                             <Typography
@@ -1091,7 +985,7 @@ export default function ULEEmpadronadosPage() {
 
               <TablePagination
                 component="div"
-                count={empadronadosFiltrados.length}
+                count={totalCount}
                 page={page}
                 onPageChange={(_, newPage) => setPage(newPage)}
                 rowsPerPage={rowsPerPage}

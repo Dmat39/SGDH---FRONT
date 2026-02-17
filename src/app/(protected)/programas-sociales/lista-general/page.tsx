@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -42,11 +42,15 @@ import * as XLSX from "xlsx";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 
-// Paleta de colores para módulos
-const MODULE_COLORS = [
-  "#d81b7e", "#4caf50", "#ff9800", "#2196f3", "#9c27b0",
-  "#00bcd4", "#e91e63", "#795548", "#607d8b", "#f44336",
+// Lista fija de módulos con colores
+const MODULOS_FIJOS = [
+  { name: "ULE", color: "#d81b7e" },
+  { name: "PVL", color: "#4caf50" },
+  { name: "CIAM", color: "#ff9800" },
+  { name: "Ollas Comunes", color: "#2196f3" },
+  { name: "Comedores Populares", color: "#9c27b0" },
 ];
+
 
 // Meses para el filtro
 const MESES = [
@@ -143,12 +147,6 @@ interface PersonaTabla {
   moduloNombre: string;
 }
 
-interface ModuloInfo {
-  id: string;
-  name: string;
-  color: string;
-}
-
 // ============================================
 // COMPONENTE PRINCIPAL
 // ============================================
@@ -158,25 +156,20 @@ export default function ListaGeneralPage() {
   // Datos
   const [data, setData] = useState<PersonaTabla[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [modulos, setModulos] = useState<ModuloInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [moduloTotals, setModuloTotals] = useState<Record<string, number>>({});
 
   // Paginación server-side
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [fetchKey, setFetchKey] = useState(0);
 
-  // Módulos acumulados (ref para evitar loops en useEffect)
-  const allModulosRef = useRef<ModuloInfo[]>([]);
-  const moduloIdsRef = useRef<Set<string>>(new Set());
-  const colorIndexRef = useRef(0);
-
-  // Mapa de módulos derivado del estado
+  // Mapa de módulos fijo (por nombre)
   const moduloMap = useMemo(() => {
-    const map: Record<string, ModuloInfo> = {};
-    modulos.forEach((m) => { map[m.id] = m; });
+    const map: Record<string, { name: string; color: string }> = {};
+    MODULOS_FIJOS.forEach((m) => { map[m.name] = m; });
     return map;
-  }, [modulos]);
+  }, []);
 
   // Filtros
   const [searchTerm, setSearchTerm] = useState("");
@@ -198,6 +191,29 @@ export default function ListaGeneralPage() {
   }, [searchTerm]);
 
   // Cargar datos con paginación y filtros server-side
+  // Cargar totales por módulo (limit=1 para obtener solo totalCount)
+  useEffect(() => {
+    const fetchTotals = async () => {
+      const totals: Record<string, number> = {};
+      await Promise.all(
+        MODULOS_FIJOS.map(async (mod) => {
+          try {
+            const res = await getData<BackendResponse>(
+              `general?page=1&limit=1&module_name=${encodeURIComponent(mod.name)}`
+            );
+            totals[mod.name] = res?.data?.totalCount ?? 0;
+          } catch {
+            totals[mod.name] = 0;
+          }
+        })
+      );
+      setModuloTotals(totals);
+    };
+    fetchTotals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getData]);
+
+  // Cargar datos con paginación y filtros server-side
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -206,18 +222,19 @@ export default function ListaGeneralPage() {
         params.set("page", String(page + 1));
         params.set("limit", String(rowsPerPage));
 
-        // Búsqueda server-side
         if (debouncedSearch) {
           params.set("search", debouncedSearch);
         }
 
-        // Filtro de edad server-side
         if (edadRange[0] > 0 || edadRange[1] < 110) {
           params.set("age_min", String(edadRange[0]));
           params.set("age_max", String(edadRange[1]));
         }
 
-        // Filtro de cumpleaños/mes server-side
+        if (filtroModulo) {
+          params.set("module_name", filtroModulo);
+        }
+
         if (filtroMes && filtroDia) {
           const mm = String(filtroMes).padStart(2, "0");
           const dd = String(filtroDia).padStart(2, "0");
@@ -231,45 +248,21 @@ export default function ListaGeneralPage() {
         );
 
         if (response?.data) {
-          const newModulos: ModuloInfo[] = [];
-
-          const items = response.data.data.map((item) => {
-            const modId = item.module?.id || item.module_id;
-            const modName = item.module?.name || "-";
-
-            // Acumular módulos nuevos
-            if (modId && !moduloIdsRef.current.has(modId)) {
-              moduloIdsRef.current.add(modId);
-              newModulos.push({
-                id: modId,
-                name: modName,
-                color: MODULE_COLORS[colorIndexRef.current % MODULE_COLORS.length],
-              });
-              colorIndexRef.current++;
-            }
-
-            return {
-              id: item.id,
-              nombreCompleto: `${item.name} ${item.lastname}`.trim(),
-              nombre: item.name,
-              apellido: item.lastname,
-              dni: item.dni || "-",
-              telefono: item.phone || "",
-              fechaNacimiento: item.birthday,
-              edad: calcularEdad(item.birthday),
-              moduloId: modId,
-              moduloNombre: modName,
-            };
-          });
+          const items = response.data.data.map((item) => ({
+            id: item.id,
+            nombreCompleto: `${item.name} ${item.lastname}`.trim(),
+            nombre: item.name,
+            apellido: item.lastname,
+            dni: item.dni || "-",
+            telefono: item.phone || "",
+            fechaNacimiento: item.birthday,
+            edad: calcularEdad(item.birthday),
+            moduloId: item.module?.id || item.module_id,
+            moduloNombre: item.module?.name || "-",
+          }));
 
           setData(items);
           setTotalCount(response.data.totalCount);
-
-          // Actualizar lista de módulos si hay nuevos
-          if (newModulos.length > 0) {
-            allModulosRef.current = [...allModulosRef.current, ...newModulos];
-            setModulos(allModulosRef.current);
-          }
         }
       } catch (error) {
         console.error("Error cargando datos:", error);
@@ -282,18 +275,13 @@ export default function ListaGeneralPage() {
 
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, rowsPerPage, fetchKey, debouncedSearch, getData]);
+  }, [page, rowsPerPage, fetchKey, debouncedSearch, filtroModulo, getData]);
 
   // Formatear strings (Title Case)
   const formattedData = useFormatTableData(data);
 
-  // Filtrado client-side (solo módulo - búsqueda/edad/cumpleaños se filtran en el servidor)
-  const filteredData = useMemo(() => {
-    return formattedData.filter((row: PersonaTabla) => {
-      if (filtroModulo && row.moduloId !== filtroModulo) return false;
-      return true;
-    });
-  }, [formattedData, filtroModulo]);
+  // Todos los filtros ahora son server-side
+  const filteredData = formattedData;
 
   // Exportar Excel
   const handleExport = () => {
@@ -319,7 +307,7 @@ export default function ListaGeneralPage() {
     XLSX.utils.book_append_sheet(wb, ws, "Lista General");
 
     let fileName = "lista_general";
-    if (filtroModulo) fileName += `_${moduloMap[filtroModulo]?.name || "modulo"}`;
+    if (filtroModulo) fileName += `_${filtroModulo}`;
     fileName += `_${new Date().toISOString().split("T")[0]}`;
     fileName += ".xlsx";
 
@@ -429,12 +417,12 @@ export default function ListaGeneralPage() {
             size="small"
             label="Módulo"
             value={filtroModulo}
-            onChange={(e) => setFiltroModulo(e.target.value)}
+            onChange={(e) => { setFiltroModulo(e.target.value); setPage(0); setFetchKey((k) => k + 1); }}
             sx={{ minWidth: 200 }}
           >
             <MenuItem value="">Todos los módulos</MenuItem>
-            {modulos.map((mod) => (
-              <MenuItem key={mod.id} value={mod.id}>
+            {MODULOS_FIJOS.map((mod) => (
+              <MenuItem key={mod.name} value={mod.name}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Box
                     sx={{
@@ -734,8 +722,8 @@ export default function ListaGeneralPage() {
             {filtroModulo && (
               <Chip
                 size="small"
-                label={moduloMap[filtroModulo]?.name || "Módulo"}
-                onDelete={() => setFiltroModulo("")}
+                label={filtroModulo}
+                onDelete={() => { setFiltroModulo(""); setPage(0); }}
                 sx={{
                   backgroundColor: moduloMap[filtroModulo]?.color || "#666",
                   color: "white",
@@ -787,9 +775,9 @@ export default function ListaGeneralPage() {
             <strong>{totalCount.toLocaleString()}</strong> registros
           </Typography>
         </Paper>
-        {modulos.map((mod) => (
+        {MODULOS_FIJOS.map((mod) => (
           <Paper
-            key={mod.id}
+            key={mod.name}
             sx={{
               px: 2,
               py: 1,
@@ -801,7 +789,7 @@ export default function ListaGeneralPage() {
             }}
           >
             <Typography variant="body2">
-              {mod.name}
+              {mod.name}: <strong>{(moduloTotals[mod.name] ?? 0).toLocaleString()}</strong>
             </Typography>
           </Paper>
         ))}
@@ -865,7 +853,7 @@ export default function ListaGeneralPage() {
                     </TableRow>
                   ) : (
                     filteredData.map((row: PersonaTabla, index: number) => {
-                      const modColor = moduloMap[row.moduloId]?.color || "#666";
+                      const modColor = moduloMap[row.moduloNombre]?.color || "#666";
                       return (
                         <TableRow
                           key={row.id}

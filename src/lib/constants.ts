@@ -183,6 +183,13 @@ export const MODULOS_PROGRAMAS_SOCIALES: MenuItem[] = [
         permisos: ["pvl", "all_programas_sociales", "all"],
       },
       {
+        id: "pvl-coordinadoras",
+        nombre: "Coordinadoras",
+        ruta: "/programas-sociales/pvl/coordinadoras",
+        icono: "Person",
+        permisos: ["pvl", "all_programas_sociales", "all"],
+      },
+      {
         id: "pvl-mapa",
         nombre: "Mapa",
         ruta: "/programas-sociales/pvl/mapa",
@@ -194,7 +201,7 @@ export const MODULOS_PROGRAMAS_SOCIALES: MenuItem[] = [
   {
     id: "pantbc",
     nombre: "PANTBC",
-    icono: "Restaurant",
+    icono: "Masks",
     descripcion: "Programa de Alimentación y Nutrición para pacientes con TBC",
     permisos: ["pantbc", "all_programas_sociales", "all"],
     children: [
@@ -243,6 +250,20 @@ export const MODULOS_PROGRAMAS_SOCIALES: MenuItem[] = [
         permisos: ["comedores_populares", "all_programas_sociales", "all"],
       },
       {
+        id: "comedores-beneficiarios",
+        nombre: "Beneficiarios",
+        ruta: "/programas-sociales/comedores-populares/beneficiarios",
+        icono: "People",
+        permisos: ["comedores_populares", "all_programas_sociales", "all"],
+      },
+      {
+        id: "comedores-presidentes",
+        nombre: "Presidentes",
+        ruta: "/programas-sociales/comedores-populares/presidentes",
+        icono: "Person",
+        permisos: ["comedores_populares", "all_programas_sociales", "all"],
+      },
+      {
         id: "comedores-mapa",
         nombre: "Mapa",
         ruta: "/programas-sociales/comedores-populares/mapa",
@@ -270,6 +291,20 @@ export const MODULOS_PROGRAMAS_SOCIALES: MenuItem[] = [
         nombre: "Lista de Ollas",
         ruta: "/programas-sociales/ollas-comunes/lista",
         icono: "List",
+        permisos: ["ollas_comunes", "all_programas_sociales", "all"],
+      },
+      {
+        id: "ollas-beneficiarios",
+        nombre: "Beneficiarios",
+        ruta: "/programas-sociales/ollas-comunes/beneficiarios",
+        icono: "People",
+        permisos: ["ollas_comunes", "all_programas_sociales", "all"],
+      },
+      {
+        id: "ollas-presidentes",
+        nombre: "Presidentes",
+        ruta: "/programas-sociales/ollas-comunes/presidentes",
+        icono: "Person",
         permisos: ["ollas_comunes", "all_programas_sociales", "all"],
       },
       {
@@ -325,13 +360,6 @@ export const MODULOS_PROGRAMAS_SOCIALES: MenuItem[] = [
         icono: "People",
         permisos: ["omaped", "all_programas_sociales", "all"],
       },
-      {
-        id: "omaped-mapa",
-        nombre: "Mapa",
-        ruta: "/programas-sociales/omaped/mapa",
-        icono: "Map",
-        permisos: ["omaped", "mapa_omaped", "all_programas_sociales", "all"],
-      },
     ],
   },
   {
@@ -365,15 +393,6 @@ export const MODULOS_PROGRAMAS_SOCIALES: MenuItem[] = [
       },
       */
     ],
-  },
-  // Módulo de Mapa General (solo para subgerente)
-  {
-    id: "mapa-general-ps",
-    nombre: "Mapa General",
-    ruta: "/programas-sociales/mapa",
-    icono: "Map",
-    descripcion: "Mapa con todas las capas de Programas Sociales",
-    permisos: ["all_programas_sociales", "all"],
   },
 ];
 
@@ -470,15 +489,6 @@ export const MODULOS_SERVICIOS_SOCIALES: MenuItem[] = [
         permisos: ["salud", "mapa_salud", "all_servicios_sociales", "all"],
       },
     ],
-  },
-  // Módulo de Mapa General (solo para subgerente)
-  {
-    id: "mapa-general-ss",
-    nombre: "Mapa General",
-    ruta: "/servicios-sociales/mapa",
-    icono: "Map",
-    descripcion: "Mapa con todas las capas de Servicios Sociales",
-    permisos: ["all_servicios_sociales", "all"],
   },
 ];
 
