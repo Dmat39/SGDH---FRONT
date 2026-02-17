@@ -835,7 +835,7 @@ export default function ULEEmpadronadosPage() {
                       <TableCell sx={{ fontWeight: 600, color: "#334155" }}>FSU / S100</TableCell>
                       <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Nivel</TableCell>
                       <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Miembros</TableCell>
-                      <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Fecha Nacimiento</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Edad</TableCell>
                       <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Empadronador</TableCell>
                       <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                     </TableRow>
@@ -901,12 +901,15 @@ export default function ULEEmpadronadosPage() {
                               {empadronado.members}
                             </Typography>
                           </TableCell>
-                          <TableCell>
-                            <Typography variant="body2">
-                              {empadronado.birthday
-                                ? `${formatearFecha(empadronado.birthday)} (${calcularEdad(empadronado.birthday)})`
-                                : "-"}
-                            </Typography>
+                          <TableCell align="center">
+                            {empadronado.birthday ? (
+                              <Box display="flex" flexDirection="column" alignItems="center" gap={0.3}>
+                                <Chip label={`${calcularEdad(empadronado.birthday)} años`} size="small" sx={{ backgroundColor: "#f3e5f5", color: "#7b1fa2", fontWeight: 600, fontSize: "0.75rem" }} />
+                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem" }}>
+                                  {formatearFecha(empadronado.birthday)}
+                                </Typography>
+                              </Box>
+                            ) : "-"}
                           </TableCell>
                           <TableCell>
                             <Typography

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Box,
   Typography,
@@ -50,6 +50,7 @@ const MODULOS_FIJOS = [
   { name: "Ollas Comunes", color: "#2196f3" },
   { name: "Comedores Populares", color: "#9c27b0" },
 ];
+
 
 // Meses para el filtro
 const MESES = [
@@ -146,12 +147,6 @@ interface PersonaTabla {
   moduloNombre: string;
 }
 
-interface ModuloInfo {
-  id: string;
-  name: string;
-  color: string;
-}
-
 // ============================================
 // COMPONENTE PRINCIPAL
 // ============================================
@@ -162,6 +157,7 @@ export default function ListaGeneralPage() {
   const [data, setData] = useState<PersonaTabla[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [moduloTotals, setModuloTotals] = useState<Record<string, number>>({});
 
   // Paginación server-side
   const [page, setPage] = useState(0);
@@ -195,6 +191,29 @@ export default function ListaGeneralPage() {
   }, [searchTerm]);
 
   // Cargar datos con paginación y filtros server-side
+  // Cargar totales por módulo (limit=1 para obtener solo totalCount)
+  useEffect(() => {
+    const fetchTotals = async () => {
+      const totals: Record<string, number> = {};
+      await Promise.all(
+        MODULOS_FIJOS.map(async (mod) => {
+          try {
+            const res = await getData<BackendResponse>(
+              `general?page=1&limit=1&module_name=${encodeURIComponent(mod.name)}`
+            );
+            totals[mod.name] = res?.data?.totalCount ?? 0;
+          } catch {
+            totals[mod.name] = 0;
+          }
+        })
+      );
+      setModuloTotals(totals);
+    };
+    fetchTotals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getData]);
+
+  // Cargar datos con paginación y filtros server-side
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -203,23 +222,19 @@ export default function ListaGeneralPage() {
         params.set("page", String(page + 1));
         params.set("limit", String(rowsPerPage));
 
-        // Búsqueda server-side
         if (debouncedSearch) {
           params.set("search", debouncedSearch);
         }
 
-        // Filtro de edad server-side
         if (edadRange[0] > 0 || edadRange[1] < 110) {
           params.set("age_min", String(edadRange[0]));
           params.set("age_max", String(edadRange[1]));
         }
 
-        // Filtro de módulo server-side
         if (filtroModulo) {
           params.set("module_name", filtroModulo);
         }
 
-        // Filtro de cumpleaños/mes server-side
         if (filtroMes && filtroDia) {
           const mm = String(filtroMes).padStart(2, "0");
           const dd = String(filtroDia).padStart(2, "0");
@@ -233,45 +248,21 @@ export default function ListaGeneralPage() {
         );
 
         if (response?.data) {
-          const newModulos: ModuloInfo[] = [];
-
-          const items = response.data.data.map((item) => {
-            const modId = item.module?.id || item.module_id;
-            const modName = item.module?.name || "-";
-
-            // Acumular módulos nuevos
-            if (modId && !moduloIdsRef.current.has(modId)) {
-              moduloIdsRef.current.add(modId);
-              newModulos.push({
-                id: modId,
-                name: modName,
-                color: MODULE_COLORS[colorIndexRef.current % MODULE_COLORS.length],
-              });
-              colorIndexRef.current++;
-            }
-
-            return {
-              id: item.id,
-              nombreCompleto: `${item.name} ${item.lastname}`.trim(),
-              nombre: item.name,
-              apellido: item.lastname,
-              dni: item.dni || "-",
-              telefono: item.phone || "",
-              fechaNacimiento: item.birthday,
-              edad: calcularEdad(item.birthday),
-              moduloId: modId,
-              moduloNombre: modName,
-            };
-          });
+          const items = response.data.data.map((item) => ({
+            id: item.id,
+            nombreCompleto: `${item.name} ${item.lastname}`.trim(),
+            nombre: item.name,
+            apellido: item.lastname,
+            dni: item.dni || "-",
+            telefono: item.phone || "",
+            fechaNacimiento: item.birthday,
+            edad: calcularEdad(item.birthday),
+            moduloId: item.module?.id || item.module_id,
+            moduloNombre: item.module?.name || "-",
+          }));
 
           setData(items);
           setTotalCount(response.data.totalCount);
-
-          // Actualizar lista de módulos si hay nuevos
-          if (newModulos.length > 0) {
-            allModulosRef.current = [...allModulosRef.current, ...newModulos];
-            setModulos(allModulosRef.current);
-          }
         }
       } catch (error) {
         console.error("Error cargando datos:", error);
@@ -426,12 +417,12 @@ export default function ListaGeneralPage() {
             size="small"
             label="Módulo"
             value={filtroModulo}
-            onChange={(e) => { setFiltroModulo(e.target.value); setPage(0); }}
+            onChange={(e) => { setFiltroModulo(e.target.value); setPage(0); setFetchKey((k) => k + 1); }}
             sx={{ minWidth: 200 }}
           >
             <MenuItem value="">Todos los módulos</MenuItem>
-            {modulos.map((mod) => (
-              <MenuItem key={mod.id} value={mod.name}>
+            {MODULOS_FIJOS.map((mod) => (
+              <MenuItem key={mod.name} value={mod.name}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Box
                     sx={{
@@ -784,9 +775,9 @@ export default function ListaGeneralPage() {
             <strong>{totalCount.toLocaleString()}</strong> registros
           </Typography>
         </Paper>
-        {modulos.map((mod) => (
+        {MODULOS_FIJOS.map((mod) => (
           <Paper
-            key={mod.id}
+            key={mod.name}
             sx={{
               px: 2,
               py: 1,
@@ -798,7 +789,7 @@ export default function ListaGeneralPage() {
             }}
           >
             <Typography variant="body2">
-              {mod.name}
+              {mod.name}: <strong>{(moduloTotals[mod.name] ?? 0).toLocaleString()}</strong>
             </Typography>
           </Paper>
         ))}

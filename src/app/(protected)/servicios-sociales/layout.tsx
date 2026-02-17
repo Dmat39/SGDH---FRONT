@@ -12,20 +12,10 @@ export default function ServiciosSocialesLayout({ children }: { children: React.
   const [toggled, setToggled] = useState(false);
   const { filterMenuItems } = usePermissions();
 
-  // Crear menú con Dashboard como primer item
-  const allMenuItems = [
-    {
-      id: "dashboard",
-      nombre: "Dashboard",
-      ruta: "/servicios-sociales",
-      icono: "Dashboard",
-      permisos: ["all", "all_servicios_sociales"], // Solo admin y subgerente ven el dashboard general
-    },
-    ...MODULOS_SERVICIOS_SOCIALES.map((modulo) => ({
-      ...modulo,
-      subgerencia: SubgerenciaType.SERVICIOS_SOCIALES,
-    })),
-  ];
+  const allMenuItems = MODULOS_SERVICIOS_SOCIALES.map((modulo) => ({
+    ...modulo,
+    subgerencia: SubgerenciaType.SERVICIOS_SOCIALES,
+  }));
 
   // Filtrar módulos según permisos del usuario
   const menuItems = filterMenuItems(allMenuItems);

@@ -12,20 +12,10 @@ export default function ProgramasSocialesLayout({ children }: { children: React.
   const [toggled, setToggled] = useState(false);
   const { filterMenuItems } = usePermissions();
 
-  // Crear menú con Dashboard como primer item
-  const allMenuItems = [
-    {
-      id: "dashboard",
-      nombre: "Dashboard",
-      ruta: "/programas-sociales",
-      icono: "Dashboard",
-      permisos: ["all", "all_programas_sociales"], // Solo admin y subgerente ven el dashboard general
-    },
-    ...MODULOS_PROGRAMAS_SOCIALES.map((modulo) => ({
-      ...modulo,
-      subgerencia: SubgerenciaType.PROGRAMAS_SOCIALES,
-    })),
-  ];
+  const allMenuItems = MODULOS_PROGRAMAS_SOCIALES.map((modulo) => ({
+    ...modulo,
+    subgerencia: SubgerenciaType.PROGRAMAS_SOCIALES,
+  }));
 
   // Filtrar módulos según permisos del usuario
   const menuItems = filterMenuItems(allMenuItems);
