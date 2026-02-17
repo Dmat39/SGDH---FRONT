@@ -54,6 +54,7 @@ import {
   GridView,
   Explore,
   WhatsApp,
+  Masks,
 } from "@mui/icons-material";
 
 interface DynamicIconProps {
@@ -119,6 +120,7 @@ const iconMap: Record<string, React.ReactNode> = {
   GridView: <GridView />,
   Explore: <Explore />,
   WhatsApp: <WhatsApp />,
+  Masks: <Masks />,
 };
 
 export default function DynamicIcon({ iconName, className }: DynamicIconProps) {

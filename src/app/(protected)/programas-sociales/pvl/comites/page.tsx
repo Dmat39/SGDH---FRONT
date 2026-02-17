@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -40,7 +40,6 @@ import {
   Visibility,
   Edit,
   Delete,
-  Cake,
 } from "@mui/icons-material";
 import * as XLSX from "xlsx";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -48,28 +47,6 @@ import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
-// Función para calcular edad desde fecha de nacimiento
-const calcularEdad = (fechaNacimiento: string | null | undefined): number => {
-  if (!fechaNacimiento) return 0;
-  const hoy = new Date();
-  const nacimiento = new Date(fechaNacimiento);
-  let edad = hoy.getFullYear() - nacimiento.getFullYear();
-  const mes = hoy.getMonth() - nacimiento.getMonth();
-  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) {
-    edad--;
-  }
-  return edad;
-};
-
-// Función para formatear fecha a DD/MM/YYYY
-const formatearFecha = (fecha: string | null | undefined): string => {
-  if (!fecha) return "-";
-  const date = new Date(fecha);
-  const dia = date.getDate().toString().padStart(2, "0");
-  const mes = (date.getMonth() + 1).toString().padStart(2, "0");
-  const anio = date.getFullYear();
-  return `${dia}/${mes}/${anio}`;
-};
 
 // Interfaces para el backend
 interface CoordinatorBackend {
@@ -131,7 +108,6 @@ interface ComiteFrontend {
   beneficiarios: number;
   socios: number;
   coordinadora: string;
-  fechaNacimientoCoordinadora: string | null;
   dniCoordinadora: string;
   telefonoCoordinadora: string;
   direccionReferencia: string;
@@ -153,7 +129,6 @@ const mapBackendToFrontend = (item: CommitteeBackend): ComiteFrontend => ({
   beneficiarios: item.beneficiaries,
   socios: item.members,
   coordinadora: item.coordinator ? `${item.coordinator.name} ${item.coordinator.lastname}` : "-",
-  fechaNacimientoCoordinadora: item.coordinator?.birthday || null,
   dniCoordinadora: item.coordinator?.dni || "-",
   telefonoCoordinadora: item.coordinator?.phone || "-",
   direccionReferencia: item.address,
@@ -166,13 +141,7 @@ const mapBackendToFrontend = (item: CommitteeBackend): ComiteFrontend => ({
   fechaCreacion: item.created_at,
 });
 
-type FilterType = "beneficiarios" | "edad" | "cumpleanos" | "comuna";
-
-// Nombres de los meses en español
-const MESES = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-];
+type FilterType = "beneficiarios" | "comuna";
 
 // Lista de comunas basada en el GeoJSON de sectores PVL
 const COMUNAS = [
@@ -196,28 +165,23 @@ const COMUNAS = [
   { id: 18, name: "CAJA DE AGUA" },
 ];
 
-// Tipo de filtro de cumpleaños
-type CumpleanosModo = "mes" | "dia";
-
 export default function PVLComitesPage() {
   const { getData } = useFetch();
 
   // Estados para datos
-  const [allComitesData, setAllComitesData] = useState<ComiteFrontend[]>([]);
+  const [data, setData] = useState<ComiteFrontend[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Estados para paginación local
+  // Paginación server-side
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [fetchKey, setFetchKey] = useState(0);
 
   // Estados para búsqueda y filtros
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("beneficiarios");
   const [beneficiariosRange, setBeneficiariosRange] = useState<number[]>([0, 200]);
-  const [edadRange, setEdadRange] = useState<number[]>([0, 100]);
-  const [mesesCumpleanos, setMesesCumpleanos] = useState<number[]>([]);
-  const [cumpleanosModo, setCumpleanosModo] = useState<CumpleanosModo>("mes");
-  const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
   const [comunasSeleccionadas, setComunasSeleccionadas] = useState<number[]>([]);
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
 
@@ -225,35 +189,48 @@ export default function PVLComitesPage() {
   const [selectedComite, setSelectedComite] = useState<ComiteFrontend | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
-  // Función para cargar TODOS los datos del backend
-  const fetchAllComites = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      // Primero obtener el total
-      const firstResponse = await getData<BackendResponse>(`pvl/committee?page=1&limit=1`);
-      const totalCount = firstResponse?.data?.totalCount || 0;
+  // Cargar datos con paginación server-side
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const params = new URLSearchParams();
+        params.set("page", String(page + 1));
+        params.set("limit", String(rowsPerPage));
 
-      if (totalCount > 0) {
-        // Luego obtener todos los datos
+        if (searchTerm.trim()) {
+          params.set("search", searchTerm.trim());
+        }
+
+        if (beneficiariosRange[0] > 0 || beneficiariosRange[1] < 200) {
+          params.set("beneficiaries_min", String(beneficiariosRange[0]));
+          params.set("beneficiaries_max", String(beneficiariosRange[1]));
+        }
+
+        if (comunasSeleccionadas.length > 0) {
+          params.set("commune", comunasSeleccionadas.join(","));
+        }
+
         const response = await getData<BackendResponse>(
-          `pvl/committee?page=1&limit=${totalCount}`
+          `pvl/committee?${params.toString()}`
         );
         if (response?.data) {
           const mappedData = response.data.data.map(mapBackendToFrontend);
-          setAllComitesData(mappedData);
+          setData(mappedData);
+          setTotalCount(response.data.totalCount);
         }
+      } catch (error) {
+        console.error("Error fetching comités:", error);
+        setData([]);
+        setTotalCount(0);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error("Error fetching comités:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [getData]);
+    };
 
-  // Cargar todos los datos al montar
-  useEffect(() => {
-    fetchAllComites();
-  }, [fetchAllComites]);
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, rowsPerPage, searchTerm, fetchKey, getData]);
 
   const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setFilterAnchor(event.currentTarget);
@@ -276,16 +253,6 @@ export default function PVLComitesPage() {
     setBeneficiariosRange(newValue as number[]);
   };
 
-  const handleEdadChange = (_event: Event, newValue: number | number[]) => {
-    setEdadRange(newValue as number[]);
-  };
-
-  const handleMesToggle = (mes: number) => {
-    setMesesCumpleanos((prev) =>
-      prev.includes(mes) ? prev.filter((m) => m !== mes) : [...prev, mes]
-    );
-  };
-
   const handleComunaToggle = (comunaId: number) => {
     setComunasSeleccionadas((prev) =>
       prev.includes(comunaId) ? prev.filter((c) => c !== comunaId) : [...prev, comunaId]
@@ -294,9 +261,7 @@ export default function PVLComitesPage() {
 
   const filterOpen = Boolean(filterAnchor);
 
-  const isBeneficiariosFiltered = beneficiariosRange[0] > 0 || beneficiariosRange[1] < 100;
-  const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 100;
-  const isCumpleanosFiltered = cumpleanosModo === "mes" ? mesesCumpleanos.length > 0 : diaCumpleanos !== "";
+  const isBeneficiariosFiltered = beneficiariosRange[0] > 0 || beneficiariosRange[1] < 200;
   const isComunaFiltered = comunasSeleccionadas.length > 0;
 
   const handleChangePage = (_event: unknown, newPage: number) => {
@@ -319,65 +284,11 @@ export default function PVLComitesPage() {
   };
 
   // Formatear strings del backend (Title Case, preservar siglas en direcciones)
-  const allComitesFormateados = useFormatTableData(allComitesData);
+  const dataFormateados = useFormatTableData(data);
 
-  // Filtrar datos localmente sobre TODOS los datos
-  const filteredData = allComitesFormateados.filter((c: ComiteFrontend) => {
-    const matchesSearch =
-      c.comite.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.codigo.includes(searchTerm) ||
-      c.coordinadora.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.pueblo.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesBeneficiarios =
-      c.beneficiarios >= beneficiariosRange[0] && c.beneficiarios <= beneficiariosRange[1];
-
-    const edadCoordinadora = calcularEdad(c.fechaNacimientoCoordinadora);
-    const matchesEdad =
-      edadCoordinadora >= edadRange[0] && edadCoordinadora <= edadRange[1];
-
-    // Filtro por cumpleaños (mes o día específico)
-    let matchesCumpleanos = true;
-    if (cumpleanosModo === "mes" && mesesCumpleanos.length > 0) {
-      if (c.fechaNacimientoCoordinadora) {
-        const mesCumple = new Date(c.fechaNacimientoCoordinadora).getMonth();
-        matchesCumpleanos = mesesCumpleanos.includes(mesCumple);
-      } else {
-        matchesCumpleanos = false;
-      }
-    } else if (cumpleanosModo === "dia" && diaCumpleanos) {
-      if (c.fechaNacimientoCoordinadora) {
-        const fechaNac = new Date(c.fechaNacimientoCoordinadora);
-        const [, mes, dia] = diaCumpleanos.split("-").map(Number);
-        matchesCumpleanos = fechaNac.getMonth() + 1 === mes && fechaNac.getDate() === dia;
-      } else {
-        matchesCumpleanos = false;
-      }
-    }
-
-    // Filtro por comuna
-    let matchesComuna = true;
-    if (comunasSeleccionadas.length > 0) {
-      matchesComuna = comunasSeleccionadas.includes(c.comuna);
-    }
-
-    return matchesSearch && matchesBeneficiarios && matchesEdad && matchesCumpleanos && matchesComuna;
-  });
-
-  // Resetear página cuando cambian los filtros
-  useEffect(() => {
-    setPage(0);
-  }, [searchTerm, beneficiariosRange, edadRange, mesesCumpleanos, cumpleanosModo, diaCumpleanos, comunasSeleccionadas]);
-
-  // Datos paginados para mostrar en la tabla
-  const paginatedData = filteredData.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
-
-  // Exportar a Excel (exporta TODOS los datos filtrados, no solo la página actual)
+  // Exportar a Excel
   const handleExport = () => {
-    const exportData = filteredData.map((c: ComiteFrontend) => ({
+    const exportData = dataFormateados.map((c: ComiteFrontend) => ({
       Código: c.codigo,
       "Centro de Acopio": c.centroAcopio,
       Comité: c.comite,
@@ -386,8 +297,6 @@ export default function PVLComitesPage() {
       Coordinadora: c.coordinadora,
       "DNI Coordinadora": c.dniCoordinadora,
       "Teléfono Coordinadora": c.telefonoCoordinadora,
-      "Fecha Nac. Coordinadora": formatearFecha(c.fechaNacimientoCoordinadora),
-      "Edad Coordinadora": calcularEdad(c.fechaNacimientoCoordinadora),
       "Dirección": c.direccionReferencia,
       Pueblo: c.pueblo,
       Comuna: c.comuna,
@@ -454,7 +363,7 @@ export default function PVLComitesPage() {
               <TextField
                 placeholder="Buscar por código, comité, coordinadora..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
                 slotProps={{
                   input: {
                     startAdornment: (
@@ -527,64 +436,10 @@ export default function PVLComitesPage() {
                   </Typography>
                   <IconButton
                     size="small"
-                    onClick={() => setBeneficiariosRange([0, 100])}
+                    onClick={() => { setBeneficiariosRange([0, 200]); setPage(0); setFetchKey((k) => k + 1); }}
                     sx={{ p: 0.25 }}
                   >
                     <Close sx={{ fontSize: 14, color: "#64748b" }} />
-                  </IconButton>
-                </Box>
-              )}
-              {isEdadFiltered && (
-                <Box
-                  sx={{
-                    backgroundColor: "#dbeafe",
-                    borderRadius: "16px",
-                    px: 1.5,
-                    py: 0.5,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                  }}
-                >
-                  <Typography variant="caption" color="#1e40af">
-                    Edad coordinadora: {edadRange[0]} - {edadRange[1]} años
-                  </Typography>
-                  <IconButton
-                    size="small"
-                    onClick={() => setEdadRange([0, 100])}
-                    sx={{ p: 0.25 }}
-                  >
-                    <Close sx={{ fontSize: 14, color: "#1e40af" }} />
-                  </IconButton>
-                </Box>
-              )}
-              {isCumpleanosFiltered && (
-                <Box
-                  sx={{
-                    backgroundColor: "#fce7f3",
-                    borderRadius: "16px",
-                    px: 1.5,
-                    py: 0.5,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                  }}
-                >
-                  <Cake sx={{ fontSize: 14, color: "#be185d" }} />
-                  <Typography variant="caption" color="#be185d">
-                    {cumpleanosModo === "mes"
-                      ? mesesCumpleanos.map((m) => MESES[m].slice(0, 3)).join(", ")
-                      : diaCumpleanos.split("-").slice(1).reverse().join("/")}
-                  </Typography>
-                  <IconButton
-                    size="small"
-                    onClick={() => {
-                      setMesesCumpleanos([]);
-                      setDiaCumpleanos("");
-                    }}
-                    sx={{ p: 0.25 }}
-                  >
-                    <Close sx={{ fontSize: 14, color: "#be185d" }} />
                   </IconButton>
                 </Box>
               )}
@@ -605,7 +460,7 @@ export default function PVLComitesPage() {
                   </Typography>
                   <IconButton
                     size="small"
-                    onClick={() => setComunasSeleccionadas([])}
+                    onClick={() => { setComunasSeleccionadas([]); setPage(0); setFetchKey((k) => k + 1); }}
                     sx={{ p: 0.25 }}
                   >
                     <Close sx={{ fontSize: 14, color: "#0369a1" }} />
@@ -613,7 +468,7 @@ export default function PVLComitesPage() {
                 </Box>
               )}
               <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
-                {filteredData.length.toLocaleString()} de {allComitesData.length.toLocaleString()} comité(s)
+                {totalCount.toLocaleString()} comité(s)
               </Typography>
             </Box>
 
@@ -657,35 +512,7 @@ export default function PVLComitesPage() {
                       },
                     }}
                   >
-                    Benef.
-                  </ToggleButton>
-                  <ToggleButton
-                    value="edad"
-                    sx={{
-                      textTransform: "none",
-                      fontSize: "0.7rem",
-                      "&.Mui-selected": {
-                        backgroundColor: "#dbeafe",
-                        color: "#1e40af",
-                        "&:hover": { backgroundColor: "#bfdbfe" },
-                      },
-                    }}
-                  >
-                    Edad
-                  </ToggleButton>
-                  <ToggleButton
-                    value="cumpleanos"
-                    sx={{
-                      textTransform: "none",
-                      fontSize: "0.7rem",
-                      "&.Mui-selected": {
-                        backgroundColor: "#fce7f3",
-                        color: "#be185d",
-                        "&:hover": { backgroundColor: "#fbcfe8" },
-                      },
-                    }}
-                  >
-                    Cumple
+                    Beneficiarios
                   </ToggleButton>
                   <ToggleButton
                     value="comuna"
@@ -716,7 +543,7 @@ export default function PVLComitesPage() {
                       onChange={handleBeneficiariosChange}
                       valueLabelDisplay="auto"
                       min={0}
-                      max={100}
+                      max={200}
                       sx={{
                         color: "#64748b",
                         "& .MuiSlider-thumb": {
@@ -735,146 +562,6 @@ export default function PVLComitesPage() {
                         {beneficiariosRange[1]} beneficiarios
                       </Typography>
                     </Box>
-                  </>
-                )}
-
-                {/* Filtro por edad de coordinadora */}
-                {filterType === "edad" && (
-                  <>
-                    <Typography variant="body2" color="#475569" mb={1.5}>
-                      Edad de la coordinadora
-                    </Typography>
-                    <Slider
-                      value={edadRange}
-                      onChange={handleEdadChange}
-                      valueLabelDisplay="auto"
-                      min={0}
-                      max={100}
-                      sx={{
-                        color: "#3b82f6",
-                        "& .MuiSlider-thumb": {
-                          backgroundColor: "#1e40af",
-                        },
-                        "& .MuiSlider-track": {
-                          backgroundColor: "#3b82f6",
-                        },
-                      }}
-                    />
-                    <Box display="flex" justifyContent="space-between" mt={1}>
-                      <Typography variant="caption" color="text.secondary">
-                        {edadRange[0]} años
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {edadRange[1]} años
-                      </Typography>
-                    </Box>
-                  </>
-                )}
-
-                {/* Filtro por cumpleaños (mes o día específico) */}
-                {filterType === "cumpleanos" && (
-                  <>
-                    <Typography variant="body2" color="#475569" mb={1.5}>
-                      Cumpleaños de la coordinadora
-                    </Typography>
-
-                    {/* Selector de modo */}
-                    <ToggleButtonGroup
-                      value={cumpleanosModo}
-                      exclusive
-                      onChange={(_, value) => value && setCumpleanosModo(value)}
-                      size="small"
-                      fullWidth
-                      sx={{ mb: 2 }}
-                    >
-                      <ToggleButton
-                        value="mes"
-                        sx={{
-                          textTransform: "none",
-                          fontSize: "0.75rem",
-                          "&.Mui-selected": {
-                            backgroundColor: "#fce7f3",
-                            color: "#be185d",
-                            "&:hover": { backgroundColor: "#fbcfe8" },
-                          },
-                        }}
-                      >
-                        Por mes
-                      </ToggleButton>
-                      <ToggleButton
-                        value="dia"
-                        sx={{
-                          textTransform: "none",
-                          fontSize: "0.75rem",
-                          "&.Mui-selected": {
-                            backgroundColor: "#fce7f3",
-                            color: "#be185d",
-                            "&:hover": { backgroundColor: "#fbcfe8" },
-                          },
-                        }}
-                      >
-                        Día específico
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-
-                    {cumpleanosModo === "mes" ? (
-                      <>
-                        <Box
-                          sx={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(3, 1fr)",
-                            gap: 0.75,
-                          }}
-                        >
-                          {MESES.map((mes, index) => (
-                            <Button
-                              key={mes}
-                              size="small"
-                              variant={mesesCumpleanos.includes(index) ? "contained" : "outlined"}
-                              onClick={() => handleMesToggle(index)}
-                              sx={{
-                                textTransform: "none",
-                                fontSize: "0.7rem",
-                                py: 0.5,
-                                px: 1,
-                                minWidth: 0,
-                                borderColor: mesesCumpleanos.includes(index) ? "#be185d" : "#e2e8f0",
-                                backgroundColor: mesesCumpleanos.includes(index) ? "#be185d" : "transparent",
-                                color: mesesCumpleanos.includes(index) ? "white" : "#64748b",
-                                "&:hover": {
-                                  backgroundColor: mesesCumpleanos.includes(index) ? "#9d174d" : "#fce7f3",
-                                  borderColor: "#be185d",
-                                },
-                              }}
-                            >
-                              {mes.slice(0, 3)}
-                            </Button>
-                          ))}
-                        </Box>
-                        {mesesCumpleanos.length > 0 && (
-                          <Typography variant="caption" color="#be185d" sx={{ mt: 1, display: "block" }}>
-                            {mesesCumpleanos.length} mes(es) seleccionado(s)
-                          </Typography>
-                        )}
-                      </>
-                    ) : (
-                      <TextField
-                        type="date"
-                        value={diaCumpleanos}
-                        onChange={(e) => setDiaCumpleanos(e.target.value)}
-                        fullWidth
-                        size="small"
-                        helperText="Selecciona una fecha para filtrar por día y mes"
-                        sx={{
-                          "& .MuiOutlinedInput-root": {
-                            borderRadius: "8px",
-                            "&.Mui-focused fieldset": {
-                              borderColor: "#be185d",
-                            },
-                          },
-                        }}
-                      />
-                    )}
                   </>
                 )}
 
@@ -931,12 +618,10 @@ export default function PVLComitesPage() {
                   <Button
                     size="small"
                     onClick={() => {
-                      setBeneficiariosRange([0, 100]);
-                      setEdadRange([0, 100]);
-                      setMesesCumpleanos([]);
-                      setCumpleanosModo("mes");
-                      setDiaCumpleanos("");
+                      setBeneficiariosRange([0, 200]);
                       setComunasSeleccionadas([]);
+                      setPage(0);
+                      setFetchKey((k) => k + 1);
                     }}
                     sx={{ color: "#64748b", textTransform: "none" }}
                   >
@@ -945,7 +630,7 @@ export default function PVLComitesPage() {
                   <Button
                     size="small"
                     variant="contained"
-                    onClick={handleFilterClose}
+                    onClick={() => { setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
                     sx={{
                       backgroundColor: "#475569",
                       textTransform: "none",
@@ -991,7 +676,7 @@ export default function PVLComitesPage() {
                         </Typography>
                       </TableCell>
                     </TableRow>
-                  ) : paginatedData.length === 0 ? (
+                  ) : dataFormateados.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">
@@ -1000,7 +685,7 @@ export default function PVLComitesPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    paginatedData.map((row: ComiteFrontend, index: number) => (
+                    dataFormateados.map((row: ComiteFrontend, index: number) => (
                       <TableRow
                         key={row.id}
                         onClick={() => handleRowClick(row)}
@@ -1085,7 +770,7 @@ export default function PVLComitesPage() {
             {/* Paginación */}
             <TablePagination
               component="div"
-              count={filteredData.length}
+              count={totalCount}
               page={page}
               onPageChange={handleChangePage}
               rowsPerPage={rowsPerPage}
@@ -1226,14 +911,6 @@ export default function PVLComitesPage() {
               <Grid size={{ xs: 12, sm: 6, md: 4 }}>
                 <Typography variant="caption" color="text.secondary">Teléfono</Typography>
                 <Typography variant="body2" fontWeight={500}>{selectedComite.telefonoCoordinadora}</Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Fecha de Nacimiento</Typography>
-                <Typography variant="body2" fontWeight={500}>
-                  {selectedComite.fechaNacimientoCoordinadora
-                    ? `${formatearFecha(selectedComite.fechaNacimientoCoordinadora)} (${calcularEdad(selectedComite.fechaNacimientoCoordinadora)} años)`
-                    : "-"}
-                </Typography>
               </Grid>
 
               {/* Observaciones */}

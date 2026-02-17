@@ -40,61 +40,49 @@ interface DemoUserData {
   cargo: string;
 }
 
-// Usuarios de prueba para modo demo
-const DEMO_USERS: Record<string, { password: string; user: DemoUserData }> = {
-  admin: {
-    password: "admin",
-    user: {
-      id: 1,
-      username: "admin",
-      firstName: "Administrador",
-      lastName: "Demo",
-      fullName: "Administrador Demo",
-      email: "admin@sjl.gob.pe",
-      permissions: ["all"],
-      subgerencia: "programas-sociales" as SubgerenciaType,
-      cargo: "Administrador del Sistema",
-    },
-  },
-  pvl: {
-    password: "pvl123",
-    user: {
-      id: 2,
-      username: "pvl",
-      firstName: "Usuario",
-      lastName: "PVL",
-      fullName: "Usuario PVL",
-      email: "pvl@sjl.gob.pe",
-      permissions: ["pvl", "mapa_pvl"],
-      subgerencia: "programas-sociales" as SubgerenciaType,
-      cargo: "Operador PVL",
-    },
-  },
-  userA: {
-    password: "user2026$",
-    user: {
-      id: 3,
-      username: "userA",
-      firstName: "Usuario",
-      lastName: "A",
-      fullName: "Usuario A",
-      email: "userA@sjl.gob.pe",
-      permissions: [
-        "ule",
-        "pvl",
-        "mapa_pvl",
-        "ollas_comunes",
-        "mapa_ollas",
-        "comedores_populares",
-        "mapa_comedores",
-        "all_servicios_sociales",
-        "ciam",
-      ],
-      subgerencia: "programas-sociales" as SubgerenciaType,
-      cargo: "Operador de Programas Sociales",
-    },
-  },
+interface DemoUserEnv {
+  password: string;
+  id: number;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  email: string;
+  permissions: string[];
+  subgerencia: string;
+  cargo: string;
+}
+
+// Usuarios demo desde variables de entorno (.env)
+const parseDemoUsers = (): Record<string, { password: string; user: DemoUserData }> => {
+  try {
+    const raw = process.env.NEXT_PUBLIC_DEMO_USERS;
+    if (!raw) return {};
+    const parsed: Record<string, DemoUserEnv> = JSON.parse(raw);
+    const result: Record<string, { password: string; user: DemoUserData }> = {};
+    for (const [username, data] of Object.entries(parsed)) {
+      result[username] = {
+        password: data.password,
+        user: {
+          id: data.id,
+          username,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          fullName: data.fullName,
+          email: data.email,
+          permissions: data.permissions,
+          subgerencia: data.subgerencia as SubgerenciaType,
+          cargo: data.cargo,
+        },
+      };
+    }
+    return result;
+  } catch {
+    console.error("Error parseando NEXT_PUBLIC_DEMO_USERS del .env");
+    return {};
+  }
 };
+
+const DEMO_USERS = parseDemoUsers();
 
 export default function LoginForm({ subgerencia, color, subgerenciaName }: LoginFormProps) {
   const router = useRouter();

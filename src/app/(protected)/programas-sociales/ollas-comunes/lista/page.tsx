@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -28,8 +28,6 @@ import {
   Grid,
   Divider,
   CircularProgress,
-  ToggleButton,
-  ToggleButtonGroup,
 } from "@mui/material";
 import {
   Search,
@@ -43,7 +41,6 @@ import {
   LocationOn,
   Male,
   Female,
-  Cake,
 } from "@mui/icons-material";
 import * as XLSX from "xlsx";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
@@ -51,18 +48,6 @@ import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
-
-// Nombres de los meses en español
-const MESES = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-];
-
-// Tipo de filtro
-type FilterType = "miembros" | "cumpleanos" | "edad";
-
-// Tipo de filtro de cumpleaños
-type CumpleanosModo = "mes" | "dia";
 
 // Interface para el presidente
 interface President {
@@ -115,63 +100,58 @@ interface APIResponse {
 export default function OllasListaPage() {
   const { getData } = useFetch();
 
-  // Estados para datos - cargar TODOS los datos
-  const [allOllas, setAllOllas] = useState<OllaAPI[]>([]);
+  // Estados para datos - paginación del servidor
+  const [data, setData] = useState<OllaAPI[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [fetchKey, setFetchKey] = useState(0);
 
-  // Estados para paginación LOCAL
+  // Estados para paginación
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
   // Estados para búsqueda y filtros
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState<FilterType>("miembros");
   const [miembrosRange, setMiembrosRange] = useState<number[]>([0, 500]);
-  const [mesesCumpleanos, setMesesCumpleanos] = useState<number[]>([]);
-  const [cumpleanosModo, setCumpleanosModo] = useState<CumpleanosModo>("mes");
-  const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
-  const [edadRange, setEdadRange] = useState<number[]>([0, 100]);
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
-  const [edadFilterAnchor, setEdadFilterAnchor] = useState<HTMLButtonElement | null>(null);
 
   // Estados para detalle
   const [selectedOlla, setSelectedOlla] = useState<OllaAPI | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
-  // Función para cargar TODOS los datos del backend
-  const fetchAllOllas = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      // Primero obtener el total
-      const firstResponse = await getData<APIResponse>(
-        `pca/center?page=1&limit=1&modality=CPOT`,
-        { showErrorAlert: false }
-      );
-      const totalCount = firstResponse?.data?.totalCount || 0;
+  // Fetch con paginación del servidor
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const params = new URLSearchParams();
+        params.set("page", String(page + 1));
+        params.set("limit", String(rowsPerPage));
+        params.set("modality", "CPOT");
 
-      if (totalCount > 0) {
-        // Luego obtener todos los datos
+        if (searchTerm.trim()) {
+          params.set("search", searchTerm.trim());
+        }
+
         const response = await getData<APIResponse>(
-          `pca/center?page=1&limit=${totalCount}&modality=CPOT`,
-          { showErrorAlert: false }
+          `pca/center?${params.toString()}`
         );
         if (response?.data) {
-          setAllOllas(response.data.data);
+          setData(response.data.data);
+          setTotalCount(response.data.totalCount);
         }
+      } catch (error) {
+        console.error("Error fetching ollas:", error);
+        setData([]);
+        setTotalCount(0);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error desconocido");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [getData]);
+    };
 
-  // Cargar todos los datos al montar
-  useEffect(() => {
-    fetchAllOllas();
-  }, [fetchAllOllas]);
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, rowsPerPage, searchTerm, fetchKey, getData]);
 
   const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setFilterAnchor(event.currentTarget);
@@ -181,56 +161,13 @@ export default function OllasListaPage() {
     setFilterAnchor(null);
   };
 
-  const handleEdadFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    setEdadFilterAnchor(event.currentTarget);
-  };
-
-  const handleEdadFilterClose = () => {
-    setEdadFilterAnchor(null);
-  };
-
-  const edadFilterOpen = Boolean(edadFilterAnchor);
-
-  const handleFilterTypeChange = (
-    _event: React.MouseEvent<HTMLElement>,
-    newFilterType: FilterType | null
-  ) => {
-    if (newFilterType !== null) {
-      setFilterType(newFilterType);
-    }
-  };
-
   const handleMiembrosChange = (_event: Event, newValue: number | number[]) => {
     setMiembrosRange(newValue as number[]);
-  };
-
-  const handleEdadChange = (_event: Event, newValue: number | number[]) => {
-    setEdadRange(newValue as number[]);
-  };
-
-  const calcularEdad = (fechaNacimiento: string | null | undefined): number => {
-    if (!fechaNacimiento) return 0;
-    const hoy = new Date();
-    const nacimiento = new Date(fechaNacimiento);
-    let edad = hoy.getFullYear() - nacimiento.getFullYear();
-    const mes = hoy.getMonth() - nacimiento.getMonth();
-    if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getDate())) {
-      edad--;
-    }
-    return edad;
-  };
-
-  const handleMesToggle = (mes: number) => {
-    setMesesCumpleanos((prev) =>
-      prev.includes(mes) ? prev.filter((m) => m !== mes) : [...prev, mes]
-    );
   };
 
   const filterOpen = Boolean(filterAnchor);
 
   const isMiembrosFiltered = miembrosRange[0] > 0 || miembrosRange[1] < 500;
-  const isCumpleanosFiltered = cumpleanosModo === "mes" ? mesesCumpleanos.length > 0 : diaCumpleanos !== "";
-  const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 100;
 
   const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
@@ -252,7 +189,7 @@ export default function OllasListaPage() {
   };
 
   // Formatear strings del backend (Title Case, preservar siglas en direcciones)
-  const allOllasFormateadas = useFormatTableData(allOllas);
+  const dataFormateados = useFormatTableData(data);
 
   // Formatear fecha
   const formatDate = (dateString: string | null | undefined) => {
@@ -262,68 +199,13 @@ export default function OllasListaPage() {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
+      timeZone: "UTC",
     });
   };
 
-  // Filtrar datos localmente sobre TODOS los datos
-  const filteredData = allOllasFormateadas.filter((c: OllaAPI) => {
-    const matchesSearch =
-      c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (c.president?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
-      (c.president?.lastname?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
-
-    const matchesMiembros =
-      c.members >= miembrosRange[0] && c.members <= miembrosRange[1];
-
-    // Filtro por cumpleaños del presidente (mes o día específico)
-    let matchesCumpleanos = true;
-    if (cumpleanosModo === "mes" && mesesCumpleanos.length > 0) {
-      if (c.president?.birthday) {
-        const mesCumple = new Date(c.president.birthday).getMonth();
-        matchesCumpleanos = mesesCumpleanos.includes(mesCumple);
-      } else {
-        matchesCumpleanos = false;
-      }
-    } else if (cumpleanosModo === "dia" && diaCumpleanos) {
-      if (c.president?.birthday) {
-        const fechaNac = new Date(c.president.birthday);
-        const [, mes, dia] = diaCumpleanos.split("-").map(Number);
-        matchesCumpleanos = fechaNac.getMonth() + 1 === mes && fechaNac.getDate() === dia;
-      } else {
-        matchesCumpleanos = false;
-      }
-    }
-
-    // Filtro por edad del presidente
-    let matchesEdad = true;
-    if (isEdadFiltered) {
-      if (c.president?.birthday) {
-        const edad = calcularEdad(c.president.birthday);
-        matchesEdad = edad >= edadRange[0] && edad <= edadRange[1];
-      } else {
-        matchesEdad = false;
-      }
-    }
-
-    return matchesSearch && matchesMiembros && matchesCumpleanos && matchesEdad;
-  });
-
-  // Resetear página cuando cambian los filtros
-  useEffect(() => {
-    setPage(0);
-  }, [searchTerm, miembrosRange, mesesCumpleanos, cumpleanosModo, diaCumpleanos, edadRange]);
-
-  // Datos paginados para mostrar en la tabla
-  const paginatedData = filteredData.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
-
   // Exportar a Excel
   const handleExport = () => {
-    const exportData = filteredData.map((c: OllaAPI) => ({
+    const exportData = dataFormateados.map((c: OllaAPI) => ({
       Código: c.code,
       Nombre: c.name,
       Dirección: c.address,
@@ -409,7 +291,10 @@ export default function OllasListaPage() {
               <TextField
                 placeholder="Buscar por código, nombre, dirección, presidente..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setPage(0);
+                }}
                 slotProps={{
                   input: {
                     startAdornment: (
@@ -451,7 +336,7 @@ export default function OllasListaPage() {
                   <FilterList sx={{ color: filterOpen ? subgerencia.color : "#64748b", fontSize: 20 }} />
                 </IconButton>
               </Tooltip>
-              
+
               <Tooltip title="Exportar a Excel">
                 <IconButton
                   onClick={handleExport}
@@ -487,64 +372,14 @@ export default function OllasListaPage() {
                   </Typography>
                   <IconButton
                     size="small"
-                    onClick={() => setMiembrosRange([0, 500])}
-                    sx={{ p: 0.25 }}
-                  >
-                    <Close sx={{ fontSize: 14, color: "#64748b" }} />
-                  </IconButton>
-                </Box>
-              )}
-              {isCumpleanosFiltered && (
-                <Box
-                  sx={{
-                    backgroundColor: "#fce7f3",
-                    borderRadius: "16px",
-                    px: 1.5,
-                    py: 0.5,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                  }}
-                >
-                  <Cake sx={{ fontSize: 14, color: "#be185d" }} />
-                  <Typography variant="caption" color="#be185d">
-                    {cumpleanosModo === "mes"
-                      ? mesesCumpleanos.map((m) => MESES[m].slice(0, 3)).join(", ")
-                      : diaCumpleanos.split("-").slice(1).reverse().join("/")}
-                  </Typography>
-                  <IconButton
-                    size="small"
                     onClick={() => {
-                      setMesesCumpleanos([]);
-                      setDiaCumpleanos("");
+                      setMiembrosRange([0, 500]);
+                      setPage(0);
+                      setFetchKey((k) => k + 1);
                     }}
                     sx={{ p: 0.25 }}
                   >
-                    <Close sx={{ fontSize: 14, color: "#be185d" }} />
-                  </IconButton>
-                </Box>
-              )}
-              {isEdadFiltered && (
-                <Box
-                  sx={{
-                    backgroundColor: "#e0e7ff",
-                    borderRadius: "16px",
-                    px: 1.5,
-                    py: 0.5,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                  }}
-                >
-                  <Typography variant="caption" color="#4338ca" fontWeight={500}>
-                    Edad: {edadRange[0]} - {edadRange[1]}
-                  </Typography>
-                  <IconButton
-                    size="small"
-                    onClick={() => setEdadRange([0, 100])}
-                    sx={{ p: 0.25 }}
-                  >
-                    <Close sx={{ fontSize: 14, color: "#4338ca" }} />
+                    <Close sx={{ fontSize: 14, color: "#64748b" }} />
                   </IconButton>
                 </Box>
               )}
@@ -557,7 +392,7 @@ export default function OllasListaPage() {
                   fontFamily: "'Inter', 'Roboto', sans-serif",
                 }}
               >
-                {filteredData.length.toLocaleString()} de {allOllas.length.toLocaleString()} olla(s)
+                {totalCount.toLocaleString()} olla(s)
               </Typography>
             </Box>
 
@@ -577,245 +412,47 @@ export default function OllasListaPage() {
               sx={{ mt: 1 }}
             >
               <Box sx={{ p: 2.5, width: 320 }}>
-                {/* Selector de tipo de filtro */}
                 <Typography variant="subtitle2" fontWeight={600} color="#334155" mb={1.5}>
-                  Tipo de filtro
+                  Filtrar por miembros
                 </Typography>
-                <ToggleButtonGroup
-                  value={filterType}
-                  exclusive
-                  onChange={handleFilterTypeChange}
-                  size="small"
-                  fullWidth
-                  sx={{ mb: 2.5 }}
-                >
-                  <ToggleButton
-                    value="miembros"
-                    sx={{
-                      textTransform: "none",
-                      fontSize: "0.75rem",
-                      "&.Mui-selected": {
-                        backgroundColor: "#e2e8f0",
-                        color: "#334155",
-                        "&:hover": { backgroundColor: "#cbd5e1" },
-                      },
-                    }}
-                  >
-                    Miembros
-                  </ToggleButton>
-                  <ToggleButton
-                    value="cumpleanos"
-                    sx={{
-                      textTransform: "none",
-                      fontSize: "0.75rem",
-                      "&.Mui-selected": {
-                        backgroundColor: "#fce7f3",
-                        color: "#be185d",
-                        "&:hover": { backgroundColor: "#fbcfe8" },
-                      },
-                    }}
-                  >
-                    Cumpleaños
-                  </ToggleButton>
-                  <ToggleButton
-                    value="edad"
-                    sx={{
-                      textTransform: "none",
-                      fontSize: "0.75rem",
-                      "&.Mui-selected": {
-                        backgroundColor: "#e0e7ff",
-                        color: "#4338ca",
-                        "&:hover": { backgroundColor: "#c7d2fe" },
-                      },
-                    }}
-                  >
-                    Edad
-                  </ToggleButton>
-                </ToggleButtonGroup>
 
                 <Divider sx={{ mb: 2 }} />
 
-                {/* Filtro por miembros */}
-                {filterType === "miembros" && (
-                  <>
-                    <Typography variant="body2" color="#475569" mb={1.5}>
-                      Cantidad de miembros
-                    </Typography>
-                    <Slider
-                      value={miembrosRange}
-                      onChange={handleMiembrosChange}
-                      valueLabelDisplay="auto"
-                      min={0}
-                      max={500}
-                      sx={{
-                        color: "#64748b",
-                        "& .MuiSlider-thumb": {
-                          backgroundColor: "#475569",
-                        },
-                        "& .MuiSlider-track": {
-                          backgroundColor: "#64748b",
-                        },
-                      }}
-                    />
-                    <Box display="flex" justifyContent="space-between" mt={1}>
-                      <Typography variant="caption" color="text.secondary">
-                        {miembrosRange[0]} miembros
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {miembrosRange[1]} miembros
-                      </Typography>
-                    </Box>
-                  </>
-                )}
-
-                {/* Filtro por cumpleaños */}
-                {filterType === "cumpleanos" && (
-                  <>
-                    <Typography variant="body2" color="#475569" mb={1.5}>
-                      Cumpleaños del presidente
-                    </Typography>
-
-                    {/* Selector de modo */}
-                    <ToggleButtonGroup
-                      value={cumpleanosModo}
-                      exclusive
-                      onChange={(_, value) => value && setCumpleanosModo(value)}
-                      size="small"
-                      fullWidth
-                      sx={{ mb: 2 }}
-                    >
-                      <ToggleButton
-                        value="mes"
-                        sx={{
-                          textTransform: "none",
-                          fontSize: "0.75rem",
-                          "&.Mui-selected": {
-                            backgroundColor: "#fce7f3",
-                            color: "#be185d",
-                            "&:hover": { backgroundColor: "#fbcfe8" },
-                          },
-                        }}
-                      >
-                        Por mes
-                      </ToggleButton>
-                      <ToggleButton
-                        value="dia"
-                        sx={{
-                          textTransform: "none",
-                          fontSize: "0.75rem",
-                          "&.Mui-selected": {
-                            backgroundColor: "#fce7f3",
-                            color: "#be185d",
-                            "&:hover": { backgroundColor: "#fbcfe8" },
-                          },
-                        }}
-                      >
-                        Día específico
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-
-                    {cumpleanosModo === "mes" ? (
-                      <>
-                        <Box
-                          sx={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(3, 1fr)",
-                            gap: 0.75,
-                          }}
-                        >
-                          {MESES.map((mes, index) => (
-                            <Button
-                              key={mes}
-                              size="small"
-                              variant={mesesCumpleanos.includes(index) ? "contained" : "outlined"}
-                              onClick={() => handleMesToggle(index)}
-                              sx={{
-                                textTransform: "none",
-                                fontSize: "0.7rem",
-                                py: 0.5,
-                                px: 1,
-                                minWidth: 0,
-                                borderColor: mesesCumpleanos.includes(index) ? "#be185d" : "#e2e8f0",
-                                backgroundColor: mesesCumpleanos.includes(index) ? "#be185d" : "transparent",
-                                color: mesesCumpleanos.includes(index) ? "white" : "#64748b",
-                                "&:hover": {
-                                  backgroundColor: mesesCumpleanos.includes(index) ? "#9d174d" : "#fce7f3",
-                                  borderColor: "#be185d",
-                                },
-                              }}
-                            >
-                              {mes.slice(0, 3)}
-                            </Button>
-                          ))}
-                        </Box>
-                        {mesesCumpleanos.length > 0 && (
-                          <Typography variant="caption" color="#be185d" sx={{ mt: 1, display: "block" }}>
-                            {mesesCumpleanos.length} mes(es) seleccionado(s)
-                          </Typography>
-                        )}
-                      </>
-                    ) : (
-                      <TextField
-                        type="date"
-                        value={diaCumpleanos}
-                        onChange={(e) => setDiaCumpleanos(e.target.value)}
-                        fullWidth
-                        size="small"
-                        helperText="Selecciona una fecha para filtrar por día y mes"
-                        sx={{
-                          "& .MuiOutlinedInput-root": {
-                            borderRadius: "8px",
-                            "&.Mui-focused fieldset": {
-                              borderColor: "#be185d",
-                            },
-                          },
-                        }}
-                      />
-                    )}
-                  </>
-                )}
-
-                {/* Filtro por edad */}
-                {filterType === "edad" && (
-                  <>
-                    <Typography variant="body2" color="#475569" mb={1.5}>
-                      Edad del presidente
-                    </Typography>
-                    <Slider
-                      value={edadRange}
-                      onChange={handleEdadChange}
-                      valueLabelDisplay="auto"
-                      min={0}
-                      max={100}
-                      sx={{
-                        color: "#6366f1",
-                        "& .MuiSlider-thumb": {
-                          backgroundColor: "#4338ca",
-                        },
-                        "& .MuiSlider-track": {
-                          backgroundColor: "#6366f1",
-                        },
-                      }}
-                    />
-                    <Box display="flex" justifyContent="space-between" mt={1}>
-                      <Typography variant="caption" color="text.secondary">
-                        {edadRange[0]} años
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {edadRange[1]} años
-                      </Typography>
-                    </Box>
-                  </>
-                )}
+                <Typography variant="body2" color="#475569" mb={1.5}>
+                  Cantidad de miembros
+                </Typography>
+                <Slider
+                  value={miembrosRange}
+                  onChange={handleMiembrosChange}
+                  valueLabelDisplay="auto"
+                  min={0}
+                  max={500}
+                  sx={{
+                    color: "#64748b",
+                    "& .MuiSlider-thumb": {
+                      backgroundColor: "#475569",
+                    },
+                    "& .MuiSlider-track": {
+                      backgroundColor: "#64748b",
+                    },
+                  }}
+                />
+                <Box display="flex" justifyContent="space-between" mt={1}>
+                  <Typography variant="caption" color="text.secondary">
+                    {miembrosRange[0]} miembros
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {miembrosRange[1]} miembros
+                  </Typography>
+                </Box>
 
                 <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
                   <Button
                     size="small"
                     onClick={() => {
                       setMiembrosRange([0, 500]);
-                      setMesesCumpleanos([]);
-                      setDiaCumpleanos("");
-                      setEdadRange([0, 100]);
+                      setPage(0);
+                      setFetchKey((k) => k + 1);
                     }}
                     sx={{
                       color: "#64748b",
@@ -828,79 +465,16 @@ export default function OllasListaPage() {
                   <Button
                     size="small"
                     variant="contained"
-                    onClick={handleFilterClose}
+                    onClick={() => {
+                      setPage(0);
+                      setFetchKey((k) => k + 1);
+                      handleFilterClose();
+                    }}
                     sx={{
                       backgroundColor: subgerencia.color,
                       textTransform: "none",
                       fontFamily: "'Inter', 'Roboto', sans-serif",
                       "&:hover": { backgroundColor: "#be185d" },
-                    }}
-                  >
-                    Aplicar
-                  </Button>
-                </Box>
-              </Box>
-            </Popover>
-
-            {/* Popover de filtro por edad */}
-            <Popover
-              open={edadFilterOpen}
-              anchorEl={edadFilterAnchor}
-              onClose={handleEdadFilterClose}
-              anchorOrigin={{
-                vertical: "bottom",
-                horizontal: "left",
-              }}
-              transformOrigin={{
-                vertical: "top",
-                horizontal: "left",
-              }}
-              sx={{ mt: 1 }}
-            >
-              <Box sx={{ p: 2.5, width: 280 }}>
-                <Typography variant="subtitle2" fontWeight={600} color="#334155" mb={2}>
-                  Filtrar por rango de edad
-                </Typography>
-                <Slider
-                  value={edadRange}
-                  onChange={handleEdadChange}
-                  valueLabelDisplay="auto"
-                  min={0}
-                  max={100}
-                  sx={{
-                    color: "#6366f1",
-                    "& .MuiSlider-thumb": {
-                      backgroundColor: "#4338ca",
-                    },
-                    "& .MuiSlider-track": {
-                      backgroundColor: "#6366f1",
-                    },
-                  }}
-                />
-                <Box display="flex" justifyContent="space-between" mt={1}>
-                  <Typography variant="caption" color="text.secondary">
-                    {edadRange[0]} años
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {edadRange[1]} años
-                  </Typography>
-                </Box>
-                <Box display="flex" justifyContent="flex-end" mt={2} gap={1}>
-                  <Button
-                    size="small"
-                    onClick={() => setEdadRange([0, 100])}
-                    sx={{ color: "#64748b", textTransform: "none" }}
-                  >
-                    Limpiar
-                  </Button>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    onClick={handleEdadFilterClose}
-                    sx={{
-                      backgroundColor: "#4338ca",
-                      textTransform: "none",
-                      "&:hover": { backgroundColor: "#3730a3" },
                     }}
                   >
                     Aplicar
@@ -970,22 +544,7 @@ export default function OllasListaPage() {
                         </Typography>
                       </TableCell>
                     </TableRow>
-                  ) : error ? (
-                    <TableRow>
-                      <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
-                        <Typography variant="body2" color="error">
-                          {error}
-                        </Typography>
-                        <Button
-                          size="small"
-                          onClick={fetchAllOllas}
-                          sx={{ mt: 1, textTransform: "none" }}
-                        >
-                          Reintentar
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ) : paginatedData.length === 0 ? (
+                  ) : dataFormateados.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">
@@ -994,7 +553,7 @@ export default function OllasListaPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    paginatedData.map((row: OllaAPI, index: number) => (
+                    dataFormateados.map((row: OllaAPI, index: number) => (
                       <TableRow
                         key={row.id}
                         onClick={() => handleRowClick(row)}
@@ -1125,7 +684,7 @@ export default function OllasListaPage() {
             {/* Paginación */}
             <TablePagination
               component="div"
-              count={filteredData.length}
+              count={totalCount}
               page={page}
               onPageChange={handleChangePage}
               rowsPerPage={rowsPerPage}

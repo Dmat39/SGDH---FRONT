@@ -34,11 +34,13 @@ import {
 } from "@mui/material";
 import {
   Search,
-  RestaurantMenu,
+  Person,
   FilterList,
   FileDownload,
   Close,
   Visibility,
+  Edit,
+  Delete,
   Cake,
 } from "@mui/icons-material";
 import * as XLSX from "xlsx";
@@ -69,42 +71,31 @@ const formatearFecha = (fecha: string | null | undefined): string => {
   return `${dia}/${mes}/${anio}`;
 };
 
-const MESES = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
-];
+const formatearSexo = (sex: string | null | undefined): string => {
+  if (!sex) return "-";
+  if (sex === "MALE") return "Masculino";
+  if (sex === "FEMALE") return "Femenino";
+  return sex;
+};
 
-const TRADUCCIONES_SEXO: Record<string, string> = { MALE: "Masculino", FEMALE: "Femenino" };
-const TRADUCCIONES_SOCIAL: Record<string, string> = { PARTNER: "Socio", BENEFICIARY: "Beneficiario" };
-
-interface RecipientBackend {
+interface PresidentBackend {
   id: string;
-  doc_num: string;
-  doc_type: string;
-  lastname: string;
   name: string;
-  address: string | null;
-  phone: string | null;
-  pregnant: boolean;
-  disabled: boolean;
-  assignee_doc_num: string | null;
-  assignee_lastname: string | null;
-  assignee_name: string | null;
+  lastname: string;
+  dni: string;
+  phone: string;
   birthday: string | null;
-  registered_at: string | null;
+  sex: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
-  center_id: string;
-  modality: string;
-  sex: string;
-  social: string;
+  centers: { modality: string }[];
 }
 
 interface BackendResponse {
   message: string;
   data: {
-    data: RecipientBackend[];
+    data: PresidentBackend[];
     currentPage: number;
     pageCount: number;
     totalCount: number;
@@ -112,70 +103,64 @@ interface BackendResponse {
   };
 }
 
-interface BeneficiarioFrontend {
+interface PresidenteFrontend {
   id: string;
   nombreCompleto: string;
+  nombre: string;
+  apellido: string;
   dni: string;
-  tipoDoc: string;
   telefono: string;
-  direccion: string;
+  sexo: string | null;
   fechaNacimiento: string | null;
-  sexo: string;
-  social: string;
-  gestante: boolean;
-  discapacitado: boolean;
-  apoderadoDni: string;
-  apoderadoNombre: string;
-  fechaRegistro: string | null;
   fechaCreacion: string;
 }
 
-const mapBackendToFrontend = (item: RecipientBackend): BeneficiarioFrontend => ({
+const mapBackendToFrontend = (item: PresidentBackend): PresidenteFrontend => ({
   id: item.id,
-  nombreCompleto: `${item.name} ${item.lastname}`.trim(),
-  dni: item.doc_num || "-",
-  tipoDoc: item.doc_type || "DNI",
+  nombreCompleto: `${item.name} ${item.lastname}`,
+  nombre: item.name,
+  apellido: item.lastname,
+  dni: item.dni,
   telefono: item.phone || "-",
-  direccion: item.address || "-",
+  sexo: item.sex,
   fechaNacimiento: item.birthday,
-  sexo: TRADUCCIONES_SEXO[item.sex] || item.sex || "-",
-  social: TRADUCCIONES_SOCIAL[item.social] || item.social || "-",
-  gestante: item.pregnant,
-  discapacitado: item.disabled,
-  apoderadoDni: item.assignee_doc_num || "-",
-  apoderadoNombre: item.assignee_name && item.assignee_lastname
-    ? `${item.assignee_name} ${item.assignee_lastname}`.trim()
-    : "-",
-  fechaRegistro: item.registered_at,
   fechaCreacion: item.created_at,
 });
 
 type FilterType = "edad" | "cumpleanos";
 type CumpleanosModo = "mes" | "dia";
 
-export default function ComedoresBeneficiariosPage() {
+const MESES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+];
+
+export default function OllasPresidentesPage() {
   const { getData } = useFetch();
 
-  const [data, setData] = useState<BeneficiarioFrontend[]>([]);
+  const [data, setData] = useState<PresidenteFrontend[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Paginación server-side
+  // Paginacion server-side
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [fetchKey, setFetchKey] = useState(0);
 
+  // Filtros
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("edad");
-  const [edadRange, setEdadRange] = useState<number[]>([0, 110]);
+  const [edadRange, setEdadRange] = useState<number[]>([0, 100]);
   const [mesesCumpleanos, setMesesCumpleanos] = useState<number[]>([]);
   const [cumpleanosModo, setCumpleanosModo] = useState<CumpleanosModo>("mes");
   const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
-  const [selectedBeneficiario, setSelectedBeneficiario] = useState<BeneficiarioFrontend | null>(null);
+
+  // Detalle
+  const [selectedPresidente, setSelectedPresidente] = useState<PresidenteFrontend | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
-  // Cargar datos con paginación server-side
+  // Cargar datos con paginacion server-side
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -183,31 +168,31 @@ export default function ComedoresBeneficiariosPage() {
         const params = new URLSearchParams();
         params.set("page", String(page + 1));
         params.set("limit", String(rowsPerPage));
-        params.set("modality", "EATER");
+        params.set("modality", "CPOT");
 
         if (searchTerm.trim()) {
           params.set("search", searchTerm.trim());
         }
 
-        if (edadRange[0] > 0 || edadRange[1] < 110) {
+        if (edadRange[0] > 0 || edadRange[1] < 100) {
           params.set("age_min", String(edadRange[0]));
           params.set("age_max", String(edadRange[1]));
         }
 
         if (cumpleanosModo === "mes" && mesesCumpleanos.length > 0) {
-          params.set("birthday_month", mesesCumpleanos.map((m) => m + 1).join(","));
+          params.set("month", mesesCumpleanos.map((m) => m + 1).join(","));
         } else if (cumpleanosModo === "dia" && diaCumpleanos) {
           const parts = diaCumpleanos.split("-");
-          params.set("birthday_day", `${parts[1]}-${parts[2]}`);
+          params.set("birthday", `${parts[1]}-${parts[2]}`);
         }
 
-        const response = await getData<BackendResponse>(`pca/recipient?${params.toString()}`);
+        const response = await getData<BackendResponse>(`pca/president?${params.toString()}`);
         if (response?.data) {
           setData(response.data.data.map(mapBackendToFrontend));
           setTotalCount(response.data.totalCount);
         }
       } catch (error) {
-        console.error("Error fetching beneficiarios comedores:", error);
+        console.error("Error fetching presidentes:", error);
         setData([]);
         setTotalCount(0);
       } finally {
@@ -226,54 +211,92 @@ export default function ComedoresBeneficiariosPage() {
   const handleMesToggle = (mes: number) => setMesesCumpleanos((prev) => prev.includes(mes) ? prev.filter((m) => m !== mes) : [...prev, mes]);
 
   const filterOpen = Boolean(filterAnchor);
-  const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 110;
+  const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 100;
   const isCumpleanosFiltered = cumpleanosModo === "mes" ? mesesCumpleanos.length > 0 : diaCumpleanos !== "";
 
   const handleChangePage = (_event: unknown, newPage: number) => setPage(newPage);
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => { setRowsPerPage(parseInt(event.target.value, 10)); setPage(0); };
-  const handleRowClick = (b: BeneficiarioFrontend) => { setSelectedBeneficiario(b); setDetailOpen(true); };
-  const handleDetailClose = () => { setDetailOpen(false); setSelectedBeneficiario(null); };
+  const handleRowClick = (presidente: PresidenteFrontend) => { setSelectedPresidente(presidente); setDetailOpen(true); };
+  const handleDetailClose = () => { setDetailOpen(false); setSelectedPresidente(null); };
 
   const dataFormateados = useFormatTableData(data);
 
   const handleExport = () => {
-    const exportData = dataFormateados.map((c: BeneficiarioFrontend) => ({
-      "Nombre Completo": c.nombreCompleto, DNI: c.dni, "Teléfono": c.telefono, "Dirección": c.direccion,
-      "Fecha Nacimiento": formatearFecha(c.fechaNacimiento), Edad: c.fechaNacimiento ? calcularEdad(c.fechaNacimiento) : "-",
-      Sexo: c.sexo, Condición: c.social, Gestante: c.gestante ? "Sí" : "No", Discapacitado: c.discapacitado ? "Sí" : "No",
-      "Fecha Registro": formatearFecha(c.fechaRegistro),
+    const exportData = dataFormateados.map((c: PresidenteFrontend) => ({
+      "Nombre Completo": c.nombreCompleto,
+      DNI: c.dni,
+      "Telefono": c.telefono,
+      Sexo: formatearSexo(c.sexo),
+      "Fecha Nacimiento": formatearFecha(c.fechaNacimiento),
+      Edad: calcularEdad(c.fechaNacimiento),
+      "Fecha Registro": formatearFecha(c.fechaCreacion),
     }));
     if (exportData.length === 0) return;
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Beneficiarios Comedores");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Presidentes Ollas");
     worksheet["!cols"] = Object.keys(exportData[0]).map(() => ({ wch: 20 }));
-    XLSX.writeFile(workbook, `beneficiarios_comedores_${new Date().toISOString().split("T")[0]}.xlsx`);
+    XLSX.writeFile(workbook, `presidentes_ollas_comunes_${new Date().toISOString().split("T")[0]}.xlsx`);
   };
 
   return (
     <Box>
+      {/* Encabezado */}
       <Box mb={4}>
         <Box display="flex" alignItems="center" gap={2} mb={1}>
-          <Box sx={{ background: `linear-gradient(135deg, ${subgerencia.color}15 0%, ${subgerencia.color}30 100%)`, color: subgerencia.color, width: 48, height: 48, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "12px", boxShadow: `0 4px 12px ${subgerencia.color}25` }}>
-            <RestaurantMenu sx={{ fontSize: 28 }} />
+          <Box
+            sx={{
+              background: `linear-gradient(135deg, ${subgerencia.color}15 0%, ${subgerencia.color}30 100%)`,
+              color: subgerencia.color,
+              width: 48,
+              height: 48,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "12px",
+              boxShadow: `0 4px 12px ${subgerencia.color}25`,
+            }}
+          >
+            <Person sx={{ fontSize: 28 }} />
           </Box>
           <Typography variant="h4" fontWeight="bold" sx={{ color: subgerencia.color }}>
-            Comedores Populares - Beneficiarios
+            Ollas Comunes - Presidentes
           </Typography>
         </Box>
         <Typography variant="body1" color="text.secondary" sx={{ ml: 7.5 }}>
-          Listado de beneficiarios de Comedores Populares
+          Listado de presidentes de Ollas Comunes
         </Typography>
       </Box>
 
+      {/* Tarjeta principal */}
       <Box sx={{ position: "relative" }}>
         <Card sx={{ borderRadius: "16px", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)", position: "relative", zIndex: 1, overflow: "hidden" }}>
           <CardContent sx={{ p: 3 }}>
+            {/* Buscador y Filtros */}
             <Box mb={3} display="flex" gap={1.5} alignItems="center" flexWrap="wrap">
-              <TextField placeholder="Buscar por nombre, DNI, dirección..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
-                slotProps={{ input: { startAdornment: (<InputAdornment position="start"><Search sx={{ color: "#64748b", fontSize: 20 }} /></InputAdornment>) } }}
-                size="small" sx={{ width: 320, "& .MuiOutlinedInput-root": { borderRadius: "8px", backgroundColor: "#f8fafc", "&:hover fieldset": { borderColor: "#64748b" }, "&.Mui-focused fieldset": { borderColor: "#475569" } } }}
+              <TextField
+                placeholder="Buscar por nombre, apellido, DNI..."
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Search sx={{ color: "#64748b", fontSize: 20 }} />
+                      </InputAdornment>
+                    ),
+                  },
+                }}
+                size="small"
+                sx={{
+                  width: 320,
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "8px",
+                    backgroundColor: "#f8fafc",
+                    "&:hover fieldset": { borderColor: "#64748b" },
+                    "&.Mui-focused fieldset": { borderColor: "#475569" },
+                  },
+                }}
               />
               <Tooltip title="Filtros">
                 <IconButton onClick={handleFilterClick} sx={{ backgroundColor: filterOpen ? "#e2e8f0" : "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", "&:hover": { backgroundColor: "#e2e8f0" } }}>
@@ -288,23 +311,30 @@ export default function ComedoresBeneficiariosPage() {
               {isEdadFiltered && (
                 <Box sx={{ backgroundColor: "#dbeafe", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
                   <Typography variant="caption" color="#1e40af">Edad: {edadRange[0]} - {edadRange[1]} años</Typography>
-                  <IconButton size="small" onClick={() => { setEdadRange([0, 110]); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}><Close sx={{ fontSize: 14, color: "#1e40af" }} /></IconButton>
+                  <IconButton size="small" onClick={() => { setEdadRange([0, 100]); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                    <Close sx={{ fontSize: 14, color: "#1e40af" }} />
+                  </IconButton>
                 </Box>
               )}
               {isCumpleanosFiltered && (
                 <Box sx={{ backgroundColor: "#fce7f3", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
                   <Cake sx={{ fontSize: 14, color: "#be185d" }} />
                   <Typography variant="caption" color="#be185d">
-                    {cumpleanosModo === "mes" ? mesesCumpleanos.map((m) => MESES[m].slice(0, 3)).join(", ") : diaCumpleanos.split("-").slice(1).reverse().join("/")}
+                    {cumpleanosModo === "mes"
+                      ? mesesCumpleanos.map((m) => MESES[m].slice(0, 3)).join(", ")
+                      : diaCumpleanos.split("-").slice(1).reverse().join("/")}
                   </Typography>
-                  <IconButton size="small" onClick={() => { setMesesCumpleanos([]); setDiaCumpleanos(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}><Close sx={{ fontSize: 14, color: "#be185d" }} /></IconButton>
+                  <IconButton size="small" onClick={() => { setMesesCumpleanos([]); setDiaCumpleanos(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                    <Close sx={{ fontSize: 14, color: "#be185d" }} />
+                  </IconButton>
                 </Box>
               )}
               <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
-                {totalCount.toLocaleString()} beneficiario(s)
+                {totalCount.toLocaleString()} presidente(s)
               </Typography>
             </Box>
 
+            {/* Popover de filtro */}
             <Popover open={filterOpen} anchorEl={filterAnchor} onClose={handleFilterClose} anchorOrigin={{ vertical: "bottom", horizontal: "left" }} transformOrigin={{ vertical: "top", horizontal: "left" }} sx={{ mt: 1 }}>
               <Box sx={{ p: 2.5, width: 320 }}>
                 <Typography variant="subtitle2" fontWeight={600} color="#334155" mb={1.5}>Tipo de filtro</Typography>
@@ -313,23 +343,26 @@ export default function ComedoresBeneficiariosPage() {
                   <ToggleButton value="cumpleanos" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#fce7f3", color: "#be185d", "&:hover": { backgroundColor: "#fbcfe8" } } }}>Cumpleaños</ToggleButton>
                 </ToggleButtonGroup>
                 <Divider sx={{ mb: 2 }} />
+
                 {filterType === "edad" && (
                   <>
-                    <Typography variant="body2" color="#475569" mb={1.5}>Rango de edad</Typography>
-                    <Slider value={edadRange} onChange={handleEdadChange} valueLabelDisplay="auto" min={0} max={110} sx={{ color: "#3b82f6", "& .MuiSlider-thumb": { backgroundColor: "#1e40af" }, "& .MuiSlider-track": { backgroundColor: "#3b82f6" } }} />
+                    <Typography variant="body2" color="#475569" mb={1.5}>Edad del presidente</Typography>
+                    <Slider value={edadRange} onChange={handleEdadChange} valueLabelDisplay="auto" min={0} max={100} sx={{ color: "#3b82f6", "& .MuiSlider-thumb": { backgroundColor: "#1e40af" }, "& .MuiSlider-track": { backgroundColor: "#3b82f6" } }} />
                     <Box display="flex" justifyContent="space-between" mt={1}>
                       <Typography variant="caption" color="text.secondary">{edadRange[0]} años</Typography>
                       <Typography variant="caption" color="text.secondary">{edadRange[1]} años</Typography>
                     </Box>
                   </>
                 )}
+
                 {filterType === "cumpleanos" && (
                   <>
-                    <Typography variant="body2" color="#475569" mb={1.5}>Cumpleaños del beneficiario</Typography>
+                    <Typography variant="body2" color="#475569" mb={1.5}>Cumpleaños del presidente</Typography>
                     <ToggleButtonGroup value={cumpleanosModo} exclusive onChange={(_, v) => v && setCumpleanosModo(v)} size="small" fullWidth sx={{ mb: 2 }}>
                       <ToggleButton value="mes" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fce7f3", color: "#be185d", "&:hover": { backgroundColor: "#fbcfe8" } } }}>Por mes</ToggleButton>
                       <ToggleButton value="dia" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fce7f3", color: "#be185d", "&:hover": { backgroundColor: "#fbcfe8" } } }}>Día específico</ToggleButton>
                     </ToggleButtonGroup>
+
                     {cumpleanosModo === "mes" ? (
                       <>
                         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0.75 }}>
@@ -348,13 +381,15 @@ export default function ComedoresBeneficiariosPage() {
                     )}
                   </>
                 )}
+
                 <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
-                  <Button size="small" onClick={() => { setEdadRange([0, 110]); setMesesCumpleanos([]); setCumpleanosModo("mes"); setDiaCumpleanos(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ color: "#64748b", textTransform: "none" }}>Limpiar todo</Button>
+                  <Button size="small" onClick={() => { setEdadRange([0, 100]); setMesesCumpleanos([]); setCumpleanosModo("mes"); setDiaCumpleanos(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ color: "#64748b", textTransform: "none" }}>Limpiar todo</Button>
                   <Button size="small" variant="contained" onClick={() => { setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }} sx={{ backgroundColor: "#475569", textTransform: "none", "&:hover": { backgroundColor: "#334155" } }}>Aplicar</Button>
                 </Box>
               </Box>
             </Popover>
 
+            {/* Tabla */}
             <TableContainer component={Paper} sx={{ borderRadius: "12px", boxShadow: "none", border: "1px solid #e2e8f0", overflow: "hidden" }}>
               <Table>
                 <TableHead>
@@ -362,23 +397,32 @@ export default function ComedoresBeneficiariosPage() {
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Nombre Completo</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>DNI</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Teléfono</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Dirección</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Sexo</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Edad</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={6} align="center" sx={{ py: 4 }}><CircularProgress size={32} sx={{ color: "#64748b" }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Cargando beneficiarios...</Typography></TableCell></TableRow>
+                    <TableRow>
+                      <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                        <CircularProgress size={32} sx={{ color: "#64748b" }} />
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Cargando presidentes...</Typography>
+                      </TableCell>
+                    </TableRow>
                   ) : dataFormateados.length === 0 ? (
-                    <TableRow><TableCell colSpan={6} align="center" sx={{ py: 4 }}><Typography variant="body2" color="text.secondary">No se encontraron beneficiarios</Typography></TableCell></TableRow>
+                    <TableRow>
+                      <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                        <Typography variant="body2" color="text.secondary">No se encontraron presidentes</Typography>
+                      </TableCell>
+                    </TableRow>
                   ) : (
-                    dataFormateados.map((row: BeneficiarioFrontend, index: number) => (
+                    dataFormateados.map((row: PresidenteFrontend, index: number) => (
                       <TableRow key={row.id} onClick={() => handleRowClick(row)} sx={{ backgroundColor: index % 2 === 0 ? "white" : "#f8fafc", "&:hover": { backgroundColor: "#f1f5f9", cursor: "pointer" }, transition: "background-color 0.2s" }}>
                         <TableCell sx={{ fontWeight: 500 }}>{row.nombreCompleto}</TableCell>
                         <TableCell>{row.dni}</TableCell>
                         <TableCell>{row.telefono}</TableCell>
-                        <TableCell sx={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.direccion}</TableCell>
+                        <TableCell>{formatearSexo(row.sexo)}</TableCell>
                         <TableCell align="center">
                           {row.fechaNacimiento ? (
                             <Box display="flex" flexDirection="column" alignItems="center" gap={0.3}>
@@ -390,7 +434,21 @@ export default function ComedoresBeneficiariosPage() {
                           ) : "-"}
                         </TableCell>
                         <TableCell align="center">
-                          <Tooltip title="Ver detalles"><IconButton size="small" onClick={(e) => { e.stopPropagation(); handleRowClick(row); }} sx={{ color: "#64748b", "&:hover": { backgroundColor: "#f1f5f9" } }}><Visibility fontSize="small" /></IconButton></Tooltip>
+                          <Tooltip title="Ver detalles">
+                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleRowClick(row); }} sx={{ color: "#64748b", "&:hover": { backgroundColor: "#f1f5f9" } }}>
+                              <Visibility fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Editar">
+                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); }} sx={{ color: "#0891b2", "&:hover": { backgroundColor: "rgba(8, 145, 178, 0.1)" } }}>
+                              <Edit fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Eliminar">
+                            <IconButton size="small" onClick={(e) => { e.stopPropagation(); }} sx={{ color: "#dc2626", "&:hover": { backgroundColor: "rgba(220, 38, 38, 0.1)" } }}>
+                              <Delete fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                         </TableCell>
                       </TableRow>
                     ))
@@ -399,57 +457,72 @@ export default function ComedoresBeneficiariosPage() {
               </Table>
             </TableContainer>
 
-            <TablePagination component="div" count={totalCount} page={page} onPageChange={handleChangePage} rowsPerPage={rowsPerPage} onRowsPerPageChange={handleChangeRowsPerPage}
-              rowsPerPageOptions={[10, 25, 50, 100]} labelRowsPerPage="Filas por página:" labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`}
-              sx={{ borderTop: "1px solid #e2e8f0", mt: 2, "& .MuiTablePagination-selectIcon": { color: "#64748b" } }} />
+            {/* Paginacion */}
+            <TablePagination
+              component="div"
+              count={totalCount}
+              page={page}
+              onPageChange={handleChangePage}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+              rowsPerPageOptions={[10, 25, 50, 100]}
+              labelRowsPerPage="Filas por página:"
+              labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`}
+              sx={{ borderTop: "1px solid #e2e8f0", mt: 2, "& .MuiTablePagination-selectIcon": { color: "#64748b" } }}
+            />
           </CardContent>
         </Card>
       </Box>
 
+      {/* Dialog de detalles */}
       <Dialog open={detailOpen} onClose={handleDetailClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "16px" } }}>
         <DialogTitle sx={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <Box display="flex" alignItems="center" gap={1.5}>
-            <RestaurantMenu sx={{ color: "#475569" }} />
-            <Typography variant="h6" fontWeight={600} color="#334155">Detalle del Beneficiario</Typography>
+            <Person sx={{ color: "#475569" }} />
+            <Typography variant="h6" fontWeight={600} color="#334155">Detalles del Presidente</Typography>
           </Box>
           <IconButton onClick={handleDetailClose} size="small"><Close /></IconButton>
         </DialogTitle>
         <DialogContent sx={{ p: 3, mt: 1 }}>
-          {selectedBeneficiario && (
-            <Grid container spacing={2}>
-              <Grid size={12}><Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom>Datos Personales</Typography><Divider sx={{ mb: 1 }} /></Grid>
-              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="caption" color="text.secondary">Nombre Completo</Typography><Typography variant="body2" fontWeight={500}>{selectedBeneficiario.nombreCompleto}</Typography></Grid>
-              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="caption" color="text.secondary">{selectedBeneficiario.tipoDoc}</Typography><Typography variant="body2" fontWeight={500}>{selectedBeneficiario.dni}</Typography></Grid>
-              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="caption" color="text.secondary">Teléfono</Typography><Typography variant="body2" fontWeight={500}>{selectedBeneficiario.telefono}</Typography></Grid>
-              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="caption" color="text.secondary">Sexo</Typography><Typography variant="body2" fontWeight={500}>{selectedBeneficiario.sexo}</Typography></Grid>
+          {selectedPresidente && (
+            <Grid container spacing={3}>
+              <Grid size={12}>
+                <Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom>Información Personal</Typography>
+                <Divider sx={{ mb: 2 }} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography variant="caption" color="text.secondary">Nombre Completo</Typography>
+                <Typography variant="body2" fontWeight={500}>{selectedPresidente.nombreCompleto}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography variant="caption" color="text.secondary">DNI</Typography>
+                <Typography variant="body2" fontWeight={500}>{selectedPresidente.dni}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography variant="caption" color="text.secondary">Teléfono</Typography>
+                <Typography variant="body2" fontWeight={500}>{selectedPresidente.telefono}</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography variant="caption" color="text.secondary">Sexo</Typography>
+                <Typography variant="body2" fontWeight={500}>{formatearSexo(selectedPresidente.sexo)}</Typography>
+              </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <Typography variant="caption" color="text.secondary">Fecha de Nacimiento</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedBeneficiario.fechaNacimiento ? `${formatearFecha(selectedBeneficiario.fechaNacimiento)} (${calcularEdad(selectedBeneficiario.fechaNacimiento)} años)` : "-"}</Typography>
-              </Grid>
-              <Grid size={12}><Typography variant="caption" color="text.secondary">Dirección</Typography><Typography variant="body2" fontWeight={500}>{selectedBeneficiario.direccion}</Typography></Grid>
-
-              <Grid size={12}><Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom sx={{ mt: 2 }}>Condición</Typography><Divider sx={{ mb: 1 }} /></Grid>
-              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="caption" color="text.secondary">Tipo</Typography><Typography variant="body2" fontWeight={500}>{selectedBeneficiario.social}</Typography></Grid>
-              <Grid size={{ xs: 12, sm: 3 }}>
-                <Typography variant="caption" color="text.secondary">Gestante</Typography>
-                <Box mt={0.5}><Chip label={selectedBeneficiario.gestante ? "Sí" : "No"} size="small" sx={{ backgroundColor: selectedBeneficiario.gestante ? "#dcfce7" : "#f1f5f9", color: selectedBeneficiario.gestante ? "#166534" : "#475569", fontWeight: 600 }} /></Box>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 3 }}>
-                <Typography variant="caption" color="text.secondary">Discapacitado</Typography>
-                <Box mt={0.5}><Chip label={selectedBeneficiario.discapacitado ? "Sí" : "No"} size="small" sx={{ backgroundColor: selectedBeneficiario.discapacitado ? "#dbeafe" : "#f1f5f9", color: selectedBeneficiario.discapacitado ? "#1e40af" : "#475569", fontWeight: 600 }} /></Box>
+                <Typography variant="body2" fontWeight={500}>
+                  {selectedPresidente.fechaNacimiento
+                    ? `${formatearFecha(selectedPresidente.fechaNacimiento)} (${calcularEdad(selectedPresidente.fechaNacimiento)} años)`
+                    : "-"}
+                </Typography>
               </Grid>
 
-              {selectedBeneficiario.apoderadoDni !== "-" && (
-                <>
-                  <Grid size={12}><Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom sx={{ mt: 2 }}>Apoderado</Typography><Divider sx={{ mb: 1 }} /></Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}><Typography variant="caption" color="text.secondary">Nombre</Typography><Typography variant="body2" fontWeight={500}>{selectedBeneficiario.apoderadoNombre}</Typography></Grid>
-                  <Grid size={{ xs: 12, sm: 6 }}><Typography variant="caption" color="text.secondary">DNI</Typography><Typography variant="body2" fontWeight={500}>{selectedBeneficiario.apoderadoDni}</Typography></Grid>
-                </>
-              )}
-
-              <Grid size={12}><Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom sx={{ mt: 2 }}>Registro</Typography><Divider sx={{ mb: 1 }} /></Grid>
-              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="caption" color="text.secondary">Fecha de Registro</Typography><Typography variant="body2" fontWeight={500}>{formatearFecha(selectedBeneficiario.fechaRegistro)}</Typography></Grid>
-              <Grid size={{ xs: 12, sm: 6 }}><Typography variant="caption" color="text.secondary">Fecha de Creación</Typography><Typography variant="body2" fontWeight={500}>{formatearFecha(selectedBeneficiario.fechaCreacion)}</Typography></Grid>
+              <Grid size={12}>
+                <Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom sx={{ mt: 2 }}>Registro</Typography>
+                <Divider sx={{ mb: 2 }} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography variant="caption" color="text.secondary">Fecha de Registro</Typography>
+                <Typography variant="body2" fontWeight={500}>{formatearFecha(selectedPresidente.fechaCreacion)}</Typography>
+              </Grid>
             </Grid>
           )}
         </DialogContent>
