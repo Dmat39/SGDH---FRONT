@@ -47,6 +47,7 @@ const MODULOS_FIJOS = [
   { name: "ULE", color: "#d81b7e" },
   { name: "PVL", color: "#4caf50" },
   { name: "CIAM", color: "#ff9800" },
+  { name: "OMAPED", color: "#e53935" },
   { name: "Ollas Comunes", color: "#2196f3" },
   { name: "Comedores Populares", color: "#9c27b0" },
 ];
