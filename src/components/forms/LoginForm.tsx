@@ -130,11 +130,16 @@ export default function LoginForm({ subgerencia, color, subgerenciaName }: Login
 
             showSuccess("Bienvenido", `Hola ${demoUser.fullName}`);
 
+            // Ruta por defecto según subgerencia
+            const defaultRoute = subgerencia === "servicios-sociales"
+              ? `/${subgerencia}/servicios-deporte/participantes`
+              : `/${subgerencia}/lista-general`;
+
             // Redirigir según permisos del usuario
             if (demoUser.permissions.includes("all") || demoUser.permissions.includes("all_programas_sociales")) {
-              router.push(`/${subgerencia}`);
+              router.push(defaultRoute);
             } else if (demoUser.permissions.includes("all_servicios_sociales") || demoUser.permissions.includes("ule")) {
-              router.push(`/${subgerencia}/lista-general`);
+              router.push(defaultRoute);
             } else if (demoUser.permissions.includes("pvl")) {
               router.push(`/${subgerencia}/pvl`);
             } else if (demoUser.permissions.includes("pantbc")) {
@@ -148,7 +153,7 @@ export default function LoginForm({ subgerencia, color, subgerenciaName }: Login
             } else if (demoUser.permissions.includes("ciam")) {
               router.push(`/${subgerencia}/ciam`);
             } else {
-              router.push(`/${subgerencia}`);
+              router.push(defaultRoute);
             }
             return;
           } else {
@@ -178,7 +183,10 @@ export default function LoginForm({ subgerencia, color, subgerenciaName }: Login
         showSuccess("Bienvenido", `Hola ${response.user.fullName}`);
 
         // Redirigir al dashboard de la subgerencia
-        router.push(`/${subgerencia}`);
+        const defaultRoute = subgerencia === "servicios-sociales"
+          ? `/${subgerencia}/servicios-deporte/participantes`
+          : `/${subgerencia}/lista-general`;
+        router.push(defaultRoute);
       } catch (error: any) {
         console.error("Error en login:", error);
         showError(

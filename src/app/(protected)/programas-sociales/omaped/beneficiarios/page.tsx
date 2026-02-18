@@ -299,6 +299,7 @@ export default function OMAPEDBeneficiariosPage() {
 
   // Estados para búsqueda y filtros
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("edad");
   const [edadRange, setEdadRange] = useState<number[]>([0, 110]);
   const [mesSeleccionado, setMesSeleccionado] = useState<number | null>(null);
@@ -311,6 +312,15 @@ export default function OMAPEDBeneficiariosPage() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // Debounce de búsqueda (500ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(0);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   // Cargar datos con paginación y filtros server-side
   useEffect(() => {
     const fetchData = async () => {
@@ -319,6 +329,10 @@ export default function OMAPEDBeneficiariosPage() {
         const params = new URLSearchParams();
         params.set("page", String(page + 1));
         params.set("limit", String(rowsPerPage));
+
+        if (debouncedSearch.trim()) {
+          params.set("search", debouncedSearch.trim());
+        }
 
         // Filtro de edad (server-side)
         if (edadRange[0] > 0 || edadRange[1] < 110) {
@@ -353,7 +367,7 @@ export default function OMAPEDBeneficiariosPage() {
 
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, rowsPerPage, fetchKey, getData]);
+  }, [page, rowsPerPage, fetchKey, debouncedSearch, getData]);
 
   // Handlers de filtros
   const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -410,16 +424,8 @@ export default function OMAPEDBeneficiariosPage() {
   // Formatear strings del backend (Title Case)
   const dataFormateados = useFormatTableData(data);
 
-  // Filtrado client-side (solo búsqueda - edad/cumpleaños se filtran en el servidor)
-  const filteredData = dataFormateados.filter((row: BeneficiarioTabla) => {
-    if (!searchTerm) return true;
-    const term = searchTerm.toLowerCase();
-    return (
-      row.nombreCompleto.toLowerCase().includes(term) ||
-      row.docNum.includes(searchTerm) ||
-      row.telefono.includes(searchTerm)
-    );
-  });
+  // La búsqueda es server-side; se usa dataFormateados directamente
+  const filteredData = dataFormateados;
 
   // Exportar a Excel
   const handleExport = () => {
@@ -452,6 +458,8 @@ export default function OMAPEDBeneficiariosPage() {
 
   // Limpiar filtros
   const limpiarFiltros = () => {
+    setSearchTerm("");
+    setDebouncedSearch("");
     setEdadRange([0, 110]);
     setMesSeleccionado(null);
     setCumpleanosModo("mes");

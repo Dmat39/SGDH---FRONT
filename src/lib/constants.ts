@@ -166,7 +166,6 @@ export const MODULOS_PROGRAMAS_SOCIALES: MenuItem[] = [
         icono: "SpaceDashboard",
         permisos: ["pvl", "all_programas_sociales", "all"],
       },
-      /*
       {
         id: "pvl-beneficiarios",
         nombre: "Beneficiarios",
@@ -174,7 +173,6 @@ export const MODULOS_PROGRAMAS_SOCIALES: MenuItem[] = [
         icono: "Diversity1",
         permisos: ["pvl", "all_programas_sociales", "all"],
       },
-      */
       {
         id: "pvl-comites",
         nombre: "Comités",
@@ -218,13 +216,6 @@ export const MODULOS_PROGRAMAS_SOCIALES: MenuItem[] = [
         ruta: "/programas-sociales/pantbc/beneficiarios",
         icono: "People",
         permisos: ["pantbc", "all_programas_sociales", "all"],
-      },
-      {
-        id: "pantbc-mapa",
-        nombre: "Mapa",
-        ruta: "/programas-sociales/pantbc/mapa",
-        icono: "Map",
-        permisos: ["pantbc", "mapa_pantbc", "all_programas_sociales", "all"],
       },
     ],
   },
@@ -432,9 +423,9 @@ export const MODULOS_SERVICIOS_SOCIALES: MenuItem[] = [
   },
   {
     id: "servicios-deporte",
-    nombre: "Servicios de Deporte",
+    nombre: "Cultura y Deporte",
     icono: "SportsScore",
-    descripcion: "Gestión de actividades deportivas y recreativas",
+    descripcion: "Gestión de actividades culturales, deportivas y recreativas",
     permisos: ["servicios_deporte", "all_servicios_sociales", "all"],
     children: [
       {
@@ -445,18 +436,11 @@ export const MODULOS_SERVICIOS_SOCIALES: MenuItem[] = [
         permisos: ["servicios_deporte", "all_servicios_sociales", "all"],
       },
       {
-        id: "deportes-actividades",
-        nombre: "Actividades",
-        ruta: "/servicios-sociales/servicios-deporte/actividades",
-        icono: "List",
+        id: "deportes-participantes",
+        nombre: "Participantes",
+        ruta: "/servicios-sociales/servicios-deporte/participantes",
+        icono: "People",
         permisos: ["servicios_deporte", "all_servicios_sociales", "all"],
-      },
-      {
-        id: "deportes-mapa",
-        nombre: "Mapa",
-        ruta: "/servicios-sociales/servicios-deporte/mapa",
-        icono: "Map",
-        permisos: ["servicios_deporte", "mapa_deportes", "all_servicios_sociales", "all"],
       },
     ],
   },
