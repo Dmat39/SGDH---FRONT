@@ -10,83 +10,65 @@ import {
   CircularProgress,
   Skeleton,
 } from "@mui/material";
-import { People, Male, Female, LocalHospital } from "@mui/icons-material";
+import { People, SportsScore, ChildCare, Person } from "@mui/icons-material";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
 
-const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
-const PANTBC_COLOR = subgerencia.color;
+const subgerencia = SUBGERENCIAS[SubgerenciaType.SERVICIOS_SOCIALES];
+const MODULE_COLOR = subgerencia.color; // #00a3a8
 
 // ============================================
-// TRADUCCIONES
+// TALLERES
 // ============================================
-const TRADUCCIONES: Record<string, Record<string, string>> = {
-  sex: { MALE: "Masculino", FEMALE: "Femenino" },
-  patient_type: {
-    NEW: "Nuevo",
-    RELAPSE: "Recaída",
-    TREATMENT_AFTER_FAILURE: "Fracaso de Tto.",
-    TREATMENT_AFTER_LOSS: "Abandono recuperado",
-    OTHER: "Otro",
-  },
-};
+const TALLERES = [
+  { id: "8d36a33e-65e7-48bd-b513-978ad63b237a", name: "Ballet",         color: "#00897b" },
+  { id: "56949f0f-9bd6-4b9f-aae0-e4abc00ab0b8", name: "Dibujo y Pintura", color: "#1e88e5" },
+  { id: "6ffa2818-ac6a-4d59-8897-6b7425cac2d1", name: "Futbol",          color: "#8e24aa" },
+  { id: "140bf549-1e37-431e-8372-3df0fe867903", name: "Taekwondo",       color: "#f4511e" },
+];
 
-const traducir = (cat: string, val: string | null | undefined): string =>
-  val ? (TRADUCCIONES[cat]?.[val] ?? val) : "-";
+const TALLER_MAP = Object.fromEntries(TALLERES.map((t) => [t.id, t]));
+
+// ============================================
+// RANGOS DE EDAD
+// ============================================
+const AGE_RANGES = [
+  { label: "0-11",  min: 0,   max: 11,  color: "#38bdf8" },
+  { label: "12-17", min: 12,  max: 17,  color: "#34d399" },
+  { label: "18-29", min: 18,  max: 29,  color: "#fbbf24" },
+  { label: "30-44", min: 30,  max: 44,  color: "#fb923c" },
+  { label: "45-59", min: 45,  max: 59,  color: "#f87171" },
+  { label: "60+",   min: 60,  max: 200, color: "#c084fc" },
+];
 
 // ============================================
 // INTERFACES
 // ============================================
-interface CensusEntity {
+interface WorkshopEntity {
   id: string;
   name: string;
 }
 
-interface PacienteBackend {
+interface ParticipanteBackend {
   id: string;
-  doc_num: string;
+  dni: string;
   name: string;
   lastname: string;
   phone: string | null;
-  start_at: string;
   birthday: string;
-  doc_type: string;
-  patient_type: string;
-  sector: string | null;
-  sex: string;
-  census: CensusEntity | null;
+  workshop: WorkshopEntity | null;
 }
 
 interface BackendResponse {
   message: string;
   data: {
-    data: PacienteBackend[];
+    data: ParticipanteBackend[];
     totalCount: number;
     currentPage: number;
     pageCount: number;
     totalPages: number;
   };
 }
-
-// ============================================
-// COLORES
-// ============================================
-const TIPO_COLORS: Record<string, string> = {
-  Nuevo: "#d81b7e",
-  Recaída: "#ff9800",
-  "Fracaso de Tto.": "#f44336",
-  "Abandono recuperado": "#4caf50",
-  Otro: "#9c27b0",
-  "-": "#94a3b8",
-};
-
-const AGE_RANGES = [
-  { label: "0-17", min: 0, max: 17, color: "#38bdf8" },
-  { label: "18-29", min: 18, max: 29, color: "#34d399" },
-  { label: "30-44", min: 30, max: 44, color: "#fbbf24" },
-  { label: "45-59", min: 45, max: 59, color: "#fb923c" },
-  { label: "60+", min: 60, max: 200, color: "#f87171" },
-];
 
 // ============================================
 // UTILIDADES
@@ -124,24 +106,26 @@ const generateDonutSegment = (
 // ============================================
 // COMPONENTE PRINCIPAL
 // ============================================
-export default function PANTBCDashboardPage() {
+export default function CulturaDeporteDashboardPage() {
   const { getData } = useFetch();
   const [isLoading, setIsLoading] = useState(true);
-  const [pacientes, setPacientes] = useState<PacienteBackend[]>([]);
+  const [participantes, setParticipantes] = useState<ParticipanteBackend[]>([]);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const first = await getData<BackendResponse>("pantbc/patient?page=1&limit=1");
+      const first = await getData<BackendResponse>(
+        "recreation/participant?page=1&limit=1"
+      );
       const total = first?.data?.totalCount || 0;
       if (total > 0) {
         const res = await getData<BackendResponse>(
-          `pantbc/patient?page=1&limit=${total}`
+          `recreation/participant?page=1&limit=${total}`
         );
-        if (res?.data?.data) setPacientes(res.data.data);
+        if (res?.data?.data) setParticipantes(res.data.data);
       }
     } catch (e) {
-      console.error("Error cargando PANTBC:", e);
+      console.error("Error cargando Cultura y Deporte:", e);
     } finally {
       setIsLoading(false);
     }
@@ -152,90 +136,81 @@ export default function PANTBCDashboardPage() {
   }, [fetchData]);
 
   // === ESTADÍSTICAS ===
-  const total = pacientes.length;
-  const masculinos = pacientes.filter((p) => p.sex === "MALE").length;
-  const femeninos = pacientes.filter((p) => p.sex === "FEMALE").length;
-  const establecimientos = new Set(
-    pacientes.map((p) => p.census?.name).filter(Boolean)
+  const total = participantes.length;
+  const menores = participantes.filter((p) => calcularEdad(p.birthday) < 18).length;
+  const adultos = participantes.filter((p) => calcularEdad(p.birthday) >= 18).length;
+  const talleresActivos = new Set(
+    participantes.map((p) => p.workshop?.id).filter(Boolean)
   ).size;
 
   const stats = [
     {
-      title: "Total Pacientes",
+      title: "Total Participantes",
       value: total.toLocaleString(),
       icon: <People sx={{ fontSize: 32 }} />,
-      color: PANTBC_COLOR,
+      color: MODULE_COLOR,
     },
     {
-      title: "Masculino",
-      value: masculinos.toLocaleString(),
-      icon: <Male sx={{ fontSize: 32 }} />,
+      title: "Talleres Activos",
+      value: talleresActivos.toLocaleString(),
+      icon: <SportsScore sx={{ fontSize: 32 }} />,
+      color: "#f4511e",
+    },
+    {
+      title: "Menores (0-17)",
+      value: menores.toLocaleString(),
+      icon: <ChildCare sx={{ fontSize: 32 }} />,
       color: "#1e88e5",
     },
     {
-      title: "Femenino",
-      value: femeninos.toLocaleString(),
-      icon: <Female sx={{ fontSize: 32 }} />,
-      color: "#e91e63",
-    },
-    {
-      title: "Establecimientos",
-      value: establecimientos.toLocaleString(),
-      icon: <LocalHospital sx={{ fontSize: 32 }} />,
-      color: "#00897b",
+      title: "Adultos (18+)",
+      value: adultos.toLocaleString(),
+      icon: <Person sx={{ fontSize: 32 }} />,
+      color: "#8e24aa",
     },
   ];
 
-  // === TIPO PACIENTE DONUT ===
-  const tipoMap = new Map<string, number>();
-  pacientes.forEach((p) => {
-    const label = traducir("patient_type", p.patient_type);
-    tipoMap.set(label, (tipoMap.get(label) || 0) + 1);
+  // === DONUT - PARTICIPANTES POR TALLER ===
+  const tallerMap = new Map<string, { name: string; color: string; cantidad: number }>();
+  participantes.forEach((p) => {
+    const wid = p.workshop?.id || "sin-taller";
+    if (!tallerMap.has(wid)) {
+      const info = wid !== "sin-taller"
+        ? TALLER_MAP[wid] || { name: p.workshop?.name || "Otro", color: "#64748b" }
+        : { name: "Sin taller", color: "#94a3b8" };
+      tallerMap.set(wid, { ...info, cantidad: 0 });
+    }
+    tallerMap.get(wid)!.cantidad++;
   });
-  const tipoDistribucion = Array.from(tipoMap.entries())
-    .map(([label, cantidad]) => ({
-      label,
-      cantidad,
-      color: TIPO_COLORS[label] || "#94a3b8",
-    }))
+
+  const tallerDistribucion = Array.from(tallerMap.values())
     .sort((a, b) => b.cantidad - a.cantidad);
-  const totalTipo = tipoDistribucion.reduce((sum, t) => sum + t.cantidad, 0);
+  const totalTaller = tallerDistribucion.reduce((s, t) => s + t.cantidad, 0);
 
   let currentAngle = -Math.PI / 2;
-  const tipoSegments = tipoDistribucion.map((t) => {
-    const angle = totalTipo > 0 ? (t.cantidad / totalTipo) * 2 * Math.PI : 0;
+  const donutSegments = tallerDistribucion.map((t) => {
+    const angle = totalTaller > 0 ? (t.cantidad / totalTaller) * 2 * Math.PI : 0;
     const start = currentAngle;
     const end = currentAngle + angle;
     currentAngle = end;
     return {
       ...t,
-      startAngle: start,
-      endAngle: end,
       path: generateDonutSegment(start, end, 90, 50, 100, 100),
     };
   });
 
-  // === RANGO DE EDAD ===
+  // === BAR - RANGOS DE EDAD ===
   const edadDistribucion = AGE_RANGES.map((range) => ({
     ...range,
-    cantidad: pacientes.filter((p) => {
+    cantidad: participantes.filter((p) => {
       const e = calcularEdad(p.birthday);
       return e >= range.min && e <= range.max;
     }).length,
   }));
   const maxEdad = Math.max(...edadDistribucion.map((e) => e.cantidad), 1);
 
-  // === TOP ESTABLECIMIENTOS ===
-  const censusMap = new Map<string, number>();
-  pacientes.forEach((p) => {
-    const name = p.census?.name || "Sin establecimiento";
-    censusMap.set(name, (censusMap.get(name) || 0) + 1);
-  });
-  const topEstablecimientos = Array.from(censusMap.entries())
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 8);
-  const maxCensusCount = Math.max(...topEstablecimientos.map((e) => e.count), 1);
+  // === BAR HORIZONTAL - TALLERES ===
+  const maxTaller = Math.max(...tallerDistribucion.map((t) => t.cantidad), 1);
 
   return (
     <Box>
@@ -245,12 +220,12 @@ export default function PANTBCDashboardPage() {
           variant="h4"
           gutterBottom
           fontWeight="bold"
-          sx={{ color: PANTBC_COLOR }}
+          sx={{ color: MODULE_COLOR }}
         >
-          PANTBC - Programa de Alimentación y Nutrición para TBC
+          Cultura y Deporte
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Dashboard del módulo PANTBC
+          Dashboard del módulo de Cultura y Deporte
         </Typography>
       </Box>
 
@@ -276,7 +251,7 @@ export default function PANTBCDashboardPage() {
                 left: "10%",
                 right: "10%",
                 height: "30px",
-                background: `linear-gradient(to bottom, ${PANTBC_COLOR}4D, ${PANTBC_COLOR}00)`,
+                background: `linear-gradient(to bottom, ${MODULE_COLOR}4D, ${MODULE_COLOR}00)`,
                 borderRadius: "50%",
                 filter: "blur(12px)",
                 zIndex: 0,
@@ -288,7 +263,7 @@ export default function PANTBCDashboardPage() {
                 borderRadius: "24px",
                 boxShadow: "0 4px 15px rgba(0, 0, 0, 0.05)",
                 border: "none",
-                transition: "transform 0.2s, box-shadow 0.2s",
+                transition: "transform 0.2s",
                 position: "relative",
                 overflow: "visible",
                 zIndex: 1,
@@ -301,9 +276,9 @@ export default function PANTBCDashboardPage() {
                   transform: "translateY(-50%)",
                   width: "12px",
                   height: "60%",
-                  background: `linear-gradient(to bottom, #f472b6, ${PANTBC_COLOR}, #be185d)`,
+                  background: `linear-gradient(to bottom, #4dd0e1, ${MODULE_COLOR}, #00838f)`,
                   borderRadius: "12px",
-                  boxShadow: `0 4px 10px ${PANTBC_COLOR}59`,
+                  boxShadow: `0 4px 10px ${MODULE_COLOR}59`,
                 },
               }}
             >
@@ -343,7 +318,7 @@ export default function PANTBCDashboardPage() {
         ))}
       </Box>
 
-      {/* Gráficos - fila 1 */}
+      {/* Gráficos fila 1 */}
       <Box
         sx={{
           display: "grid",
@@ -352,15 +327,15 @@ export default function PANTBCDashboardPage() {
           mb: 3,
         }}
       >
-        {/* Donut - Tipo de Paciente */}
+        {/* Donut - Participantes por Taller */}
         <Paper
           sx={{
             p: 3,
             height: "420px",
             borderRadius: "20px",
-            boxShadow: `0 8px 20px ${PANTBC_COLOR}26, 0 4px 8px rgba(0,0,0,0.08)`,
+            boxShadow: `0 8px 20px ${MODULE_COLOR}26, 0 4px 8px rgba(0,0,0,0.08)`,
             background:
-              "linear-gradient(145deg, rgba(241, 245, 249, 0.95) 0%, rgba(226, 232, 240, 0.85) 100%)",
+              "linear-gradient(145deg, rgba(241,245,249,0.95) 0%, rgba(226,232,240,0.85) 100%)",
             backdropFilter: "blur(8px)",
             display: "flex",
             flexDirection: "column",
@@ -372,28 +347,18 @@ export default function PANTBCDashboardPage() {
             fontWeight="bold"
             sx={{ color: "#334155" }}
           >
-            Tipo de Paciente
+            Participantes por Taller
           </Typography>
           <Typography variant="body2" sx={{ color: "#64748b", mb: 2 }}>
-            Distribución por categoría de tratamiento
+            Distribución de participantes según taller inscrito
           </Typography>
 
           {isLoading ? (
-            <Box
-              display="flex"
-              justifyContent="center"
-              alignItems="center"
-              flex={1}
-            >
-              <CircularProgress sx={{ color: PANTBC_COLOR }} />
+            <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
+              <CircularProgress sx={{ color: MODULE_COLOR }} />
             </Box>
-          ) : tipoDistribucion.length === 0 ? (
-            <Box
-              display="flex"
-              justifyContent="center"
-              alignItems="center"
-              flex={1}
-            >
+          ) : tallerDistribucion.length === 0 ? (
+            <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
               <Typography variant="body2" color="text.secondary">
                 No hay datos disponibles
               </Typography>
@@ -418,7 +383,7 @@ export default function PANTBCDashboardPage() {
                     strokeWidth="2"
                     strokeDasharray="4 4"
                   />
-                  {tipoSegments.map((seg, i) => (
+                  {donutSegments.map((seg, i) => (
                     <path
                       key={i}
                       d={seg.path}
@@ -434,7 +399,7 @@ export default function PANTBCDashboardPage() {
                         e.currentTarget.style.transform = "scale(1)";
                       }}
                     >
-                      <title>{`${seg.label}: ${seg.cantidad} (${((seg.cantidad / totalTipo) * 100).toFixed(1)}%)`}</title>
+                      <title>{`${seg.name}: ${seg.cantidad} (${((seg.cantidad / totalTaller) * 100).toFixed(1)}%)`}</title>
                     </path>
                   ))}
                   <circle cx="100" cy="100" r="45" fill="white" />
@@ -454,9 +419,9 @@ export default function PANTBCDashboardPage() {
                     textAnchor="middle"
                     fontSize="14"
                     fontWeight="700"
-                    fill={PANTBC_COLOR}
+                    fill={MODULE_COLOR}
                   >
-                    {totalTipo.toLocaleString()}
+                    {totalTaller.toLocaleString()}
                   </text>
                 </svg>
               </Box>
@@ -471,9 +436,9 @@ export default function PANTBCDashboardPage() {
                   px: 1,
                 }}
               >
-                {tipoDistribucion.map((t) => (
+                {tallerDistribucion.map((t) => (
                   <Box
-                    key={t.label}
+                    key={t.name}
                     sx={{
                       display: "flex",
                       alignItems: "center",
@@ -494,7 +459,7 @@ export default function PANTBCDashboardPage() {
                         variant="body2"
                         sx={{ color: "#475569", fontWeight: 500 }}
                       >
-                        {t.label}
+                        {t.name}
                       </Typography>
                     </Box>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -506,13 +471,9 @@ export default function PANTBCDashboardPage() {
                       </Typography>
                       <Typography
                         variant="caption"
-                        sx={{
-                          color: "#64748b",
-                          minWidth: 40,
-                          textAlign: "right",
-                        }}
+                        sx={{ color: "#64748b", minWidth: 40, textAlign: "right" }}
                       >
-                        {((t.cantidad / totalTipo) * 100).toFixed(1)}%
+                        {((t.cantidad / totalTaller) * 100).toFixed(1)}%
                       </Typography>
                     </Box>
                   </Box>
@@ -528,9 +489,9 @@ export default function PANTBCDashboardPage() {
             p: 3,
             height: "420px",
             borderRadius: "20px",
-            boxShadow: `0 8px 20px ${PANTBC_COLOR}26, 0 4px 8px rgba(0,0,0,0.08)`,
+            boxShadow: `0 8px 20px ${MODULE_COLOR}26, 0 4px 8px rgba(0,0,0,0.08)`,
             background:
-              "linear-gradient(145deg, rgba(241, 245, 249, 0.95) 0%, rgba(226, 232, 240, 0.85) 100%)",
+              "linear-gradient(145deg, rgba(241,245,249,0.95) 0%, rgba(226,232,240,0.85) 100%)",
             backdropFilter: "blur(8px)",
             display: "flex",
             flexDirection: "column",
@@ -545,17 +506,12 @@ export default function PANTBCDashboardPage() {
             Distribución por Edad
           </Typography>
           <Typography variant="body2" sx={{ color: "#64748b", mb: 2 }}>
-            Pacientes agrupados por rango de edad
+            Participantes agrupados por rango de edad
           </Typography>
 
           {isLoading ? (
-            <Box
-              display="flex"
-              justifyContent="center"
-              alignItems="center"
-              flex={1}
-            >
-              <CircularProgress sx={{ color: PANTBC_COLOR }} />
+            <Box display="flex" justifyContent="center" alignItems="center" flex={1}>
+              <CircularProgress sx={{ color: MODULE_COLOR }} />
             </Box>
           ) : (
             <Box
@@ -571,8 +527,8 @@ export default function PANTBCDashboardPage() {
                   height: "240px",
                   display: "flex",
                   alignItems: "flex-end",
-                  gap: 2,
-                  px: 2,
+                  gap: 1.5,
+                  px: 1,
                 }}
               >
                 {edadDistribucion.map((range) => {
@@ -592,7 +548,7 @@ export default function PANTBCDashboardPage() {
                     >
                       <Typography
                         variant="body2"
-                        sx={{ color: "#334155", fontWeight: 700, mb: 0.5 }}
+                        sx={{ color: "#334155", fontWeight: 700, mb: 0.5, fontSize: "0.75rem" }}
                       >
                         {range.cantidad.toLocaleString()}
                       </Typography>
@@ -611,7 +567,7 @@ export default function PANTBCDashboardPage() {
                             boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
                           },
                         }}
-                        title={`${range.label} años: ${range.cantidad} pacientes`}
+                        title={`${range.label} años: ${range.cantidad} participantes`}
                       />
                     </Box>
                   );
@@ -622,29 +578,21 @@ export default function PANTBCDashboardPage() {
                   height: "2px",
                   backgroundColor: "#94a3b8",
                   borderRadius: "1px",
-                  mx: 2,
+                  mx: 1,
                 }}
               />
-              <Box sx={{ display: "flex", gap: 2, px: 2, mt: 1 }}>
+              <Box sx={{ display: "flex", gap: 1.5, px: 1, mt: 1 }}>
                 {edadDistribucion.map((range) => (
                   <Box key={range.label} sx={{ flex: 1, textAlign: "center" }}>
                     <Typography
                       variant="caption"
-                      sx={{
-                        color: "#64748b",
-                        fontWeight: 600,
-                        fontSize: "0.75rem",
-                      }}
+                      sx={{ color: "#64748b", fontWeight: 600, fontSize: "0.7rem" }}
                     >
                       {range.label}
                     </Typography>
                     <Typography
                       variant="caption"
-                      sx={{
-                        color: "#94a3b8",
-                        fontSize: "0.65rem",
-                        display: "block",
-                      }}
+                      sx={{ color: "#94a3b8", fontSize: "0.6rem", display: "block" }}
                     >
                       años
                     </Typography>
@@ -656,14 +604,14 @@ export default function PANTBCDashboardPage() {
         </Paper>
       </Box>
 
-      {/* Gráfico - Establecimientos (ancho completo) */}
+      {/* Barras horizontales - Talleres (ancho completo) */}
       <Paper
         sx={{
           p: 3,
           borderRadius: "20px",
-          boxShadow: `0 8px 20px ${PANTBC_COLOR}26, 0 4px 8px rgba(0,0,0,0.08)`,
+          boxShadow: `0 8px 20px ${MODULE_COLOR}26, 0 4px 8px rgba(0,0,0,0.08)`,
           background:
-            "linear-gradient(145deg, rgba(241, 245, 249, 0.95) 0%, rgba(226, 232, 240, 0.85) 100%)",
+            "linear-gradient(145deg, rgba(241,245,249,0.95) 0%, rgba(226,232,240,0.85) 100%)",
           backdropFilter: "blur(8px)",
         }}
       >
@@ -673,17 +621,17 @@ export default function PANTBCDashboardPage() {
           fontWeight="bold"
           sx={{ color: "#334155" }}
         >
-          Establecimientos de Salud
+          Participantes por Taller
         </Typography>
         <Typography variant="body2" sx={{ color: "#64748b", mb: 3 }}>
-          Pacientes por establecimiento (Top {topEstablecimientos.length})
+          Cantidad de participantes inscritos en cada taller
         </Typography>
 
         {isLoading ? (
           <Box display="flex" justifyContent="center" py={4}>
-            <CircularProgress sx={{ color: PANTBC_COLOR }} />
+            <CircularProgress sx={{ color: MODULE_COLOR }} />
           </Box>
-        ) : topEstablecimientos.length === 0 ? (
+        ) : tallerDistribucion.length === 0 ? (
           <Typography
             variant="body2"
             color="text.secondary"
@@ -693,44 +641,61 @@ export default function PANTBCDashboardPage() {
             No hay datos disponibles
           </Typography>
         ) : (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            {topEstablecimientos.map((est) => {
-              const pct = (est.count / maxCensusCount) * 100;
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+            {tallerDistribucion.map((t) => {
+              const pct = (t.cantidad / maxTaller) * 100;
               return (
-                <Box key={est.name}>
+                <Box key={t.name}>
                   <Box
                     sx={{
                       display: "flex",
                       justifyContent: "space-between",
-                      mb: 0.5,
+                      alignItems: "center",
+                      mb: 0.75,
                     }}
                   >
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        color: "#334155",
-                        fontWeight: 500,
-                        maxWidth: "75%",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                      title={est.name}
-                    >
-                      {est.name}
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      sx={{ color: PANTBC_COLOR, fontWeight: 700 }}
-                    >
-                      {est.count.toLocaleString()}
-                    </Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Box
+                        sx={{
+                          width: 14,
+                          height: 14,
+                          borderRadius: "4px",
+                          backgroundColor: t.color,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <Typography
+                        variant="body2"
+                        sx={{ color: "#334155", fontWeight: 600 }}
+                      >
+                        {t.name}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ color: "#64748b", fontSize: "0.8rem" }}
+                      >
+                        {((t.cantidad / totalTaller) * 100).toFixed(1)}%
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          color: t.color,
+                          fontWeight: 700,
+                          minWidth: 40,
+                          textAlign: "right",
+                        }}
+                      >
+                        {t.cantidad.toLocaleString()}
+                      </Typography>
+                    </Box>
                   </Box>
                   <Box
                     sx={{
-                      height: 8,
+                      height: 10,
                       backgroundColor: "#e2e8f0",
-                      borderRadius: 4,
+                      borderRadius: 5,
                       overflow: "hidden",
                     }}
                   >
@@ -738,8 +703,8 @@ export default function PANTBCDashboardPage() {
                       sx={{
                         height: "100%",
                         width: `${pct}%`,
-                        background: `linear-gradient(90deg, ${PANTBC_COLOR}80, ${PANTBC_COLOR})`,
-                        borderRadius: 4,
+                        background: `linear-gradient(90deg, ${t.color}80, ${t.color})`,
+                        borderRadius: 5,
                         transition: "width 0.6s ease",
                       }}
                     />
