@@ -29,6 +29,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Grid,
 } from "@mui/material";
 import {
   Download,
@@ -39,6 +40,12 @@ import {
   Clear,
   Close,
   Visibility,
+  Badge,
+  Phone,
+  CalendarMonth,
+  PersonSearch,
+  Groups,
+  EmojiEvents,
 } from "@mui/icons-material";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -205,39 +212,26 @@ function DetalleParticipante({
   isLoading: boolean;
   onClose: () => void;
 }) {
-
-  const renderCampo = (label: string, valor: string | null | undefined) => (
-    <Box sx={{ mb: 1.5 }}>
-      <Typography variant="caption" color="text.secondary" fontWeight={600}>
-        {label}
-      </Typography>
-      <Typography variant="body2" fontWeight={500}>
-        {valor || "-"}
-      </Typography>
-    </Box>
-  );
+  const edad = participante ? calcularEdad(participante.birthday) : null;
+  const tallerColor = participante?.workshop ? getTallerColor(participante.workshop.id) : "#64748b";
 
   return (
     <>
       <DialogTitle
         sx={{
-          background: `linear-gradient(135deg, ${MODULE_COLOR} 0%, #00bcd4 100%)`,
-          color: "white",
-          fontWeight: 700,
           display: "flex",
-          justifyContent: "space-between",
           alignItems: "center",
+          justifyContent: "space-between",
+          backgroundColor: MODULE_COLOR,
+          color: "white",
+          py: 2,
         }}
       >
-        <Box>
-          <Typography variant="h6" fontWeight={700}>
-            {participante ? `${participante.name} ${participante.lastname}` : "Cargando..."}
+        <Box display="flex" alignItems="center" gap={1}>
+          <PersonSearch />
+          <Typography variant="h6" fontWeight={600}>
+            Datos del Participante
           </Typography>
-          {participante && (
-            <Typography variant="caption" sx={{ opacity: 0.85 }}>
-              DNI: {participante.dni}
-            </Typography>
-          )}
         </Box>
         <IconButton onClick={onClose} sx={{ color: "white" }}>
           <Close />
@@ -245,31 +239,158 @@ function DetalleParticipante({
       </DialogTitle>
 
       <DialogContent sx={{ pt: 3 }}>
-        {isLoading ? (
-          <Box display="flex" justifyContent="center" alignItems="center" py={5}>
+        {isLoading || !participante ? (
+          <Box display="flex" justifyContent="center" py={5}>
             <CircularProgress sx={{ color: MODULE_COLOR }} />
           </Box>
-        ) : participante ? (
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 2,
-              mt: 1,
-            }}
-          >
-            {renderCampo("Nombre", participante.name)}
-            {renderCampo("Apellido", participante.lastname)}
-            {renderCampo("DNI", participante.dni)}
-            {renderCampo("Celular", formatearTelefono(participante.phone))}
-            {renderCampo("Fecha de Nacimiento", formatearFecha(participante.birthday))}
-            {renderCampo("Edad", `${calcularEdad(participante.birthday)} años`)}
-            {renderCampo("Taller", participante.workshop?.name)}
-          </Box>
         ) : (
-          <Typography variant="body2" color="text.secondary" textAlign="center" py={4}>
-            No se pudo cargar la información
-          </Typography>
+          <Box>
+            {/* Header de identidad */}
+            <Box
+              sx={{
+                textAlign: "center",
+                mb: 3,
+                p: 2,
+                bgcolor: `${MODULE_COLOR}10`,
+                borderRadius: 2,
+                border: `1px solid ${MODULE_COLOR}30`,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: "50%",
+                  backgroundColor: MODULE_COLOR,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  mx: "auto",
+                  mb: 1.5,
+                }}
+              >
+                <Typography variant="h5" color="white" fontWeight={700}>
+                  {participante.name.charAt(0)}
+                </Typography>
+              </Box>
+              <Typography variant="h6" fontWeight={700} color="text.primary">
+                {`${participante.name} ${participante.lastname}`}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                DNI · {participante.dni}
+              </Typography>
+            </Box>
+
+            {/* Identificación */}
+            <Typography
+              variant="subtitle2"
+              fontWeight={700}
+              color={MODULE_COLOR}
+              sx={{ mb: 1.5, display: "flex", alignItems: "center", gap: 0.5 }}
+            >
+              <Badge fontSize="small" />
+              Identificación
+            </Typography>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid size={6}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Nombres
+                </Typography>
+                <Typography variant="body2" fontWeight={500}>
+                  {participante.name}
+                </Typography>
+              </Grid>
+              <Grid size={6}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Apellidos
+                </Typography>
+                <Typography variant="body2" fontWeight={500}>
+                  {participante.lastname}
+                </Typography>
+              </Grid>
+              <Grid size={6}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  N° de Documento (DNI)
+                </Typography>
+                <Typography variant="body2" fontWeight={500} fontFamily="monospace">
+                  {participante.dni}
+                </Typography>
+              </Grid>
+            </Grid>
+
+            <Divider sx={{ mb: 2 }} />
+
+            {/* Contacto y Nacimiento */}
+            <Typography
+              variant="subtitle2"
+              fontWeight={700}
+              color={MODULE_COLOR}
+              sx={{ mb: 1.5, display: "flex", alignItems: "center", gap: 0.5 }}
+            >
+              <Phone fontSize="small" />
+              Contacto y Nacimiento
+            </Typography>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid size={6}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Celular
+                </Typography>
+                <Typography variant="body2" fontWeight={500}>
+                  {formatearTelefono(participante.phone)}
+                </Typography>
+              </Grid>
+              <Grid size={6}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Fecha de Nacimiento
+                </Typography>
+                <Typography variant="body2" fontWeight={500}>
+                  {formatearFecha(participante.birthday)}
+                </Typography>
+              </Grid>
+              {edad !== null && (
+                <Grid size={6}>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    Edad
+                  </Typography>
+                  <Chip
+                    label={`${edad} años`}
+                    size="small"
+                    variant="outlined"
+                    sx={{ borderColor: MODULE_COLOR, color: MODULE_COLOR }}
+                  />
+                </Grid>
+              )}
+            </Grid>
+
+            <Divider sx={{ mb: 2 }} />
+
+            {/* Taller */}
+            <Typography
+              variant="subtitle2"
+              fontWeight={700}
+              color={MODULE_COLOR}
+              sx={{ mb: 1.5, display: "flex", alignItems: "center", gap: 0.5 }}
+            >
+              <EmojiEvents fontSize="small" />
+              Taller
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid size={6}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Taller Asignado
+                </Typography>
+                {participante.workshop ? (
+                  <Chip
+                    label={participante.workshop.name}
+                    size="small"
+                    sx={{ backgroundColor: tallerColor, color: "white", fontWeight: 600 }}
+                  />
+                ) : (
+                  <Typography variant="body2" fontWeight={500}>-</Typography>
+                )}
+              </Grid>
+            </Grid>
+          </Box>
         )}
       </DialogContent>
 
@@ -306,8 +427,8 @@ export default function ParticipantesPage() {
   // Filtros
   const [filtroTaller, setFiltroTaller] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("edad");
-  const [edadRange, setEdadRange] = useState<number[]>([0, 110]);       // valor aplicado → dispara fetch
-  const [edadRangePending, setEdadRangePending] = useState<number[]>([0, 110]); // valor del slider (solo UI)
+  const [edadRange, setEdadRange] = useState<number[]>([0, 110]);
+  const [edadRangePending, setEdadRangePending] = useState<number[]>([0, 110]);
   const [filtroMes, setFiltroMes] = useState<number | "">("");
   const [filtroDia, setFiltroDia] = useState("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
@@ -382,6 +503,7 @@ export default function ParticipantesPage() {
 
   // Exportar
   const handleExport = () => {
+    const fechaISO = new Date().toISOString().slice(0, 10);
     const exportData = filteredData.map((r: ParticipanteTabla) => ({
       "Nombre Completo": r.nombreCompleto,
       DNI: r.dni,
@@ -394,7 +516,7 @@ export default function ParticipantesPage() {
     const ws = XLSX.utils.json_to_sheet(exportData);
     ws["!cols"] = [{ wch: 30 }, { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 6 }, { wch: 25 }];
     XLSX.utils.book_append_sheet(wb, ws, "Participantes");
-    XLSX.writeFile(wb, `participantes_${new Date().toISOString().split("T")[0]}.xlsx`);
+    XLSX.writeFile(wb, `participantes_${fechaISO}.xlsx`);
   };
 
   // Limpiar filtros
@@ -410,7 +532,7 @@ export default function ParticipantesPage() {
     setFetchKey((k) => k + 1);
   };
 
-  // Abrir detalle — llama al endpoint individual
+  // Abrir detalle
   const handleVerDetalle = async (row: ParticipanteTabla) => {
     setDetalleParticipante(null);
     setDetalleLoading(true);
@@ -435,49 +557,68 @@ export default function ParticipantesPage() {
 
   return (
     <Box>
-      {/* Encabezado */}
-      <Box mb={3}>
-        <Typography
-          variant="h4"
-          gutterBottom
-          sx={{
-            color: MODULE_COLOR,
-            fontWeight: 700,
-            fontFamily: "'Poppins', 'Roboto', sans-serif",
-          }}
-        >
-          Participantes
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Listado de participantes del módulo de Cultura y Deporte
-        </Typography>
+      {/* ── Header ── */}
+      <Box mb={3} display="flex" alignItems="flex-start" justifyContent="space-between" flexWrap="wrap" gap={2}>
+        <Box>
+          <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+            <Groups sx={{ color: MODULE_COLOR, fontSize: 32 }} />
+            <Typography variant="h4" fontWeight={700} color="text.primary">
+              Participantes
+            </Typography>
+          </Box>
+          <Typography variant="body1" color="text.secondary">
+            Listado de participantes del módulo de{" "}
+            <span style={{ color: MODULE_COLOR, fontWeight: 600 }}>Cultura y Deporte</span>
+          </Typography>
+        </Box>
+        <Box display="flex" gap={1}>
+          <Tooltip title="Actualizar datos">
+            <IconButton
+              onClick={() => { setPage(0); setFetchKey((k) => k + 1); }}
+              sx={{ color: MODULE_COLOR }}
+            >
+              <Refresh />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Exportar a Excel">
+            <span>
+              <Button
+                variant="outlined"
+                startIcon={<Download />}
+                onClick={handleExport}
+                disabled={isLoading || filteredData.length === 0}
+                sx={{ borderColor: MODULE_COLOR, color: MODULE_COLOR, "&:hover": { borderColor: MODULE_COLOR } }}
+              >
+                Exportar
+              </Button>
+            </span>
+          </Tooltip>
+        </Box>
       </Box>
 
-      {/* Filtros */}
-      <Paper
-        sx={{
-          p: 2,
-          mb: 3,
-          borderRadius: "16px",
-          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
-        }}
-      >
+      {/* ── Barra de filtros ── */}
+      <Paper sx={{ p: 2, mb: 3 }}>
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center" }}>
           {/* Búsqueda */}
           <TextField
             size="small"
-            placeholder="Buscar por nombre, DNI..."
+            placeholder="Buscar por nombre o DNI..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            sx={{ minWidth: 280 }}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search fontSize="small" />
-                  </InputAdornment>
-                ),
+            sx={{
+              minWidth: 280,
+              flexGrow: 1,
+              "& .MuiOutlinedInput-root": {
+                "&:hover fieldset": { borderColor: MODULE_COLOR },
+                "&.Mui-focused fieldset": { borderColor: MODULE_COLOR },
               },
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search sx={{ color: MODULE_COLOR }} fontSize="small" />
+                </InputAdornment>
+              ),
             }}
           />
 
@@ -501,7 +642,7 @@ export default function ParticipantesPage() {
             ))}
           </TextField>
 
-          {/* Botón filtros */}
+          {/* Botón filtros avanzados */}
           <Tooltip title="Filtros de edad y cumpleaños">
             <IconButton
               onClick={(e) => setFilterAnchor(e.currentTarget)}
@@ -531,7 +672,7 @@ export default function ParticipantesPage() {
             </IconButton>
           </Tooltip>
 
-          {/* Chips filtros activos */}
+          {/* Chips filtros rápidos activos */}
           {isEdadFiltered && (
             <Box sx={{ backgroundColor: "#dbeafe", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
               <Typography variant="caption" color="#1e40af">
@@ -565,26 +706,13 @@ export default function ParticipantesPage() {
               </IconButton>
             </Tooltip>
           )}
-          <Tooltip title="Actualizar">
-            <IconButton onClick={() => { setPage(0); setFetchKey((k) => k + 1); }} disabled={isLoading} size="small">
-              <Refresh />
-            </IconButton>
-          </Tooltip>
-          <Button
-            variant="contained"
-            startIcon={<Download />}
-            onClick={handleExport}
-            disabled={isLoading || filteredData.length === 0}
-            sx={{
-              backgroundColor: MODULE_COLOR,
-              "&:hover": { backgroundColor: subgerencia.colorHover },
-            }}
-          >
-            Descargar Excel
-          </Button>
+
+          <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
+            {isLoading ? "Cargando..." : `${totalCount.toLocaleString()} participantes registrados`}
+          </Typography>
         </Box>
 
-        {/* Popover filtros */}
+        {/* Popover filtros avanzados */}
         <Popover
           open={filterOpen}
           anchorEl={filterAnchor}
@@ -704,7 +832,7 @@ export default function ParticipantesPage() {
           </Box>
         </Popover>
 
-        {/* Chips resumen filtros */}
+        {/* Chips resumen filtros activos */}
         {hayFiltrosActivos && (
           <Box sx={{ display: "flex", gap: 1, mt: 2, flexWrap: "wrap" }}>
             <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
@@ -742,44 +870,54 @@ export default function ParticipantesPage() {
         )}
       </Paper>
 
-      {/* Contador */}
-      <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
-        <Paper sx={{ px: 2, py: 1, borderRadius: "12px", display: "flex", alignItems: "center", gap: 1 }}>
-          <FilterList fontSize="small" color="action" />
-          <Typography variant="body2">
-            <strong>{totalCount.toLocaleString()}</strong> participantes
-          </Typography>
-        </Paper>
-      </Box>
-
-      {/* Tabla */}
-      <Paper sx={{ borderRadius: "16px", boxShadow: "0 4px 12px rgba(0,0,0,0.08)", overflow: "hidden" }}>
+      {/* ── Tabla ── */}
+      <Paper sx={{ overflow: "hidden" }}>
         {isLoading ? (
-          <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", height: 400, gap: 2 }}>
+          <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" py={8} gap={2}>
             <CircularProgress sx={{ color: MODULE_COLOR }} />
-            <Typography variant="body2" color="text.secondary">Cargando participantes...</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Cargando participantes...
+            </Typography>
           </Box>
         ) : (
           <>
-            <TableContainer sx={{ maxHeight: "calc(100vh - 420px)" }}>
+            <TableContainer>
               <Table stickyHeader size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>Nombre</TableCell>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>DNI</TableCell>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>Taller</TableCell>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>Celular</TableCell>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>Edad / Nacimiento</TableCell>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc", textAlign: "center" }}>Acciones</TableCell>
+                    {["#", "Nombre Completo", "DNI", "Taller", "Celular", "Edad / Nacimiento", ""].map(
+                      (col, i) => (
+                        <TableCell
+                          key={i}
+                          align={i === 0 || i === 6 ? "center" : "left"}
+                          sx={{
+                            backgroundColor: MODULE_COLOR,
+                            color: "white",
+                            fontWeight: 700,
+                            fontSize: "0.78rem",
+                            whiteSpace: "nowrap",
+                            py: 1.5,
+                          }}
+                        >
+                          {col}
+                        </TableCell>
+                      )
+                    )}
                   </TableRow>
                 </TableHead>
+
                 <TableBody>
                   {filteredData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                        <Typography variant="body2" color="text.secondary">
-                          No se encontraron participantes con los filtros aplicados
-                        </Typography>
+                      <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                        <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
+                          <PersonSearch sx={{ fontSize: 40, color: "text.disabled" }} />
+                          <Typography color="text.secondary">
+                            {debouncedSearch || hayFiltrosActivos
+                              ? "No se encontraron participantes con los filtros aplicados"
+                              : "No hay participantes registrados"}
+                          </Typography>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -791,19 +929,31 @@ export default function ParticipantesPage() {
                           hover
                           sx={{
                             backgroundColor: index % 2 === 0 ? "white" : "#f8fafc",
-                            "&:hover": { backgroundColor: "#f1f5f9" },
+                            "&:hover": { backgroundColor: `${MODULE_COLOR}10`, cursor: "pointer" },
+                            transition: "background-color 0.15s",
                           }}
+                          onClick={() => handleVerDetalle(row)}
                         >
+                          {/* # */}
+                          <TableCell align="center" sx={{ color: "text.disabled", fontSize: "0.75rem", width: 48 }}>
+                            {page * rowsPerPage + index + 1}
+                          </TableCell>
+
+                          {/* Nombre */}
                           <TableCell>
-                            <Typography variant="body2" fontWeight={600}>
+                            <Typography variant="body2" fontWeight={600} color="text.primary">
                               {row.nombreCompleto}
                             </Typography>
                           </TableCell>
+
+                          {/* DNI */}
                           <TableCell>
-                            <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
+                            <Typography variant="body2" fontFamily="monospace">
                               {row.dni}
                             </Typography>
                           </TableCell>
+
+                          {/* Taller */}
                           <TableCell>
                             {row.taller !== "-" ? (
                               <Chip
@@ -828,11 +978,15 @@ export default function ParticipantesPage() {
                               <Typography variant="body2" color="text.secondary">-</Typography>
                             )}
                           </TableCell>
+
+                          {/* Celular */}
                           <TableCell>
                             <Typography variant="body2">
                               {formatearTelefono(row.celular)}
                             </Typography>
                           </TableCell>
+
+                          {/* Edad / Nacimiento */}
                           <TableCell>
                             {row.fechaNacimiento ? (
                               <Box display="flex" flexDirection="column" gap={0.25}>
@@ -859,15 +1013,17 @@ export default function ParticipantesPage() {
                               <Typography variant="body2" color="text.secondary">-</Typography>
                             )}
                           </TableCell>
-                          <TableCell align="center">
+
+                          {/* Acciones */}
+                          <TableCell align="center" sx={{ width: 56 }}>
                             <Tooltip title="Ver detalle">
                               <IconButton
                                 size="small"
-                                onClick={() => handleVerDetalle(row)}
-                                sx={{
-                                  color: MODULE_COLOR,
-                                  "&:hover": { backgroundColor: "#e0f7f7" },
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleVerDetalle(row);
                                 }}
+                                sx={{ color: MODULE_COLOR }}
                               >
                                 <Visibility fontSize="small" />
                               </IconButton>
@@ -880,6 +1036,7 @@ export default function ParticipantesPage() {
                 </TableBody>
               </Table>
             </TableContainer>
+
             <TablePagination
               component="div"
               count={totalCount}
@@ -890,21 +1047,19 @@ export default function ParticipantesPage() {
               rowsPerPageOptions={[10, 25, 50, 100]}
               labelRowsPerPage="Filas por página:"
               labelDisplayedRows={({ from, to, count }) =>
-                `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`
+                `${from}–${to} de ${count !== -1 ? count.toLocaleString() : `más de ${to}`}`
               }
+              sx={{
+                borderTop: "1px solid #e2e8f0",
+                "& .MuiTablePagination-select": { fontWeight: 500 },
+              }}
             />
           </>
         )}
       </Paper>
 
-      {/* Diálogo detalle */}
-      <Dialog
-        open={detalleOpen}
-        onClose={() => setDetalleOpen(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{ sx: { borderRadius: "16px", overflow: "hidden" } }}
-      >
+      {/* ── Modal de Detalle ── */}
+      <Dialog open={detalleOpen} onClose={() => setDetalleOpen(false)} maxWidth="sm" fullWidth>
         <DetalleParticipante
           participante={detalleParticipante}
           isLoading={detalleLoading}
