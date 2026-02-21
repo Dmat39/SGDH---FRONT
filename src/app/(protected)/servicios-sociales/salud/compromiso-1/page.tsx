@@ -5,6 +5,8 @@ import {
   Box,
   Typography,
   Paper,
+  Card,
+  CardContent,
   Table,
   TableBody,
   TableCell,
@@ -27,7 +29,7 @@ import {
   Grid,
 } from "@mui/material";
 import {
-  Download,
+  FileDownload,
   Refresh,
   Search,
   Visibility,
@@ -37,6 +39,8 @@ import {
   Phone,
   CalendarMonth,
   PersonSearch,
+  Edit,
+  Delete,
 } from "@mui/icons-material";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -357,7 +361,7 @@ export default function Compromiso1Page() {
 
   // --- Estado: Paginación ---
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
   const [fetchKey, setFetchKey] = useState(0);
 
   // --- Estado: Búsqueda ---
@@ -451,71 +455,116 @@ export default function Compromiso1Page() {
   return (
     <Box>
       {/* ── Header ── */}
-      <Box mb={3} display="flex" alignItems="flex-start" justifyContent="space-between" flexWrap="wrap" gap={2}>
-        <Box>
-          <Box display="flex" alignItems="center" gap={1} mb={0.5}>
-            <ChildCare sx={{ color: MODULE_COLOR, fontSize: 32 }} />
-            <Typography variant="h4" fontWeight={700} color="text.primary">
-              Compromiso 1 · Bajo Hierro
-            </Typography>
+      <Box mb={4}>
+        <Box display="flex" alignItems="center" gap={2} mb={1}>
+          <Box
+            sx={{
+              background: `linear-gradient(135deg, ${MODULE_COLOR}15 0%, ${MODULE_COLOR}30 100%)`,
+              color: MODULE_COLOR,
+              width: 48,
+              height: 48,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "12px",
+              boxShadow: `0 4px 12px ${MODULE_COLOR}25`,
+            }}
+          >
+            <ChildCare sx={{ fontSize: 28 }} />
           </Box>
-          <Typography variant="body1" color="text.secondary">
-            Registro de madres con niños diagnosticados con anemia (bajo hierro) ·{" "}
-            <span style={{ color: MODULE_COLOR, fontWeight: 600 }}>Área de Salud</span>
+          <Typography variant="h4" fontWeight="bold" sx={{ color: MODULE_COLOR }}>
+            Compromiso 1 · Bajo Hierro
           </Typography>
         </Box>
-        <Box display="flex" gap={1}>
-          <Tooltip title="Actualizar datos">
-            <IconButton onClick={handleRefresh} sx={{ color: MODULE_COLOR }}>
-              <Refresh />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Exportar a Excel">
-            <span>
-              <Button
-                variant="outlined"
-                startIcon={<Download />}
-                onClick={handleExport}
-                disabled={dataFormateados.length === 0}
-                sx={{ borderColor: MODULE_COLOR, color: MODULE_COLOR, "&:hover": { borderColor: MODULE_COLOR } }}
-              >
-                Exportar
-              </Button>
-            </span>
-          </Tooltip>
-        </Box>
+        <Typography variant="body1" color="text.secondary" sx={{ ml: 7.5 }}>
+          Registro de madres con niños diagnosticados con anemia (bajo hierro)
+        </Typography>
       </Box>
 
-      {/* ── Barra de búsqueda ── */}
-      <Paper sx={{ p: 2, mb: 3, display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
-        <TextField
-          placeholder="Buscar por nombre o DNI..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          size="small"
-          sx={{
-            minWidth: 280,
-            flexGrow: 1,
-            "& .MuiOutlinedInput-root": {
-              "&:hover fieldset": { borderColor: MODULE_COLOR },
-              "&.Mui-focused fieldset": { borderColor: MODULE_COLOR },
-            },
-          }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search sx={{ color: MODULE_COLOR }} fontSize="small" />
-              </InputAdornment>
-            ),
-          }}
-        />
-        <Typography variant="body2" color="text.secondary" sx={{ ml: "auto", whiteSpace: "nowrap" }}>
-          {isLoading ? "Cargando..." : `${totalCount.toLocaleString()} madres registradas`}
-        </Typography>
-      </Paper>
+      {/* ── Tarjeta principal ── */}
+      <Card
+        sx={{
+          borderRadius: "16px",
+          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
+          overflow: "hidden",
+        }}
+      >
+        <CardContent sx={{ p: 3 }}>
+          {/* ── Buscador y acciones ── */}
+          <Box mb={3} display="flex" gap={1.5} alignItems="center" flexWrap="wrap">
+            <TextField
+              placeholder="Buscar por nombre o DNI..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              size="small"
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search sx={{ color: "#64748b", fontSize: 20 }} />
+                    </InputAdornment>
+                  ),
+                },
+              }}
+              sx={{
+                width: 320,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "8px",
+                  backgroundColor: "#f8fafc",
+                  "&:hover fieldset": { borderColor: "#64748b" },
+                  "&.Mui-focused fieldset": { borderColor: "#475569" },
+                },
+              }}
+            />
+            <Tooltip title="Actualizar datos">
+              <IconButton
+                onClick={handleRefresh}
+                sx={{
+                  backgroundColor: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "8px",
+                  "&:hover": { backgroundColor: "#e2e8f0" },
+                }}
+              >
+                <Refresh sx={{ color: "#64748b", fontSize: 20 }} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Descargar listado en formato Excel">
+              <span>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<FileDownload />}
+                  onClick={handleExport}
+                  disabled={dataFormateados.length === 0}
+                  sx={{
+                    borderColor: "#22c55e",
+                    color: "#16a34a",
+                    borderRadius: "8px",
+                    textTransform: "none",
+                    fontWeight: 600,
+                    "&:hover": { backgroundColor: "#dcfce7", borderColor: "#16a34a" },
+                    "&.Mui-disabled": { opacity: 0.4 },
+                  }}
+                >
+                  Exportar Excel
+                </Button>
+              </span>
+            </Tooltip>
+            <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
+              {isLoading ? "Cargando..." : `${totalCount.toLocaleString()} madre(s)`}
+            </Typography>
+          </Box>
 
-      {/* ── Tabla ── */}
-      <Paper sx={{ overflow: "hidden" }}>
+          {/* ── Tabla ── */}
+          <Paper
+            sx={{
+              borderRadius: "12px",
+              boxShadow: "none",
+              border: "1px solid #e2e8f0",
+              overflow: "hidden",
+            }}
+          >
         {isLoading ? (
           <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" py={8} gap={2}>
             <CircularProgress sx={{ color: MODULE_COLOR }} />
@@ -628,19 +677,36 @@ export default function Compromiso1Page() {
                         </TableCell>
 
                         {/* Acciones */}
-                        <TableCell align="center" sx={{ width: 56 }}>
-                          <Tooltip title="Ver detalle">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleVerDetalle(row);
-                              }}
-                              sx={{ color: MODULE_COLOR }}
-                            >
-                              <Visibility fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                        <TableCell align="center" sx={{ width: 110, whiteSpace: "nowrap" }}>
+                          <Box display="flex" alignItems="center" justifyContent="center">
+                            <Tooltip title="Ver detalle">
+                              <IconButton
+                                size="small"
+                                onClick={(e) => { e.stopPropagation(); handleVerDetalle(row); }}
+                                sx={{ color: MODULE_COLOR }}
+                              >
+                                <Visibility fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Editar">
+                              <IconButton
+                                size="small"
+                                onClick={(e) => { e.stopPropagation(); /* TODO: editar */ }}
+                                sx={{ color: "#0891b2", "&:hover": { backgroundColor: "rgba(8,145,178,0.1)" } }}
+                              >
+                                <Edit fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Eliminar">
+                              <IconButton
+                                size="small"
+                                onClick={(e) => { e.stopPropagation(); /* TODO: eliminar */ }}
+                                sx={{ color: "#dc2626", "&:hover": { backgroundColor: "rgba(220,38,38,0.1)" } }}
+                              >
+                                <Delete fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
                         </TableCell>
                       </TableRow>
                     ))
@@ -659,19 +725,23 @@ export default function Compromiso1Page() {
                 setRowsPerPage(parseInt(e.target.value, 10));
                 setPage(0);
               }}
-              rowsPerPageOptions={[10, 25, 50, 100]}
+              rowsPerPageOptions={[10, 20, 50, 100]}
               labelRowsPerPage="Filas por página:"
               labelDisplayedRows={({ from, to, count }) =>
                 `${from}–${to} de ${count !== -1 ? count.toLocaleString() : `más de ${to}`}`
               }
               sx={{
                 borderTop: "1px solid #e2e8f0",
+                mt: 2,
                 "& .MuiTablePagination-select": { fontWeight: 500 },
+                "& .MuiTablePagination-selectIcon": { color: "#64748b" },
               }}
             />
           </>
         )}
-      </Paper>
+          </Paper>
+        </CardContent>
+      </Card>
 
       {/* ── Modal de Detalle ── */}
       <Dialog open={detalleOpen} onClose={() => setDetalleOpen(false)} maxWidth="sm" fullWidth>

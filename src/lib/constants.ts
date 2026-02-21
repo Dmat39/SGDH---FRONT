@@ -446,18 +446,18 @@ export const MODULOS_SERVICIOS_SOCIALES: MenuItem[] = [
   },
   {
     id: "salud",
-    nombre: "Salud",
+    nombre: "Salud y Sanidad",
     icono: "HealthAndSafety",
     descripcion: "Gestión de servicios de salud y veterinaria",
     permisos: ["salud", "all_servicios_sociales", "all"],
     children: [
-      {
+      /* {
         id: "salud-dashboard",
         nombre: "Dashboard",
         ruta: "/servicios-sociales/salud",
         icono: "Dashboard",
         permisos: ["salud", "all_servicios_sociales", "all"],
-      },
+      }, */
       {
         id: "salud-compromiso-1",
         nombre: "Compromiso 1 · Bajo Hierro",
@@ -465,20 +465,6 @@ export const MODULOS_SERVICIOS_SOCIALES: MenuItem[] = [
         icono: "ChildCare",
         descripcion: "Madres con niños diagnosticados con anemia",
         permisos: ["salud", "all_servicios_sociales", "all"],
-      },
-      {
-        id: "salud-campanas",
-        nombre: "Campañas",
-        ruta: "/servicios-sociales/salud/campanas",
-        icono: "List",
-        permisos: ["salud", "all_servicios_sociales", "all"],
-      },
-      {
-        id: "salud-mapa",
-        nombre: "Mapa",
-        ruta: "/servicios-sociales/salud/mapa",
-        icono: "Map",
-        permisos: ["salud", "mapa_salud", "all_servicios_sociales", "all"],
       },
     ],
   },

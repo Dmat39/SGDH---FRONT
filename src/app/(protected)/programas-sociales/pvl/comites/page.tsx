@@ -40,6 +40,10 @@ import {
   Visibility,
   Edit,
   Delete,
+  PersonSearch,
+  Badge,
+  LocationOn,
+  PeopleAlt,
 } from "@mui/icons-material";
 import * as XLSX from "xlsx";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -175,7 +179,7 @@ export default function PVLComitesPage() {
 
   // Paginación server-side
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
   const [fetchKey, setFetchKey] = useState(0);
 
   // Estados para búsqueda y filtros
@@ -403,21 +407,27 @@ export default function PVLComitesPage() {
                   <FilterList sx={{ color: "#64748b", fontSize: 20 }} />
                 </IconButton>
               </Tooltip>
-              <Tooltip title="Exportar a Excel">
-                <IconButton
-                  onClick={handleExport}
-                  sx={{
-                    backgroundColor: "#f8fafc",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "8px",
-                    "&:hover": {
-                      backgroundColor: "#dcfce7",
+              <Tooltip title="Descargar listado en formato Excel">
+                <span>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<FileDownload />}
+                    onClick={handleExport}
+                    disabled={dataFormateados.length === 0}
+                    sx={{
                       borderColor: "#22c55e",
-                    },
-                  }}
-                >
-                  <FileDownload sx={{ color: "#22c55e", fontSize: 20 }} />
-                </IconButton>
+                      color: "#16a34a",
+                      borderRadius: "8px",
+                      textTransform: "none",
+                      fontWeight: 600,
+                      "&:hover": { backgroundColor: "#dcfce7", borderColor: "#16a34a" },
+                      "&.Mui-disabled": { opacity: 0.4 },
+                    }}
+                  >
+                    Exportar Excel
+                  </Button>
+                </span>
               </Tooltip>
               {isBeneficiariosFiltered && (
                 <Box
@@ -644,299 +654,337 @@ export default function PVLComitesPage() {
             </Popover>
 
             {/* Tabla */}
-            <TableContainer
-              component={Paper}
+            <Paper
               sx={{
                 borderRadius: "12px",
                 boxShadow: "none",
                 border: "1px solid #e2e8f0",
                 overflow: "hidden",
+                mt: 2,
               }}
             >
-              <Table>
-                <TableHead>
-                  <TableRow sx={{ backgroundColor: "#f8fafc" }}>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Código</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Centro Acopio</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Comité</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Beneficiarios</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Socios</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Coordinadora</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Dirección Referencia</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {isLoading ? (
+              <TableContainer>
+                <Table stickyHeader size="small">
+                  <TableHead>
                     <TableRow>
-                      <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
-                        <CircularProgress size={32} sx={{ color: "#64748b" }} />
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                          Cargando comités...
-                        </Typography>
-                      </TableCell>
+                      {["#", "Código", "Centro Acopio", "Comité", "Beneficiarios", "Socios", "Coordinadora", "Dirección", ""].map(
+                        (col, i) => (
+                          <TableCell
+                            key={i}
+                            align={i === 0 || i === 4 || i === 5 || i === 8 ? "center" : "left"}
+                            sx={{
+                              backgroundColor: `${subgerencia.color}18`,
+                              color: subgerencia.color,
+                              fontWeight: 700,
+                              fontSize: "0.78rem",
+                              whiteSpace: "nowrap",
+                              py: 1.5,
+                              borderBottom: `2px solid ${subgerencia.color}50`,
+                            }}
+                          >
+                            {col}
+                          </TableCell>
+                        )
+                      )}
                     </TableRow>
-                  ) : dataFormateados.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
-                        <Typography variant="body2" color="text.secondary">
-                          No se encontraron comités
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    dataFormateados.map((row: ComiteFrontend, index: number) => (
-                      <TableRow
-                        key={row.id}
-                        onClick={() => handleRowClick(row)}
-                        sx={{
-                          backgroundColor: index % 2 === 0 ? "white" : "#f8fafc",
-                          "&:hover": {
-                            backgroundColor: "#f1f5f9",
-                            cursor: "pointer",
-                          },
-                          transition: "background-color 0.2s",
-                        }}
-                      >
-                        <TableCell sx={{ fontWeight: 500 }}>{row.codigo}</TableCell>
-                        <TableCell>{row.centroAcopio}</TableCell>
-                        <TableCell>{row.comite}</TableCell>
-                        <TableCell align="center">{row.beneficiarios}</TableCell>
-                        <TableCell align="center">{row.socios}</TableCell>
-                        <TableCell>{row.coordinadora}</TableCell>
-                        <TableCell sx={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {row.direccionReferencia}
-                        </TableCell>
-                        <TableCell align="center">
-                          <Tooltip title="Ver detalles">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRowClick(row);
-                              }}
-                              sx={{
-                                color: "#64748b",
-                                "&:hover": {
-                                  backgroundColor: "#f1f5f9",
-                                },
-                              }}
-                            >
-                              <Visibility fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Editar">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                // TODO: Implementar edición
-                              }}
-                              sx={{
-                                color: "#0891b2",
-                                "&:hover": {
-                                  backgroundColor: "rgba(8, 145, 178, 0.1)",
-                                },
-                              }}
-                            >
-                              <Edit fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Eliminar">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                // TODO: Implementar eliminación
-                              }}
-                              sx={{
-                                color: "#dc2626",
-                                "&:hover": {
-                                  backgroundColor: "rgba(220, 38, 38, 0.1)",
-                                },
-                              }}
-                            >
-                              <Delete fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                  </TableHead>
+                  <TableBody>
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
+                          <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
+                            <CircularProgress sx={{ color: subgerencia.color }} />
+                            <Typography variant="body2" color="text.secondary">
+                              Cargando comités...
+                            </Typography>
+                          </Box>
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                    ) : dataFormateados.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
+                          <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
+                            <PersonSearch sx={{ fontSize: 40, color: "text.disabled" }} />
+                            <Typography color="text.secondary">
+                              No se encontraron comités
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      dataFormateados.map((row: ComiteFrontend, index: number) => (
+                        <TableRow
+                          key={row.id}
+                          onClick={() => handleRowClick(row)}
+                          sx={{
+                            backgroundColor: index % 2 === 0 ? "white" : "#f8fafc",
+                            "&:hover": { backgroundColor: `${subgerencia.color}10`, cursor: "pointer" },
+                            transition: "background-color 0.15s",
+                          }}
+                        >
+                          {/* # */}
+                          <TableCell align="center" sx={{ color: "text.disabled", fontSize: "0.75rem", width: 48 }}>
+                            {page * rowsPerPage + index + 1}
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>{row.codigo}</TableCell>
+                          <TableCell>{row.centroAcopio}</TableCell>
+                          <TableCell>{row.comite}</TableCell>
+                          <TableCell align="center">{row.beneficiarios}</TableCell>
+                          <TableCell align="center">{row.socios}</TableCell>
+                          <TableCell>{row.coordinadora}</TableCell>
+                          <TableCell sx={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "text.secondary" }}>
+                            {row.direccionReferencia}
+                          </TableCell>
+                          {/* Acciones */}
+                          <TableCell align="center" sx={{ width: 110, whiteSpace: "nowrap" }}>
+                            <Box display="flex" alignItems="center" justifyContent="center">
+                              <Tooltip title="Ver detalles">
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => { e.stopPropagation(); handleRowClick(row); }}
+                                  sx={{ color: subgerencia.color }}
+                                >
+                                  <Visibility fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Editar">
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => { e.stopPropagation(); /* TODO: editar */ }}
+                                  sx={{ color: "#0891b2", "&:hover": { backgroundColor: "rgba(8,145,178,0.1)" } }}
+                                >
+                                  <Edit fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Eliminar">
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => { e.stopPropagation(); /* TODO: eliminar */ }}
+                                  sx={{ color: "#dc2626", "&:hover": { backgroundColor: "rgba(220,38,38,0.1)" } }}
+                                >
+                                  <Delete fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
 
-            {/* Paginación */}
-            <TablePagination
-              component="div"
-              count={totalCount}
-              page={page}
-              onPageChange={handleChangePage}
-              rowsPerPage={rowsPerPage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
-              rowsPerPageOptions={[10, 25, 50, 100]}
-              labelRowsPerPage="Filas por página:"
-              labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
-              sx={{
-                borderTop: "1px solid #e2e8f0",
-                mt: 2,
-                "& .MuiTablePagination-selectIcon": {
-                  color: "#64748b",
-                },
-              }}
-            />
+              <TablePagination
+                component="div"
+                count={totalCount}
+                page={page}
+                onPageChange={handleChangePage}
+                rowsPerPage={rowsPerPage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+                rowsPerPageOptions={[10, 20, 50, 100]}
+                labelRowsPerPage="Filas por página:"
+                labelDisplayedRows={({ from, to, count }) =>
+                  `${from}–${to} de ${count !== -1 ? count.toLocaleString() : `más de ${to}`}`
+                }
+                sx={{
+                  borderTop: "1px solid #e2e8f0",
+                  mt: 2,
+                  "& .MuiTablePagination-select": { fontWeight: 500 },
+                  "& .MuiTablePagination-selectIcon": { color: "#64748b" },
+                }}
+              />
+            </Paper>
           </CardContent>
         </Card>
       </Box>
 
       {/* Dialog de detalles */}
-      <Dialog
-        open={detailOpen}
-        onClose={handleDetailClose}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: "16px",
-          },
-        }}
-      >
+      <Dialog open={detailOpen} onClose={handleDetailClose} maxWidth="sm" fullWidth>
         <DialogTitle
           sx={{
-            backgroundColor: "#f8fafc",
-            borderBottom: "1px solid #e2e8f0",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            backgroundColor: subgerencia.color,
+            color: "white",
+            py: 2,
           }}
         >
-          <Box display="flex" alignItems="center" gap={1.5}>
-            <Groups sx={{ color: "#475569" }} />
-            <Typography variant="h6" fontWeight={600} color="#334155">
-              Detalles del Comité
+          <Box display="flex" alignItems="center" gap={1}>
+            <PersonSearch />
+            <Typography variant="h6" fontWeight={600}>
+              Datos del Comité
             </Typography>
           </Box>
-          <IconButton onClick={handleDetailClose} size="small">
+          <IconButton onClick={handleDetailClose} sx={{ color: "white" }}>
             <Close />
           </IconButton>
         </DialogTitle>
-        <DialogContent sx={{ p: 3, mt: 1 }}>
+
+        <DialogContent sx={{ pt: 3 }}>
           {selectedComite && (
-            <Grid container spacing={3}>
-              {/* Información General */}
-              <Grid size={12}>
-                <Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom>
-                  Información General
+            <Box>
+              {/* Avatar + nombre */}
+              <Box
+                sx={{
+                  textAlign: "center",
+                  mb: 3,
+                  p: 2,
+                  bgcolor: `${subgerencia.color}10`,
+                  borderRadius: 2,
+                  border: `1px solid ${subgerencia.color}30`,
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: "50%",
+                    backgroundColor: subgerencia.color,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    mx: "auto",
+                    mb: 1.5,
+                  }}
+                >
+                  <Typography variant="h5" color="white" fontWeight={700}>
+                    {selectedComite.comite.charAt(0)}
+                  </Typography>
+                </Box>
+                <Typography variant="h6" fontWeight={700} color="text.primary">
+                  {selectedComite.comite}
                 </Typography>
-                <Divider sx={{ mb: 2 }} />
+                <Typography variant="body2" color="text.secondary">
+                  Código · {selectedComite.codigo}
+                </Typography>
+              </Box>
+
+              {/* Información General */}
+              <Typography
+                variant="subtitle2"
+                fontWeight={700}
+                color={subgerencia.color}
+                sx={{ mb: 1.5, display: "flex", alignItems: "center", gap: 0.5 }}
+              >
+                <Groups fontSize="small" />
+                Información General
+              </Typography>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid size={6}>
+                  <Typography variant="caption" color="text.secondary" display="block">Centro de Acopio</Typography>
+                  <Typography variant="body2" fontWeight={500}>{selectedComite.centroAcopio}</Typography>
+                </Grid>
+                <Grid size={6}>
+                  <Typography variant="caption" color="text.secondary" display="block">Ruta</Typography>
+                  <Typography variant="body2" fontWeight={500}>{selectedComite.ruta}</Typography>
+                </Grid>
               </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Código</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedComite.codigo}</Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Comité</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedComite.comite}</Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Centro de Acopio</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedComite.centroAcopio}</Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Ruta</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedComite.ruta}</Typography>
-              </Grid>
-              
+
+              <Divider sx={{ mb: 2 }} />
 
               {/* Ubicación */}
-              <Grid size={12}>
-                <Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom sx={{ mt: 2 }}>
-                  Ubicación
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
+              <Typography
+                variant="subtitle2"
+                fontWeight={700}
+                color={subgerencia.color}
+                sx={{ mb: 1.5, display: "flex", alignItems: "center", gap: 0.5 }}
+              >
+                <LocationOn fontSize="small" />
+                Ubicación
+              </Typography>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid size={6}>
+                  <Typography variant="caption" color="text.secondary" display="block">Pueblo</Typography>
+                  <Typography variant="body2" fontWeight={500}>{selectedComite.pueblo}</Typography>
+                </Grid>
+                <Grid size={6}>
+                  <Typography variant="caption" color="text.secondary" display="block">Comuna</Typography>
+                  <Typography variant="body2" fontWeight={500}>{selectedComite.comuna}</Typography>
+                </Grid>
+                <Grid size={12}>
+                  <Typography variant="caption" color="text.secondary" display="block">Dirección</Typography>
+                  <Typography variant="body2" fontWeight={500}>{selectedComite.direccionReferencia}</Typography>
+                </Grid>
               </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Pueblo</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedComite.pueblo}</Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Comuna</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedComite.comuna}</Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Dirección</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedComite.direccionReferencia}</Typography>
-              </Grid>
+
+              <Divider sx={{ mb: 2 }} />
 
               {/* Estadísticas */}
-              <Grid size={12}>
-                <Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom sx={{ mt: 2 }}>
-                  Estadísticas
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Beneficiarios</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedComite.beneficiarios}</Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Socios</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedComite.socios}</Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Beneficiarios Extranjeros</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedComite.beneficiariosExtranjeros}</Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Discapacitados</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedComite.discapacitados}</Typography>
+              <Typography
+                variant="subtitle2"
+                fontWeight={700}
+                color={subgerencia.color}
+                sx={{ mb: 1.5, display: "flex", alignItems: "center", gap: 0.5 }}
+              >
+                <PeopleAlt fontSize="small" />
+                Estadísticas
+              </Typography>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid size={6}>
+                  <Typography variant="caption" color="text.secondary" display="block">Beneficiarios</Typography>
+                  <Typography variant="body2" fontWeight={500}>{selectedComite.beneficiarios}</Typography>
+                </Grid>
+                <Grid size={6}>
+                  <Typography variant="caption" color="text.secondary" display="block">Socios</Typography>
+                  <Typography variant="body2" fontWeight={500}>{selectedComite.socios}</Typography>
+                </Grid>
+                <Grid size={6}>
+                  <Typography variant="caption" color="text.secondary" display="block">Beneficiarios Extranjeros</Typography>
+                  <Typography variant="body2" fontWeight={500}>{selectedComite.beneficiariosExtranjeros}</Typography>
+                </Grid>
+                <Grid size={6}>
+                  <Typography variant="caption" color="text.secondary" display="block">Discapacitados</Typography>
+                  <Typography variant="body2" fontWeight={500}>{selectedComite.discapacitados}</Typography>
+                </Grid>
               </Grid>
 
+              <Divider sx={{ mb: 2 }} />
+
               {/* Coordinadora */}
-              <Grid size={12}>
-                <Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom sx={{ mt: 2 }}>
-                  Coordinadora
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Nombre</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedComite.coordinadora}</Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">DNI</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedComite.dniCoordinadora}</Typography>
-              </Grid>
-              <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-                <Typography variant="caption" color="text.secondary">Teléfono</Typography>
-                <Typography variant="body2" fontWeight={500}>{selectedComite.telefonoCoordinadora}</Typography>
+              <Typography
+                variant="subtitle2"
+                fontWeight={700}
+                color={subgerencia.color}
+                sx={{ mb: 1.5, display: "flex", alignItems: "center", gap: 0.5 }}
+              >
+                <Badge fontSize="small" />
+                Coordinadora
+              </Typography>
+              <Grid container spacing={2} sx={{ mb: selectedComite.observaciones ? 3 : 0 }}>
+                <Grid size={6}>
+                  <Typography variant="caption" color="text.secondary" display="block">Nombre</Typography>
+                  <Typography variant="body2" fontWeight={500}>{selectedComite.coordinadora}</Typography>
+                </Grid>
+                <Grid size={6}>
+                  <Typography variant="caption" color="text.secondary" display="block">DNI</Typography>
+                  <Typography variant="body2" fontWeight={500} fontFamily="monospace">{selectedComite.dniCoordinadora}</Typography>
+                </Grid>
+                <Grid size={6}>
+                  <Typography variant="caption" color="text.secondary" display="block">Teléfono</Typography>
+                  <Typography variant="body2" fontWeight={500}>{selectedComite.telefonoCoordinadora}</Typography>
+                </Grid>
               </Grid>
 
               {/* Observaciones */}
               {selectedComite.observaciones && (
                 <>
-                  <Grid size={12}>
-                    <Typography variant="subtitle2" fontWeight={600} color="#475569" gutterBottom sx={{ mt: 2 }}>
-                      Observaciones
-                    </Typography>
-                    <Divider sx={{ mb: 2 }} />
-                  </Grid>
-                  <Grid size={12}>
-                    <Typography variant="body2">{selectedComite.observaciones}</Typography>
-                  </Grid>
+                  <Divider sx={{ mb: 2 }} />
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
+                    Observaciones
+                  </Typography>
+                  <Typography variant="body2">{selectedComite.observaciones}</Typography>
                 </>
               )}
-            </Grid>
+            </Box>
           )}
         </DialogContent>
-        <DialogActions sx={{ p: 2, borderTop: "1px solid #e2e8f0" }}>
+
+        <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button
             onClick={handleDetailClose}
-            sx={{
-              textTransform: "none",
-              color: "#64748b",
-            }}
+            variant="outlined"
+            sx={{ borderColor: subgerencia.color, color: subgerencia.color }}
           >
             Cerrar
           </Button>

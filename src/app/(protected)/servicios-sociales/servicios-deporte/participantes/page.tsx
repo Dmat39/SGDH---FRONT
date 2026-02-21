@@ -5,6 +5,8 @@ import {
   Box,
   Typography,
   Paper,
+  Card,
+  CardContent,
   Table,
   TableBody,
   TableCell,
@@ -32,7 +34,7 @@ import {
   Grid,
 } from "@mui/material";
 import {
-  Download,
+  FileDownload,
   Refresh,
   Search,
   FilterList,
@@ -558,159 +560,188 @@ export default function ParticipantesPage() {
   return (
     <Box>
       {/* ── Header ── */}
-      <Box mb={3} display="flex" alignItems="flex-start" justifyContent="space-between" flexWrap="wrap" gap={2}>
-        <Box>
-          <Box display="flex" alignItems="center" gap={1} mb={0.5}>
-            <Groups sx={{ color: MODULE_COLOR, fontSize: 32 }} />
-            <Typography variant="h4" fontWeight={700} color="text.primary">
-              Participantes
-            </Typography>
+      <Box mb={4}>
+        <Box display="flex" alignItems="center" gap={2} mb={1}>
+          <Box
+            sx={{
+              background: `linear-gradient(135deg, ${MODULE_COLOR}15 0%, ${MODULE_COLOR}30 100%)`,
+              color: MODULE_COLOR,
+              width: 48,
+              height: 48,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "12px",
+              boxShadow: `0 4px 12px ${MODULE_COLOR}25`,
+            }}
+          >
+            <Groups sx={{ fontSize: 28 }} />
           </Box>
-          <Typography variant="body1" color="text.secondary">
-            Listado de participantes del módulo de{" "}
-            <span style={{ color: MODULE_COLOR, fontWeight: 600 }}>Cultura y Deporte</span>
+          <Typography variant="h4" fontWeight="bold" sx={{ color: MODULE_COLOR }}>
+            Participantes
           </Typography>
         </Box>
-        <Box display="flex" gap={1}>
-          <Tooltip title="Actualizar datos">
-            <IconButton
-              onClick={() => { setPage(0); setFetchKey((k) => k + 1); }}
-              sx={{ color: MODULE_COLOR }}
-            >
-              <Refresh />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Exportar a Excel">
-            <span>
-              <Button
-                variant="outlined"
-                startIcon={<Download />}
-                onClick={handleExport}
-                disabled={isLoading || filteredData.length === 0}
-                sx={{ borderColor: MODULE_COLOR, color: MODULE_COLOR, "&:hover": { borderColor: MODULE_COLOR } }}
-              >
-                Exportar
-              </Button>
-            </span>
-          </Tooltip>
-        </Box>
+        <Typography variant="body1" color="text.secondary" sx={{ ml: 7.5 }}>
+          Listado de participantes del módulo de Cultura y Deporte
+        </Typography>
       </Box>
 
-      {/* ── Barra de filtros ── */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center" }}>
-          {/* Búsqueda */}
-          <TextField
-            size="small"
-            placeholder="Buscar por nombre o DNI..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            sx={{
-              minWidth: 280,
-              flexGrow: 1,
-              "& .MuiOutlinedInput-root": {
-                "&:hover fieldset": { borderColor: MODULE_COLOR },
-                "&.Mui-focused fieldset": { borderColor: MODULE_COLOR },
-              },
-            }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search sx={{ color: MODULE_COLOR }} fontSize="small" />
-                </InputAdornment>
-              ),
-            }}
-          />
-
-          {/* Filtro por taller */}
-          <TextField
-            select
-            size="small"
-            label="Taller"
-            value={filtroTaller}
-            onChange={(e) => { setFiltroTaller(e.target.value); setPage(0); setFetchKey((k) => k + 1); }}
-            sx={{ minWidth: 180 }}
-          >
-            <MenuItem value="">Todos los talleres</MenuItem>
-            {TALLERES.map((t) => (
-              <MenuItem key={t.id} value={t.id}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Box sx={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: getTallerColor(t.id) }} />
-                  {t.name}
-                </Box>
-              </MenuItem>
-            ))}
-          </TextField>
-
-          {/* Botón filtros avanzados */}
-          <Tooltip title="Filtros de edad y cumpleaños">
-            <IconButton
-              onClick={(e) => setFilterAnchor(e.currentTarget)}
+      {/* ── Tarjeta principal ── */}
+      <Card
+        sx={{
+          borderRadius: "16px",
+          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
+          overflow: "visible",
+        }}
+      >
+        <CardContent sx={{ p: 3 }}>
+          {/* ── Barra de búsqueda y filtros ── */}
+          <Box mb={2} display="flex" gap={1.5} alignItems="center" flexWrap="wrap">
+            {/* Búsqueda */}
+            <TextField
+              size="small"
+              placeholder="Buscar por nombre o DNI..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search sx={{ color: "#64748b", fontSize: 20 }} />
+                    </InputAdornment>
+                  ),
+                },
+              }}
               sx={{
-                backgroundColor:
-                  filterOpen || isEdadFiltered || filtroDia || filtroMes
-                    ? "#e0f7f7"
-                    : "#f8fafc",
-                border: `1px solid ${
-                  filterOpen || isEdadFiltered || filtroDia || filtroMes
-                    ? MODULE_COLOR
-                    : "#e2e8f0"
-                }`,
-                borderRadius: "8px",
-                "&:hover": { backgroundColor: "#e0f7f7", borderColor: MODULE_COLOR },
+                width: 280,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "8px",
+                  backgroundColor: "#f8fafc",
+                  "&:hover fieldset": { borderColor: "#64748b" },
+                  "&.Mui-focused fieldset": { borderColor: "#475569" },
+                },
+              }}
+            />
+
+            {/* Filtro por taller */}
+            <TextField
+              select
+              size="small"
+              label="Taller"
+              value={filtroTaller}
+              onChange={(e) => { setFiltroTaller(e.target.value); setPage(0); setFetchKey((k) => k + 1); }}
+              sx={{
+                minWidth: 180,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "8px",
+                  backgroundColor: "#f8fafc",
+                },
               }}
             >
-              <FilterList
+              <MenuItem value="">Todos los talleres</MenuItem>
+              {TALLERES.map((t) => (
+                <MenuItem key={t.id} value={t.id}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Box sx={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: getTallerColor(t.id) }} />
+                    {t.name}
+                  </Box>
+                </MenuItem>
+              ))}
+            </TextField>
+
+            {/* Filtros avanzados */}
+            <Tooltip title="Filtros de edad y cumpleaños">
+              <IconButton
+                onClick={(e) => setFilterAnchor(e.currentTarget)}
                 sx={{
-                  color:
-                    filterOpen || isEdadFiltered || filtroDia || filtroMes
-                      ? MODULE_COLOR
-                      : "#64748b",
-                  fontSize: 20,
+                  backgroundColor: filterOpen || isEdadFiltered || filtroDia || filtroMes ? "#e0f7f7" : "#f8fafc",
+                  border: `1px solid ${filterOpen || isEdadFiltered || filtroDia || filtroMes ? MODULE_COLOR : "#e2e8f0"}`,
+                  borderRadius: "8px",
+                  "&:hover": { backgroundColor: "#e0f7f7", borderColor: MODULE_COLOR },
                 }}
-              />
-            </IconButton>
-          </Tooltip>
-
-          {/* Chips filtros rápidos activos */}
-          {isEdadFiltered && (
-            <Box sx={{ backgroundColor: "#dbeafe", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
-              <Typography variant="caption" color="#1e40af">
-                Edad: {edadRange[0]} - {edadRange[1]} años
-              </Typography>
-              <IconButton size="small" onClick={() => { setEdadRange([0, 110]); setEdadRangePending([0, 110]); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
-                <Close sx={{ fontSize: 14, color: "#1e40af" }} />
-              </IconButton>
-            </Box>
-          )}
-          {(filtroDia || filtroMes) && (
-            <Box sx={{ backgroundColor: "#e0f7f7", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
-              <Cake sx={{ fontSize: 14, color: MODULE_COLOR }} />
-              <Typography variant="caption" color={MODULE_COLOR}>
-                {filtroMes && !filtroDia && MESES.find((m) => m.value === filtroMes)?.label}
-                {filtroDia && filtroMes && `${filtroDia}/${filtroMes}`}
-                {filtroDia && !filtroMes && `Día ${filtroDia}`}
-              </Typography>
-              <IconButton size="small" onClick={() => { setFiltroDia(""); setFiltroMes(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
-                <Close sx={{ fontSize: 14, color: MODULE_COLOR }} />
-              </IconButton>
-            </Box>
-          )}
-
-          <Box sx={{ flex: 1 }} />
-
-          {hayFiltrosActivos && (
-            <Tooltip title="Limpiar filtros">
-              <IconButton onClick={limpiarFiltros} size="small">
-                <Clear />
+              >
+                <FilterList sx={{ color: filterOpen || isEdadFiltered || filtroDia || filtroMes ? MODULE_COLOR : "#64748b", fontSize: 20 }} />
               </IconButton>
             </Tooltip>
-          )}
 
-          <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
-            {isLoading ? "Cargando..." : `${totalCount.toLocaleString()} participantes registrados`}
-          </Typography>
-        </Box>
+            {/* Chips de filtros activos */}
+            {isEdadFiltered && (
+              <Box sx={{ backgroundColor: "#dbeafe", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                <Typography variant="caption" color="#1e40af">
+                  Edad: {edadRange[0]} - {edadRange[1]} años
+                </Typography>
+                <IconButton size="small" onClick={() => { setEdadRange([0, 110]); setEdadRangePending([0, 110]); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                  <Close sx={{ fontSize: 14, color: "#1e40af" }} />
+                </IconButton>
+              </Box>
+            )}
+            {(filtroDia || filtroMes) && (
+              <Box sx={{ backgroundColor: "#e0f7f7", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                <Cake sx={{ fontSize: 14, color: MODULE_COLOR }} />
+                <Typography variant="caption" color={MODULE_COLOR}>
+                  {filtroMes && !filtroDia && MESES.find((m) => m.value === filtroMes)?.label}
+                  {filtroDia && filtroMes && `${filtroDia}/${filtroMes}`}
+                  {filtroDia && !filtroMes && `Día ${filtroDia}`}
+                </Typography>
+                <IconButton size="small" onClick={() => { setFiltroDia(""); setFiltroMes(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                  <Close sx={{ fontSize: 14, color: MODULE_COLOR }} />
+                </IconButton>
+              </Box>
+            )}
+
+            <Box sx={{ flex: 1 }} />
+
+            {hayFiltrosActivos && (
+              <Tooltip title="Limpiar filtros">
+                <IconButton onClick={limpiarFiltros} size="small" sx={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px" }}>
+                  <Clear sx={{ color: "#64748b", fontSize: 20 }} />
+                </IconButton>
+              </Tooltip>
+            )}
+
+            {/* Actualizar */}
+            <Tooltip title="Actualizar datos">
+              <IconButton
+                onClick={() => { setPage(0); setFetchKey((k) => k + 1); }}
+                sx={{
+                  backgroundColor: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "8px",
+                  "&:hover": { backgroundColor: "#e2e8f0" },
+                }}
+              >
+                <Refresh sx={{ color: "#64748b", fontSize: 20 }} />
+              </IconButton>
+            </Tooltip>
+
+            {/* Exportar Excel */}
+            <Tooltip title="Descargar listado en formato Excel">
+              <span>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<FileDownload />}
+                  onClick={handleExport}
+                  disabled={isLoading || filteredData.length === 0}
+                  sx={{
+                    borderColor: "#22c55e",
+                    color: "#16a34a",
+                    borderRadius: "8px",
+                    textTransform: "none",
+                    fontWeight: 600,
+                    "&:hover": { backgroundColor: "#dcfce7", borderColor: "#16a34a" },
+                    "&.Mui-disabled": { opacity: 0.4 },
+                  }}
+                >
+                  Exportar Excel
+                </Button>
+              </span>
+            </Tooltip>
+
+            <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
+              {isLoading ? "Cargando..." : `${totalCount.toLocaleString()} participante(s)`}
+            </Typography>
+          </Box>
 
         {/* Popover filtros avanzados */}
         <Popover
@@ -868,10 +899,17 @@ export default function ParticipantesPage() {
             )}
           </Box>
         )}
-      </Paper>
 
-      {/* ── Tabla ── */}
-      <Paper sx={{ overflow: "hidden" }}>
+          {/* ── Tabla ── */}
+          <Paper
+            sx={{
+              borderRadius: "12px",
+              boxShadow: "none",
+              border: "1px solid #e2e8f0",
+              overflow: "hidden",
+              mt: 2,
+            }}
+          >
         {isLoading ? (
           <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" py={8} gap={2}>
             <CircularProgress sx={{ color: MODULE_COLOR }} />
@@ -1051,12 +1089,16 @@ export default function ParticipantesPage() {
               }
               sx={{
                 borderTop: "1px solid #e2e8f0",
+                mt: 2,
                 "& .MuiTablePagination-select": { fontWeight: 500 },
+                "& .MuiTablePagination-selectIcon": { color: "#64748b" },
               }}
             />
           </>
         )}
-      </Paper>
+          </Paper>
+        </CardContent>
+      </Card>
 
       {/* ── Modal de Detalle ── */}
       <Dialog open={detalleOpen} onClose={() => setDetalleOpen(false)} maxWidth="sm" fullWidth>
