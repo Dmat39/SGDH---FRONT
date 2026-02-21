@@ -459,6 +459,14 @@ export const MODULOS_SERVICIOS_SOCIALES: MenuItem[] = [
         permisos: ["salud", "all_servicios_sociales", "all"],
       },
       {
+        id: "salud-compromiso-1",
+        nombre: "Compromiso 1 · Bajo Hierro",
+        ruta: "/servicios-sociales/salud/compromiso-1",
+        icono: "ChildCare",
+        descripcion: "Madres con niños diagnosticados con anemia",
+        permisos: ["salud", "all_servicios_sociales", "all"],
+      },
+      {
         id: "salud-campanas",
         nombre: "Campañas",
         ruta: "/servicios-sociales/salud/campanas",
