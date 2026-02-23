@@ -16,7 +16,7 @@ Este es un sistema web desarrollado con Next.js 15, TypeScript y Material-UI que
 - **CIAM** - Centro Integral de Atención al Adulto Mayor
 
 ### Subgerencia de Servicios Sociales
-- **Participación Ciudadana**
+- **Participación Vecinal**
 - **Servicios de Deporte**
 - **Salud** (Compromiso 1 y Veterinaria)
 

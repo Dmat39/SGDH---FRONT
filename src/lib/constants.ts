@@ -89,8 +89,8 @@ export const ROLES = {
     permisos: ["ciam", "mapa_ciam"],
   },
   [RoleType.USUARIO_PARTICIPACION]: {
-    nombre: "Usuario Participación Ciudadana",
-    descripcion: "Acceso al área de Participación Ciudadana",
+    nombre: "Usuario Participación Vecinal",
+    descripcion: "Acceso al área de Participación Vecinal",
     permisos: ["participacion_ciudadana", "mapa_participacion"],
   },
   [RoleType.USUARIO_DEPORTES]: {
@@ -393,32 +393,39 @@ export const MODULOS_PROGRAMAS_SOCIALES: MenuItem[] = [
 export const MODULOS_SERVICIOS_SOCIALES: MenuItem[] = [
   {
     id: "participacion-ciudadana",
-    nombre: "Participación Ciudadana",
+    nombre: "Participación Vecinal",
     icono: "Groups",
-    descripcion: "Gestión de programas de participación ciudadana",
+    descripcion: "Gestión de programas de participación vecinal",
     permisos: ["participacion_ciudadana", "all_servicios_sociales", "all"],
     children: [
-      {
+      /*{
         id: "participacion-dashboard",
         nombre: "Dashboard",
         ruta: "/servicios-sociales/participacion-ciudadana",
         icono: "Dashboard",
         permisos: ["participacion_ciudadana", "all_servicios_sociales", "all"],
-      },
+      },*/
       {
+        id: "participacion-dirigentes",
+        nombre: "Dirigentes",
+        ruta: "/servicios-sociales/participacion-ciudadana/dirigentes",
+        icono: "People",
+        permisos: ["participacion_ciudadana", "all_servicios_sociales", "all"],
+      },
+     /* {
         id: "participacion-programas",
         nombre: "Programas",
         ruta: "/servicios-sociales/participacion-ciudadana/programas",
         icono: "List",
         permisos: ["participacion_ciudadana", "all_servicios_sociales", "all"],
-      },
-      {
+      },*/
+     /* {
         id: "participacion-mapa",
         nombre: "Mapa",
         ruta: "/servicios-sociales/participacion-ciudadana/mapa",
         icono: "Map",
         permisos: ["participacion_ciudadana", "mapa_participacion", "all_servicios_sociales", "all"],
-      },
+      },*/
     ],
   },
   {

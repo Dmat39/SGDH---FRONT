@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box,
   Typography,
@@ -16,6 +16,7 @@ import {
   TablePagination,
   CircularProgress,
   TextField,
+  Button,
   Chip,
   IconButton,
   Tooltip,
@@ -24,9 +25,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Button,
-  Divider,
   Grid,
+  Divider,
   Popover,
   Slider,
   ToggleButton,
@@ -37,18 +37,17 @@ import {
   FileDownload,
   Refresh,
   Search,
-  Visibility,
+  Clear,
   Close,
-  ChildCare,
+  Visibility,
   Badge,
   Phone,
   CalendarMonth,
   PersonSearch,
-  Edit,
-  Delete,
-  FilterList,
-  Clear,
+  People,
+  LocationOn,
   Cake,
+  FilterList,
 } from "@mui/icons-material";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -59,7 +58,7 @@ const subgerencia = SUBGERENCIAS[SubgerenciaType.SERVICIOS_SOCIALES];
 const MODULE_COLOR = subgerencia.color; // #00a3a8
 
 // ============================================
-// MESES / TIPO FILTRO
+// MESES
 // ============================================
 const MESES = [
   { value: 1,  label: "Enero" },
@@ -79,55 +78,18 @@ const MESES = [
 type FilterType = "edad" | "cumpleanos";
 
 // ============================================
-// TIPOS
-// ============================================
-interface MadreBackend {
-  id: string;
-  name: string;
-  lastname: string;
-  doc_num: string;
-  phone: string | null;
-  birthday: string | null;
-  created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
-  doc_type: string;
-}
-
-interface BackendResponse {
-  message: string;
-  data: {
-    data: MadreBackend[];
-    currentPage: number;
-    pageCount: number;
-    totalCount: number;
-    totalPages: number;
-  };
-}
-
-interface MadreTabla {
-  id: string;
-  nombreCompleto: string;
-  nombre: string;
-  apellido: string;
-  tipoDoc: string;
-  numDoc: string;
-  telefono: string | null;
-  fechaNacimiento: string | null;
-  edad: number | null;
-  fechaRegistro: string;
-}
-
-// ============================================
 // UTILIDADES
 // ============================================
-const toTitleCase = (str: string): string => {
-  if (!str) return "";
-  return str
-    .toLowerCase()
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+const calcularEdad = (fechaNacimiento: string | null | undefined): number => {
+  if (!fechaNacimiento) return 0;
+  const hoy = new Date();
+  const nacimiento = new Date(fechaNacimiento);
+  let edad = hoy.getUTCFullYear() - nacimiento.getUTCFullYear();
+  const mes = hoy.getUTCMonth() - nacimiento.getUTCMonth();
+  if (mes < 0 || (mes === 0 && hoy.getUTCDate() < nacimiento.getUTCDate())) {
+    edad--;
+  }
+  return edad;
 };
 
 const formatearFecha = (fecha: string | null | undefined): string => {
@@ -139,54 +101,87 @@ const formatearFecha = (fecha: string | null | undefined): string => {
   return `${dia}/${mes}/${anio}`;
 };
 
-const formatearTelefono = (tel: string | null | undefined): string => {
-  if (!tel) return "-";
-  const limpio = tel.replace(/\D/g, "");
-  if (limpio.length === 9) {
-    return `${limpio.slice(0, 3)} ${limpio.slice(3, 6)} ${limpio.slice(6)}`;
-  }
-  return tel;
-};
-
-const calcularEdad = (fechaNacimiento: string | null | undefined): number | null => {
-  if (!fechaNacimiento) return null;
-  const hoy = new Date();
-  const nacimiento = new Date(fechaNacimiento);
-  let edad = hoy.getUTCFullYear() - nacimiento.getUTCFullYear();
-  const mes = hoy.getUTCMonth() - nacimiento.getUTCMonth();
-  if (mes < 0 || (mes === 0 && hoy.getUTCDate() < nacimiento.getUTCDate())) {
-    edad--;
-  }
-  return edad;
+const formatearTelefono = (telefono: string | null | undefined): string => {
+  if (!telefono || !telefono.trim()) return "-";
+  const t = telefono.trim();
+  if (t.startsWith("+51")) return t;
+  if (t.startsWith("51") && t.length >= 11) return `+${t}`;
+  return `+51${t}`;
 };
 
 // ============================================
-// MAPEO DE DATOS
+// INTERFACES BACKEND
 // ============================================
-const mapToTabla = (item: MadreBackend): MadreTabla => ({
+interface DirigenteBackend {
+  id: string;
+  name: string;
+  lastname: string;
+  dni: string;
+  phone: string | null;
+  birthday: string | null;
+  pueblo: string | null;
+  charges_id: string | null;
+  comunne_id: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+interface BackendResponse {
+  message: string;
+  data: {
+    data: DirigenteBackend[];
+    totalCount: number;
+    currentPage: number;
+    pageCount: number;
+    totalPages: number;
+  };
+}
+
+interface BackendDetalleResponse {
+  message: string;
+  data: DirigenteBackend;
+}
+
+// ============================================
+// INTERFACE FRONTEND (tabla)
+// ============================================
+interface DirigenteTabla {
+  id: string;
+  nombreCompleto: string;
+  dni: string;
+  celular: string;
+  fechaNacimiento: string;
+  edad: number;
+  pueblo: string;
+}
+
+// ============================================
+// MAPEO
+// ============================================
+const mapToTabla = (item: DirigenteBackend): DirigenteTabla => ({
   id: item.id,
-  nombreCompleto: toTitleCase(`${item.name} ${item.lastname}`),
-  nombre: toTitleCase(item.name),
-  apellido: toTitleCase(item.lastname),
-  tipoDoc: item.doc_type,
-  numDoc: item.doc_num,
-  telefono: item.phone,
-  fechaNacimiento: item.birthday,
+  nombreCompleto: `${item.name.trim()} ${item.lastname.trim()}`,
+  dni: item.dni || "-",
+  celular: item.phone || "",
+  fechaNacimiento: item.birthday || "",
   edad: calcularEdad(item.birthday),
-  fechaRegistro: item.created_at,
+  pueblo: item.pueblo?.trim() || "-",
 });
 
 // ============================================
 // COMPONENTE DE DETALLE
 // ============================================
-interface DetalleMadreProps {
-  madre: MadreTabla | null;
+function DetalleDigirente({
+  dirigente,
+  isLoading,
+  onClose,
+}: {
+  dirigente: DirigenteBackend | null;
   isLoading: boolean;
   onClose: () => void;
-}
-
-function DetalleMadre({ madre, isLoading, onClose }: DetalleMadreProps) {
-  const edad = madre ? calcularEdad(madre.fechaNacimiento) : null;
+}) {
+  const edad = dirigente ? calcularEdad(dirigente.birthday) : null;
 
   return (
     <>
@@ -203,7 +198,7 @@ function DetalleMadre({ madre, isLoading, onClose }: DetalleMadreProps) {
         <Box display="flex" alignItems="center" gap={1}>
           <PersonSearch />
           <Typography variant="h6" fontWeight={600}>
-            Datos de la Madre
+            Datos del Dirigente
           </Typography>
         </Box>
         <IconButton onClick={onClose} sx={{ color: "white" }}>
@@ -212,7 +207,7 @@ function DetalleMadre({ madre, isLoading, onClose }: DetalleMadreProps) {
       </DialogTitle>
 
       <DialogContent sx={{ pt: 3 }}>
-        {isLoading || !madre ? (
+        {isLoading || !dirigente ? (
           <Box display="flex" justifyContent="center" py={5}>
             <CircularProgress sx={{ color: MODULE_COLOR }} />
           </Box>
@@ -243,18 +238,18 @@ function DetalleMadre({ madre, isLoading, onClose }: DetalleMadreProps) {
                 }}
               >
                 <Typography variant="h5" color="white" fontWeight={700}>
-                  {madre.nombre.charAt(0)}
+                  {dirigente.name.trim().charAt(0)}
                 </Typography>
               </Box>
               <Typography variant="h6" fontWeight={700} color="text.primary">
-                {madre.nombreCompleto}
+                {`${dirigente.name.trim()} ${dirigente.lastname.trim()}`}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {madre.tipoDoc} · {madre.numDoc}
+                DNI · {dirigente.dni}
               </Typography>
             </Box>
 
-            {/* Datos de Identificación */}
+            {/* Identificación */}
             <Typography
               variant="subtitle2"
               fontWeight={700}
@@ -270,7 +265,7 @@ function DetalleMadre({ madre, isLoading, onClose }: DetalleMadreProps) {
                   Nombres
                 </Typography>
                 <Typography variant="body2" fontWeight={500}>
-                  {madre.nombre}
+                  {dirigente.name.trim()}
                 </Typography>
               </Grid>
               <Grid size={6}>
@@ -278,32 +273,22 @@ function DetalleMadre({ madre, isLoading, onClose }: DetalleMadreProps) {
                   Apellidos
                 </Typography>
                 <Typography variant="body2" fontWeight={500}>
-                  {madre.apellido}
+                  {dirigente.lastname.trim()}
                 </Typography>
               </Grid>
               <Grid size={6}>
                 <Typography variant="caption" color="text.secondary" display="block">
-                  Tipo de Documento
-                </Typography>
-                <Chip
-                  label={madre.tipoDoc}
-                  size="small"
-                  sx={{ backgroundColor: `${MODULE_COLOR}20`, color: MODULE_COLOR, fontWeight: 600 }}
-                />
-              </Grid>
-              <Grid size={6}>
-                <Typography variant="caption" color="text.secondary" display="block">
-                  N° de Documento
+                  N° de Documento (DNI)
                 </Typography>
                 <Typography variant="body2" fontWeight={500} fontFamily="monospace">
-                  {madre.numDoc}
+                  {dirigente.dni}
                 </Typography>
               </Grid>
             </Grid>
 
             <Divider sx={{ mb: 2 }} />
 
-            {/* Datos de Contacto */}
+            {/* Contacto y Nacimiento */}
             <Typography
               variant="subtitle2"
               fontWeight={700}
@@ -316,10 +301,10 @@ function DetalleMadre({ madre, isLoading, onClose }: DetalleMadreProps) {
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid size={6}>
                 <Typography variant="caption" color="text.secondary" display="block">
-                  Teléfono / Celular
+                  Celular
                 </Typography>
                 <Typography variant="body2" fontWeight={500}>
-                  {formatearTelefono(madre.telefono) || "-"}
+                  {formatearTelefono(dirigente.phone)}
                 </Typography>
               </Grid>
               <Grid size={6}>
@@ -327,10 +312,10 @@ function DetalleMadre({ madre, isLoading, onClose }: DetalleMadreProps) {
                   Fecha de Nacimiento
                 </Typography>
                 <Typography variant="body2" fontWeight={500}>
-                  {formatearFecha(madre.fechaNacimiento)}
+                  {formatearFecha(dirigente.birthday)}
                 </Typography>
               </Grid>
-              {edad !== null && (
+              {edad !== null && dirigente.birthday && (
                 <Grid size={6}>
                   <Typography variant="caption" color="text.secondary" display="block">
                     Edad
@@ -346,6 +331,29 @@ function DetalleMadre({ madre, isLoading, onClose }: DetalleMadreProps) {
             </Grid>
 
             <Divider sx={{ mb: 2 }} />
+
+            {/* Ubicación */}
+            <Typography
+              variant="subtitle2"
+              fontWeight={700}
+              color={MODULE_COLOR}
+              sx={{ mb: 1.5, display: "flex", alignItems: "center", gap: 0.5 }}
+            >
+              <LocationOn fontSize="small" />
+              Ubicación
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid size={12}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Pueblo / Asentamiento
+                </Typography>
+                <Typography variant="body2" fontWeight={500}>
+                  {dirigente.pueblo?.trim() || "-"}
+                </Typography>
+              </Grid>
+            </Grid>
+
+            <Divider sx={{ mb: 2, mt: 2 }} />
 
             {/* Registro */}
             <Typography
@@ -363,7 +371,15 @@ function DetalleMadre({ madre, isLoading, onClose }: DetalleMadreProps) {
                   Fecha de Registro
                 </Typography>
                 <Typography variant="body2" fontWeight={500}>
-                  {formatearFecha(madre.fechaRegistro)}
+                  {formatearFecha(dirigente.created_at)}
+                </Typography>
+              </Grid>
+              <Grid size={6}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  Última Actualización
+                </Typography>
+                <Typography variant="body2" fontWeight={500}>
+                  {formatearFecha(dirigente.updated_at)}
                 </Typography>
               </Grid>
             </Grid>
@@ -372,7 +388,11 @@ function DetalleMadre({ madre, isLoading, onClose }: DetalleMadreProps) {
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} variant="outlined" sx={{ borderColor: MODULE_COLOR, color: MODULE_COLOR }}>
+        <Button
+          onClick={onClose}
+          variant="outlined"
+          sx={{ borderColor: MODULE_COLOR, color: MODULE_COLOR }}
+        >
           Cerrar
         </Button>
       </DialogActions>
@@ -381,24 +401,27 @@ function DetalleMadre({ madre, isLoading, onClose }: DetalleMadreProps) {
 }
 
 // ============================================
-// PÁGINA PRINCIPAL
+// COMPONENTE PRINCIPAL
 // ============================================
-export default function Compromiso1Page() {
-  // --- Estado: Datos ---
-  const [rawData, setRawData] = useState<MadreTabla[]>([]);
+export default function DirigentesPage() {
+  const { getData } = useFetch();
+
+  // Datos
+  const [rawData, setRawData] = useState<DirigenteTabla[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const rawDataMap = useRef<Map<string, DirigenteBackend>>(new Map());
 
-  // --- Estado: Paginación ---
+  // Paginación
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(20);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [fetchKey, setFetchKey] = useState(0);
 
-  // --- Estado: Búsqueda ---
+  // Búsqueda con debounce
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  // --- Estado: Filtros avanzados ---
+  // Filtros avanzados
   const [filterType, setFilterType] = useState<FilterType>("edad");
   const [edadRange, setEdadRange] = useState<number[]>([0, 110]);
   const [edadRangePending, setEdadRangePending] = useState<number[]>([0, 110]);
@@ -406,14 +429,12 @@ export default function Compromiso1Page() {
   const [filtroDia, setFiltroDia] = useState("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
 
-  // --- Estado: Detalle ---
+  // Detalle
   const [detalleOpen, setDetalleOpen] = useState(false);
-  const [detalleMadre, setDetalleMadre] = useState<MadreTabla | null>(null);
+  const [detalleDigirente, setDetalleDigirente] = useState<DirigenteBackend | null>(null);
+  const [detalleLoading, setDetalleLoading] = useState(false);
 
-  const { getData } = useFetch();
-  const dataFormateados = useFormatTableData(rawData);
-
-  // --- Debounce búsqueda ---
+  // Debounce búsqueda
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm);
@@ -422,7 +443,7 @@ export default function Compromiso1Page() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // --- Fetch de datos ---
+  // Fetch datos
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -445,28 +466,59 @@ export default function Compromiso1Page() {
         params.set("month", String(filtroMes));
       }
 
-      const response = await getData<BackendResponse>(`compromise/mother?${params.toString()}`);
+      const response = await getData<BackendResponse>(
+        `participation/neighbors?${params.toString()}`
+      );
 
       if (response?.data) {
-        setRawData(response.data.data.map(mapToTabla));
+        const items = response.data.data.map((item) => {
+          rawDataMap.current.set(item.id, item);
+          return mapToTabla(item);
+        });
+        setRawData(items);
         setTotalCount(response.data.totalCount);
       }
     } catch (error) {
-      console.error("Error al cargar madres:", error);
+      console.error("Error cargando dirigentes:", error);
       setRawData([]);
       setTotalCount(0);
     } finally {
       setIsLoading(false);
     }
-  }, [page, rowsPerPage, debouncedSearch, fetchKey, edadRange, filtroMes, filtroDia, getData]);
+  }, [page, rowsPerPage, fetchKey, debouncedSearch, edadRange, filtroMes, filtroDia, getData]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // --- Handlers ---
-  const handleRefresh = () => { setPage(0); setFetchKey((k) => k + 1); };
+  const dataFormateados = useFormatTableData(rawData);
 
+  // Exportar a Excel
+  const handleExport = () => {
+    const fechaISO = new Date().toISOString().slice(0, 10);
+    const exportData = dataFormateados.map((r: DirigenteTabla) => ({
+      "Nombre Completo": r.nombreCompleto,
+      DNI: r.dni,
+      Celular: formatearTelefono(r.celular),
+      "F. Nacimiento": formatearFecha(r.fechaNacimiento),
+      Edad: r.edad,
+      Pueblo: r.pueblo,
+    }));
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    ws["!cols"] = [
+      { wch: 30 },
+      { wch: 12 },
+      { wch: 15 },
+      { wch: 15 },
+      { wch: 6 },
+      { wch: 40 },
+    ];
+    XLSX.utils.book_append_sheet(wb, ws, "Dirigentes");
+    XLSX.writeFile(wb, `dirigentes_participacion_${fechaISO}.xlsx`);
+  };
+
+  // Limpiar todos los filtros
   const limpiarFiltros = () => {
     setSearchTerm("");
     setDebouncedSearch("");
@@ -478,43 +530,35 @@ export default function Compromiso1Page() {
     setFetchKey((k) => k + 1);
   };
 
+  // Abrir detalle
+  const handleVerDetalle = async (row: DirigenteTabla) => {
+    const cached = rawDataMap.current.get(row.id);
+    if (cached) {
+      setDetalleDigirente(cached);
+      setDetalleLoading(false);
+      setDetalleOpen(true);
+      return;
+    }
+    setDetalleDigirente(null);
+    setDetalleLoading(true);
+    setDetalleOpen(true);
+    try {
+      const res = await getData<BackendDetalleResponse>(
+        `participation/neighbors/${row.id}`
+      );
+      if (res?.data) {
+        setDetalleDigirente(res.data);
+      }
+    } catch (error) {
+      console.error("Error cargando detalle del dirigente:", error);
+    } finally {
+      setDetalleLoading(false);
+    }
+  };
+
   const filterOpen = Boolean(filterAnchor);
   const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 110;
   const hayFiltrosActivos = searchTerm || filtroDia || filtroMes || isEdadFiltered;
-
-  const handleVerDetalle = (madre: MadreTabla) => {
-    setDetalleMadre(madre);
-    setDetalleOpen(true);
-  };
-
-  const handleExport = () => {
-    const fechaISO = new Date().toISOString().slice(0, 10);
-    const exportData = dataFormateados.map((row, index) => ({
-      "#": index + 1 + page * rowsPerPage,
-      "Nombre Completo": row.nombreCompleto,
-      "Tipo Documento": row.tipoDoc,
-      "N° Documento": row.numDoc,
-      Teléfono: row.telefono || "-",
-      "Fecha Nacimiento": formatearFecha(row.fechaNacimiento),
-      "Fecha Registro": formatearFecha(row.fechaRegistro),
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const colWidths = [
-      { wch: 5 },
-      { wch: 35 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 18 },
-      { wch: 18 },
-    ];
-    worksheet["!cols"] = colWidths;
-
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Madres");
-    XLSX.writeFile(workbook, `compromiso1_madres_${fechaISO}.xlsx`);
-  };
 
   return (
     <Box>
@@ -534,14 +578,14 @@ export default function Compromiso1Page() {
               boxShadow: `0 4px 12px ${MODULE_COLOR}25`,
             }}
           >
-            <ChildCare sx={{ fontSize: 28 }} />
+            <People sx={{ fontSize: 28 }} />
           </Box>
           <Typography variant="h4" fontWeight="bold" sx={{ color: MODULE_COLOR }}>
-            Compromiso 1 · Bajo Hierro
+            Dirigentes
           </Typography>
         </Box>
         <Typography variant="body1" color="text.secondary" sx={{ ml: 7.5 }}>
-          Registro de madres con niños diagnosticados con anemia (bajo hierro)
+          Listado de dirigentes registrados en el módulo de Participación Vecinal
         </Typography>
       </Box>
 
@@ -550,17 +594,18 @@ export default function Compromiso1Page() {
         sx={{
           borderRadius: "16px",
           boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
-          overflow: "hidden",
+          overflow: "visible",
         }}
       >
         <CardContent sx={{ p: 3 }}>
-          {/* ── Buscador y acciones ── */}
+          {/* ── Barra de búsqueda y acciones ── */}
           <Box mb={2} display="flex" gap={1.5} alignItems="center" flexWrap="wrap">
+            {/* Búsqueda */}
             <TextField
+              size="small"
               placeholder="Buscar por nombre o DNI..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              size="small"
               slotProps={{
                 input: {
                   startAdornment: (
@@ -611,26 +656,64 @@ export default function Compromiso1Page() {
               </IconButton>
             </Tooltip>
 
-            {/* Chips inline filtros activos */}
+            {/* Chips de filtros activos (edad / cumpleaños) */}
             {isEdadFiltered && (
-              <Box sx={{ backgroundColor: "#dbeafe", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+              <Box
+                sx={{
+                  backgroundColor: "#dbeafe",
+                  borderRadius: "16px",
+                  px: 1.5,
+                  py: 0.5,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.5,
+                }}
+              >
                 <Typography variant="caption" color="#1e40af">
                   Edad: {edadRange[0]} - {edadRange[1]} años
                 </Typography>
-                <IconButton size="small" onClick={() => { setEdadRange([0, 110]); setEdadRangePending([0, 110]); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    setEdadRange([0, 110]);
+                    setEdadRangePending([0, 110]);
+                    setPage(0);
+                    setFetchKey((k) => k + 1);
+                  }}
+                  sx={{ p: 0.25 }}
+                >
                   <Close sx={{ fontSize: 14, color: "#1e40af" }} />
                 </IconButton>
               </Box>
             )}
             {(filtroDia || filtroMes) && (
-              <Box sx={{ backgroundColor: "#e0f7f7", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+              <Box
+                sx={{
+                  backgroundColor: "#e0f7f7",
+                  borderRadius: "16px",
+                  px: 1.5,
+                  py: 0.5,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.5,
+                }}
+              >
                 <Cake sx={{ fontSize: 14, color: MODULE_COLOR }} />
                 <Typography variant="caption" color={MODULE_COLOR}>
                   {filtroMes && !filtroDia && MESES.find((m) => m.value === filtroMes)?.label}
                   {filtroDia && filtroMes && `${filtroDia}/${filtroMes}`}
                   {filtroDia && !filtroMes && `Día ${filtroDia}`}
                 </Typography>
-                <IconButton size="small" onClick={() => { setFiltroDia(""); setFiltroMes(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    setFiltroDia("");
+                    setFiltroMes("");
+                    setPage(0);
+                    setFetchKey((k) => k + 1);
+                  }}
+                  sx={{ p: 0.25 }}
+                >
                   <Close sx={{ fontSize: 14, color: MODULE_COLOR }} />
                 </IconButton>
               </Box>
@@ -640,15 +723,27 @@ export default function Compromiso1Page() {
 
             {hayFiltrosActivos && (
               <Tooltip title="Limpiar todos los filtros">
-                <IconButton onClick={limpiarFiltros} size="small" sx={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px" }}>
+                <IconButton
+                  onClick={limpiarFiltros}
+                  size="small"
+                  sx={{
+                    backgroundColor: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "8px",
+                  }}
+                >
                   <Clear sx={{ color: "#64748b", fontSize: 20 }} />
                 </IconButton>
               </Tooltip>
             )}
 
+            {/* Actualizar */}
             <Tooltip title="Actualizar datos">
               <IconButton
-                onClick={handleRefresh}
+                onClick={() => {
+                  setPage(0);
+                  setFetchKey((k) => k + 1);
+                }}
                 sx={{
                   backgroundColor: "#f8fafc",
                   border: "1px solid #e2e8f0",
@@ -659,6 +754,8 @@ export default function Compromiso1Page() {
                 <Refresh sx={{ color: "#64748b", fontSize: 20 }} />
               </IconButton>
             </Tooltip>
+
+            {/* Exportar Excel */}
             <Tooltip title="Descargar listado en formato Excel">
               <span>
                 <Button
@@ -666,7 +763,7 @@ export default function Compromiso1Page() {
                   size="small"
                   startIcon={<FileDownload />}
                   onClick={handleExport}
-                  disabled={dataFormateados.length === 0}
+                  disabled={isLoading || dataFormateados.length === 0}
                   sx={{
                     borderColor: "#22c55e",
                     color: "#16a34a",
@@ -681,8 +778,9 @@ export default function Compromiso1Page() {
                 </Button>
               </span>
             </Tooltip>
+
             <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
-              {isLoading ? "Cargando..." : `${totalCount.toLocaleString()} madre(s)`}
+              {isLoading ? "Cargando..." : `${totalCount.toLocaleString()} dirigente(s)`}
             </Typography>
           </Box>
 
@@ -712,7 +810,11 @@ export default function Compromiso1Page() {
                   sx={{
                     textTransform: "none",
                     fontSize: "0.75rem",
-                    "&.Mui-selected": { backgroundColor: "#dbeafe", color: "#1e40af", "&:hover": { backgroundColor: "#bfdbfe" } },
+                    "&.Mui-selected": {
+                      backgroundColor: "#dbeafe",
+                      color: "#1e40af",
+                      "&:hover": { backgroundColor: "#bfdbfe" },
+                    },
                   }}
                 >
                   Edad
@@ -722,7 +824,11 @@ export default function Compromiso1Page() {
                   sx={{
                     textTransform: "none",
                     fontSize: "0.75rem",
-                    "&.Mui-selected": { backgroundColor: "#e0f7f7", color: MODULE_COLOR, "&:hover": { backgroundColor: "#b2ebf2" } },
+                    "&.Mui-selected": {
+                      backgroundColor: "#e0f7f7",
+                      color: MODULE_COLOR,
+                      "&:hover": { backgroundColor: "#b2ebf2" },
+                    },
                   }}
                 >
                   Cumpleaños
@@ -742,11 +848,18 @@ export default function Compromiso1Page() {
                     valueLabelDisplay="auto"
                     min={0}
                     max={110}
-                    sx={{ color: "#3b82f6", "& .MuiSlider-thumb": { backgroundColor: "#1e40af" } }}
+                    sx={{
+                      color: "#3b82f6",
+                      "& .MuiSlider-thumb": { backgroundColor: "#1e40af" },
+                    }}
                   />
                   <Box display="flex" justifyContent="space-between" mt={1}>
-                    <Typography variant="caption" color="text.secondary">{edadRangePending[0]} años</Typography>
-                    <Typography variant="caption" color="text.secondary">{edadRangePending[1]} años</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {edadRangePending[0]} años
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {edadRangePending[1]} años
+                    </Typography>
                   </Box>
                 </>
               )}
@@ -767,7 +880,9 @@ export default function Compromiso1Page() {
                   >
                     <MenuItem value="">Todos los meses</MenuItem>
                     {MESES.map((m) => (
-                      <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>
+                      <MenuItem key={m.value} value={m.value}>
+                        {m.label}
+                      </MenuItem>
                     ))}
                   </TextField>
                   <TextField
@@ -778,7 +893,8 @@ export default function Compromiso1Page() {
                     value={filtroDia}
                     onChange={(e) => {
                       const v = e.target.value;
-                      if (v === "" || (parseInt(v) >= 1 && parseInt(v) <= 31)) setFiltroDia(v);
+                      if (v === "" || (parseInt(v) >= 1 && parseInt(v) <= 31))
+                        setFiltroDia(v);
                     }}
                     slotProps={{ htmlInput: { min: 1, max: 31 } }}
                     helperText="Selecciona un día específico (opcional)"
@@ -789,7 +905,14 @@ export default function Compromiso1Page() {
               <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
                 <Button
                   size="small"
-                  onClick={() => { setEdadRange([0, 110]); setEdadRangePending([0, 110]); setFiltroDia(""); setFiltroMes(""); setPage(0); setFetchKey((k) => k + 1); }}
+                  onClick={() => {
+                    setEdadRange([0, 110]);
+                    setEdadRangePending([0, 110]);
+                    setFiltroDia("");
+                    setFiltroMes("");
+                    setPage(0);
+                    setFetchKey((k) => k + 1);
+                  }}
                   sx={{ color: "#64748b", textTransform: "none" }}
                 >
                   Limpiar todo
@@ -797,8 +920,17 @@ export default function Compromiso1Page() {
                 <Button
                   size="small"
                   variant="contained"
-                  onClick={() => { setEdadRange(edadRangePending); setPage(0); setFetchKey((k) => k + 1); setFilterAnchor(null); }}
-                  sx={{ backgroundColor: MODULE_COLOR, textTransform: "none", "&:hover": { backgroundColor: subgerencia.colorHover } }}
+                  onClick={() => {
+                    setEdadRange(edadRangePending);
+                    setPage(0);
+                    setFetchKey((k) => k + 1);
+                    setFilterAnchor(null);
+                  }}
+                  sx={{
+                    backgroundColor: MODULE_COLOR,
+                    textTransform: "none",
+                    "&:hover": { backgroundColor: subgerencia.colorHover },
+                  }}
                 >
                   Aplicar
                 </Button>
@@ -808,7 +940,7 @@ export default function Compromiso1Page() {
 
           {/* ── Chips resumen filtros activos ── */}
           {hayFiltrosActivos && (
-            <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
+            <Box sx={{ display: "flex", gap: 1, mt: 2, flexWrap: "wrap" }}>
               <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
                 Filtros activos:
               </Typography>
@@ -816,7 +948,12 @@ export default function Compromiso1Page() {
                 <Chip
                   size="small"
                   label={`Edad: ${edadRange[0]}-${edadRange[1]} años`}
-                  onDelete={() => { setEdadRange([0, 110]); setEdadRangePending([0, 110]); setPage(0); setFetchKey((k) => k + 1); }}
+                  onDelete={() => {
+                    setEdadRange([0, 110]);
+                    setEdadRangePending([0, 110]);
+                    setPage(0);
+                    setFetchKey((k) => k + 1);
+                  }}
                   sx={{ backgroundColor: "#dbeafe", color: "#1e40af" }}
                 />
               )}
@@ -824,7 +961,11 @@ export default function Compromiso1Page() {
                 <Chip
                   size="small"
                   label={`Mes: ${MESES.find((m) => m.value === filtroMes)?.label}`}
-                  onDelete={() => { setFiltroMes(""); setPage(0); setFetchKey((k) => k + 1); }}
+                  onDelete={() => {
+                    setFiltroMes("");
+                    setPage(0);
+                    setFetchKey((k) => k + 1);
+                  }}
                   icon={<Cake sx={{ color: "white !important", fontSize: 16 }} />}
                   sx={{ backgroundColor: MODULE_COLOR, color: "white" }}
                 />
@@ -833,12 +974,20 @@ export default function Compromiso1Page() {
                 <Chip
                   size="small"
                   label={`Día: ${filtroDia}`}
-                  onDelete={() => { setFiltroDia(""); setPage(0); setFetchKey((k) => k + 1); }}
+                  onDelete={() => {
+                    setFiltroDia("");
+                    setPage(0);
+                    setFetchKey((k) => k + 1);
+                  }}
                   sx={{ backgroundColor: MODULE_COLOR, color: "white" }}
                 />
               )}
               {searchTerm && (
-                <Chip size="small" label={`Búsqueda: "${searchTerm}"`} onDelete={() => setSearchTerm("")} />
+                <Chip
+                  size="small"
+                  label={`Búsqueda: "${searchTerm}"`}
+                  onDelete={() => setSearchTerm("")}
+                />
               )}
             </Box>
           )}
@@ -850,212 +999,224 @@ export default function Compromiso1Page() {
               boxShadow: "none",
               border: "1px solid #e2e8f0",
               overflow: "hidden",
+              mt: 2,
             }}
           >
-        {isLoading ? (
-          <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" py={8} gap={2}>
-            <CircularProgress sx={{ color: MODULE_COLOR }} />
-            <Typography variant="body2" color="text.secondary">
-              Cargando registros...
-            </Typography>
-          </Box>
-        ) : (
-          <>
-            <TableContainer>
-              <Table stickyHeader size="small">
-                <TableHead>
-                  <TableRow>
-                    {["#", "Nombre Completo", "Tipo Doc / N° Documento", "Teléfono", "Edad / Nacimiento", "F. Registro", ""].map(
-                      (col, i) => (
-                        <TableCell
-                          key={i}
-                          align={i === 0 || i === 6 ? "center" : "left"}
-                          sx={{
-                            backgroundColor: MODULE_COLOR,
-                            color: "white",
-                            fontWeight: 700,
-                            fontSize: "0.78rem",
-                            whiteSpace: "nowrap",
-                            py: 1.5,
-                          }}
-                        >
-                          {col}
-                        </TableCell>
-                      )
-                    )}
-                  </TableRow>
-                </TableHead>
-
-                <TableBody>
-                  {dataFormateados.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
-                        <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
-                          <PersonSearch sx={{ fontSize: 40, color: "text.disabled" }} />
-                          <Typography color="text.secondary">
-                            {debouncedSearch || hayFiltrosActivos ? "No se encontraron resultados con los filtros aplicados" : "No hay madres registradas"}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    dataFormateados.map((row, index) => (
-                      <TableRow
-                        key={row.id}
-                        hover
-                        sx={{
-                          backgroundColor: index % 2 === 0 ? "white" : "#f8fafc",
-                          "&:hover": { backgroundColor: `${MODULE_COLOR}10`, cursor: "pointer" },
-                          transition: "background-color 0.15s",
-                        }}
-                        onClick={() => handleVerDetalle(row)}
-                      >
-                        {/* # */}
-                        <TableCell align="center" sx={{ color: "text.disabled", fontSize: "0.75rem", width: 48 }}>
-                          {page * rowsPerPage + index + 1}
-                        </TableCell>
-
-                        {/* Nombre */}
-                        <TableCell>
-                          <Typography variant="body2" fontWeight={600} color="text.primary">
-                            {row.nombreCompleto}
-                          </Typography>
-                        </TableCell>
-
-                        {/* Documento */}
-                        <TableCell>
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <Chip
-                              label={row.tipoDoc}
-                              size="small"
-                              sx={{
-                                backgroundColor: `${MODULE_COLOR}20`,
-                                color: MODULE_COLOR,
-                                fontWeight: 700,
-                                fontSize: "0.68rem",
-                                height: 20,
-                              }}
-                            />
-                            <Typography variant="body2" fontFamily="monospace">
-                              {row.numDoc}
-                            </Typography>
-                          </Box>
-                        </TableCell>
-
-                        {/* Teléfono */}
-                        <TableCell>
-                          <Typography variant="body2">
-                            {formatearTelefono(row.telefono)}
-                          </Typography>
-                        </TableCell>
-
-                        {/* Edad / Nacimiento */}
-                        <TableCell>
-                          {row.fechaNacimiento ? (
-                            <Box display="flex" flexDirection="column" gap={0.25}>
-                              <Chip
-                                label={`${row.edad} años`}
-                                size="small"
-                                sx={{
-                                  backgroundColor: "#dbeafe",
-                                  color: "#1e40af",
-                                  fontWeight: 600,
-                                  fontSize: "0.75rem",
-                                  height: 22,
-                                  width: "fit-content",
-                                }}
-                              />
-                              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                <Cake sx={{ fontSize: 12, color: MODULE_COLOR }} />
-                                <Typography variant="caption" color="text.secondary">
-                                  {formatearFecha(row.fechaNacimiento)}
-                                </Typography>
-                              </Box>
-                            </Box>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">-</Typography>
-                          )}
-                        </TableCell>
-
-                        {/* Fecha Registro */}
-                        <TableCell>
-                          <Typography variant="body2" color="text.secondary">
-                            {formatearFecha(row.fechaRegistro)}
-                          </Typography>
-                        </TableCell>
-
-                        {/* Acciones */}
-                        <TableCell align="center" sx={{ width: 110, whiteSpace: "nowrap" }}>
-                          <Box display="flex" alignItems="center" justifyContent="center">
-                            <Tooltip title="Ver detalle">
-                              <IconButton
-                                size="small"
-                                onClick={(e) => { e.stopPropagation(); handleVerDetalle(row); }}
-                                sx={{ color: MODULE_COLOR }}
-                              >
-                                <Visibility fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Editar">
-                              <IconButton
-                                size="small"
-                                onClick={(e) => { e.stopPropagation(); /* TODO: editar */ }}
-                                sx={{ color: "#0891b2", "&:hover": { backgroundColor: "rgba(8,145,178,0.1)" } }}
-                              >
-                                <Edit fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Eliminar">
-                              <IconButton
-                                size="small"
-                                onClick={(e) => { e.stopPropagation(); /* TODO: eliminar */ }}
-                                sx={{ color: "#dc2626", "&:hover": { backgroundColor: "rgba(220,38,38,0.1)" } }}
-                              >
-                                <Delete fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </Box>
-                        </TableCell>
+            {isLoading ? (
+              <Box
+                display="flex"
+                flexDirection="column"
+                alignItems="center"
+                justifyContent="center"
+                py={8}
+                gap={2}
+              >
+                <CircularProgress sx={{ color: MODULE_COLOR }} />
+                <Typography variant="body2" color="text.secondary">
+                  Cargando dirigentes...
+                </Typography>
+              </Box>
+            ) : (
+              <>
+                <TableContainer>
+                  <Table stickyHeader size="small">
+                    <TableHead>
+                      <TableRow>
+                        {[
+                          "#",
+                          "Nombre Completo",
+                          "DNI",
+                          "Celular",
+                          "Edad / Nacimiento",
+                          "Pueblo",
+                          "",
+                        ].map((col, i) => (
+                          <TableCell
+                            key={i}
+                            align={i === 0 || i === 6 ? "center" : "left"}
+                            sx={{
+                              backgroundColor: MODULE_COLOR,
+                              color: "white",
+                              fontWeight: 700,
+                              fontSize: "0.78rem",
+                              whiteSpace: "nowrap",
+                              py: 1.5,
+                            }}
+                          >
+                            {col}
+                          </TableCell>
+                        ))}
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                    </TableHead>
 
-            <TablePagination
-              component="div"
-              count={totalCount}
-              page={page}
-              onPageChange={(_, newPage) => setPage(newPage)}
-              rowsPerPage={rowsPerPage}
-              onRowsPerPageChange={(e) => {
-                setRowsPerPage(parseInt(e.target.value, 10));
-                setPage(0);
-              }}
-              rowsPerPageOptions={[10, 20, 50, 100]}
-              labelRowsPerPage="Filas por página:"
-              labelDisplayedRows={({ from, to, count }) =>
-                `${from}–${to} de ${count !== -1 ? count.toLocaleString() : `más de ${to}`}`
-              }
-              sx={{
-                borderTop: "1px solid #e2e8f0",
-                mt: 2,
-                "& .MuiTablePagination-select": { fontWeight: 500 },
-                "& .MuiTablePagination-selectIcon": { color: "#64748b" },
-              }}
-            />
-          </>
-        )}
+                    <TableBody>
+                      {dataFormateados.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                            <Box
+                              display="flex"
+                              flexDirection="column"
+                              alignItems="center"
+                              gap={1}
+                            >
+                              <PersonSearch sx={{ fontSize: 40, color: "text.disabled" }} />
+                              <Typography color="text.secondary">
+                                {debouncedSearch || hayFiltrosActivos
+                                  ? "No se encontraron dirigentes con los filtros aplicados"
+                                  : "No hay dirigentes registrados"}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        dataFormateados.map((row: DirigenteTabla, index: number) => (
+                          <TableRow
+                            key={row.id}
+                            hover
+                            sx={{
+                              backgroundColor: index % 2 === 0 ? "white" : "#f8fafc",
+                              "&:hover": {
+                                backgroundColor: `${MODULE_COLOR}10`,
+                                cursor: "pointer",
+                              },
+                              transition: "background-color 0.15s",
+                            }}
+                            onClick={() => handleVerDetalle(row)}
+                          >
+                            {/* # */}
+                            <TableCell
+                              align="center"
+                              sx={{ color: "text.disabled", fontSize: "0.75rem", width: 48 }}
+                            >
+                              {page * rowsPerPage + index + 1}
+                            </TableCell>
+
+                            {/* Nombre */}
+                            <TableCell>
+                              <Typography variant="body2" fontWeight={600} color="text.primary">
+                                {row.nombreCompleto}
+                              </Typography>
+                            </TableCell>
+
+                            {/* DNI */}
+                            <TableCell>
+                              <Typography variant="body2" fontFamily="monospace">
+                                {row.dni}
+                              </Typography>
+                            </TableCell>
+
+                            {/* Celular */}
+                            <TableCell>
+                              <Typography variant="body2">
+                                {formatearTelefono(row.celular)}
+                              </Typography>
+                            </TableCell>
+
+                            {/* Edad / Nacimiento */}
+                            <TableCell>
+                              {row.fechaNacimiento ? (
+                                <Box display="flex" flexDirection="column" gap={0.25}>
+                                  <Chip
+                                    label={`${row.edad} años`}
+                                    size="small"
+                                    sx={{
+                                      backgroundColor: "#dbeafe",
+                                      color: "#1e40af",
+                                      fontWeight: 600,
+                                      fontSize: "0.75rem",
+                                      height: 22,
+                                      width: "fit-content",
+                                    }}
+                                  />
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                    <Cake sx={{ fontSize: 12, color: MODULE_COLOR }} />
+                                    <Typography variant="caption" color="text.secondary">
+                                      {formatearFecha(row.fechaNacimiento)}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              ) : (
+                                <Typography variant="body2" color="text.secondary">
+                                  -
+                                </Typography>
+                              )}
+                            </TableCell>
+
+                            {/* Pueblo */}
+                            <TableCell>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  maxWidth: 220,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                                title={row.pueblo}
+                              >
+                                {row.pueblo}
+                              </Typography>
+                            </TableCell>
+
+                            {/* Acciones */}
+                            <TableCell align="center" sx={{ width: 56 }}>
+                              <Tooltip title="Ver detalle">
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleVerDetalle(row);
+                                  }}
+                                  sx={{ color: MODULE_COLOR }}
+                                >
+                                  <Visibility fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+
+                <TablePagination
+                  component="div"
+                  count={totalCount}
+                  page={page}
+                  onPageChange={(_, newPage) => setPage(newPage)}
+                  rowsPerPage={rowsPerPage}
+                  onRowsPerPageChange={(e) => {
+                    setRowsPerPage(parseInt(e.target.value, 10));
+                    setPage(0);
+                  }}
+                  rowsPerPageOptions={[10, 25, 50, 100]}
+                  labelRowsPerPage="Filas por página:"
+                  labelDisplayedRows={({ from, to, count }) =>
+                    `${from}–${to} de ${count !== -1 ? count.toLocaleString() : `más de ${to}`}`
+                  }
+                  sx={{
+                    borderTop: "1px solid #e2e8f0",
+                    "& .MuiTablePagination-select": { fontWeight: 500 },
+                    "& .MuiTablePagination-selectIcon": { color: "#64748b" },
+                  }}
+                />
+              </>
+            )}
           </Paper>
         </CardContent>
       </Card>
 
       {/* ── Modal de Detalle ── */}
-      <Dialog open={detalleOpen} onClose={() => setDetalleOpen(false)} maxWidth="sm" fullWidth>
-        <DetalleMadre
-          madre={detalleMadre}
-          isLoading={false}
+      <Dialog
+        open={detalleOpen}
+        onClose={() => setDetalleOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DetalleDigirente
+          dirigente={detalleDigirente}
+          isLoading={detalleLoading}
           onClose={() => setDetalleOpen(false)}
         />
       </Dialog>
