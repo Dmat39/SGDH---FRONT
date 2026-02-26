@@ -285,35 +285,73 @@ export default function ListaGeneralPage() {
   // Todos los filtros ahora son server-side
   const filteredData = formattedData;
 
+  const [isExporting, setIsExporting] = useState(false);
+
   // Exportar Excel
-  const handleExport = () => {
-    const exportData = filteredData.map((row: PersonaTabla) => ({
-      "Nombre Completo": row.nombreCompleto,
-      DNI: row.dni,
-      Teléfono: formatearTelefono(row.telefono),
-      "Fecha de Nacimiento": formatearFecha(row.fechaNacimiento),
-      Edad: row.edad,
-      Módulo: row.moduloNombre,
-    }));
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("page", "1");
+      params.set("limit", "99999");
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    ws["!cols"] = [
-      { wch: 30 },
-      { wch: 12 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 6 },
-      { wch: 20 },
-    ];
-    XLSX.utils.book_append_sheet(wb, ws, "Lista General");
+      if (debouncedSearch) {
+        params.set("search", debouncedSearch);
+      }
 
-    let fileName = "lista_general";
-    if (filtroModulo) fileName += `_${filtroModulo}`;
-    fileName += `_${new Date().toISOString().split("T")[0]}`;
-    fileName += ".xlsx";
+      if (edadRange[0] > 0 || edadRange[1] < 110) {
+        params.set("age_min", String(edadRange[0]));
+        params.set("age_max", String(edadRange[1]));
+      }
 
-    XLSX.writeFile(wb, fileName);
+      if (filtroModulo) {
+        params.set("module_name", filtroModulo);
+      }
+
+      if (filtroMes && filtroDia) {
+        const mm = String(filtroMes).padStart(2, "0");
+        const dd = String(filtroDia).padStart(2, "0");
+        params.set("birthday", `${mm}-${dd}`);
+      } else if (filtroMes) {
+        params.set("month", String(filtroMes));
+      }
+
+      const response = await getData<BackendResponse>(`general?${params.toString()}`);
+
+      if (!response?.data) return;
+
+      const exportData = response.data.data.map((item) => ({
+        "Nombre Completo": `${item.name} ${item.lastname}`.trim(),
+        DNI: item.dni || "-",
+        Teléfono: formatearTelefono(item.phone),
+        "Fecha de Nacimiento": formatearFecha(item.birthday),
+        Edad: calcularEdad(item.birthday),
+        Módulo: item.module?.name || "-",
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      ws["!cols"] = [
+        { wch: 30 },
+        { wch: 12 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 6 },
+        { wch: 20 },
+      ];
+      XLSX.utils.book_append_sheet(wb, ws, "Lista General");
+
+      let fileName = "lista_general";
+      if (filtroModulo) fileName += `_${filtroModulo}`;
+      fileName += `_${new Date().toISOString().split("T")[0]}`;
+      fileName += ".xlsx";
+
+      XLSX.writeFile(wb, fileName);
+    } catch (error) {
+      console.error("Error exportando:", error);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Limpiar filtros
@@ -553,13 +591,13 @@ export default function ListaGeneralPage() {
             variant="contained"
             startIcon={<Download />}
             onClick={handleExport}
-            disabled={isLoading || filteredData.length === 0}
+            disabled={isLoading || isExporting || filteredData.length === 0}
             sx={{
               backgroundColor: subgerencia.color,
               "&:hover": { backgroundColor: "#b01668" },
             }}
           >
-            Descargar Excel
+            {isExporting ? "Exportando..." : "Descargar Excel"}
           </Button>
         </Box>
 

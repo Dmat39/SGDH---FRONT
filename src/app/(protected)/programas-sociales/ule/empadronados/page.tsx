@@ -296,53 +296,77 @@ export default function ULEEmpadronadosPage() {
     setSelectedEmpadronado(null);
   };
 
+  const [isExporting, setIsExporting] = useState(false);
+
   // Descargar Excel
-  const descargarExcel = () => {
-    const datosExcel = empadronadosFiltrados.map((e) => ({
-      "DNI": e.dni,
-      "Nombres": e.name,
-      "Apellidos": e.lastname,
-      "Teléfono": formatearTelefono(e.phone),
-      "Formato": e.format,
-      "FSU": e.fsu || "",
-      "S100": e.s100 || "",
-      "Nivel": e.level,
-      "Miembros": e.members,
-      "Urbanización": e.urban?.name || "",
-      "Empadronador": e.enumerator ? `${e.enumerator.name} ${e.enumerator.lastname}` : "",
-      "Fecha Registro": formatearFecha(e.registered_at),
-      "Fecha Nacimiento": formatearFecha(e.birthday),
-      "Edad": e.birthday ? calcularEdad(e.birthday) : "",
-    }));
+  const descargarExcel = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("limit", "99999");
+      params.set("page", "1");
+      if (searchTerm.trim()) params.set("search", searchTerm.trim());
+      if (filtroFormato) params.set("format", filtroFormato);
+      if (isEdadFiltered) {
+        params.set("age_min", String(edadRange[0]));
+        params.set("age_max", String(edadRange[1]));
+      }
+      if (cumpleanosModo === "mes" && mesSeleccionado !== null) {
+        params.set("birthday_month", String(mesSeleccionado + 1));
+      } else if (cumpleanosModo === "dia" && diaCumpleanos) {
+        const parts = diaCumpleanos.split("-");
+        params.set("birthday_day", `${parts[1]}-${parts[2]}`);
+      }
+      const response = await getData<BackendResponse>(`ule/registered?${params.toString()}`);
+      if (!response?.data) return;
+      const datosExcel = response.data.data.map((e) => ({
+        "DNI": e.dni,
+        "Nombres": e.name,
+        "Apellidos": e.lastname,
+        "Teléfono": formatearTelefono(e.phone),
+        "Formato": e.format,
+        "FSU": e.fsu || "",
+        "S100": e.s100 || "",
+        "Nivel": e.level,
+        "Miembros": e.members,
+        "Urbanización": e.urban?.name || "",
+        "Empadronador": e.enumerator ? `${e.enumerator.name} ${e.enumerator.lastname}` : "",
+        "Fecha Registro": formatearFecha(e.registered_at),
+        "Fecha Nacimiento": formatearFecha(e.birthday),
+        "Edad": e.birthday ? calcularEdad(e.birthday) : "",
+      }));
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(datosExcel);
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(datosExcel);
 
-    const colWidths = [
-      { wch: 12 }, // DNI
-      { wch: 20 }, // Nombres
-      { wch: 20 }, // Apellidos
-      { wch: 14 }, // Teléfono
-      { wch: 10 }, // Formato
-      { wch: 12 }, // FSU
-      { wch: 12 }, // S100
-      { wch: 8 },  // Nivel
-      { wch: 10 }, // Miembros
-      { wch: 25 }, // Urbanización
-      { wch: 30 }, // Empadronador
-      { wch: 14 }, // Fecha Registro
-      { wch: 14 }, // Fecha Nacimiento
-      { wch: 6 },  // Edad
-    ];
-    ws["!cols"] = colWidths;
+      const colWidths = [
+        { wch: 12 }, // DNI
+        { wch: 20 }, // Nombres
+        { wch: 20 }, // Apellidos
+        { wch: 14 }, // Teléfono
+        { wch: 10 }, // Formato
+        { wch: 12 }, // FSU
+        { wch: 12 }, // S100
+        { wch: 8 },  // Nivel
+        { wch: 10 }, // Miembros
+        { wch: 25 }, // Urbanización
+        { wch: 30 }, // Empadronador
+        { wch: 14 }, // Fecha Registro
+        { wch: 14 }, // Fecha Nacimiento
+        { wch: 6 },  // Edad
+      ];
+      ws["!cols"] = colWidths;
 
-    XLSX.utils.book_append_sheet(wb, ws, "Empadronados ULE");
+      XLSX.utils.book_append_sheet(wb, ws, "Empadronados ULE");
 
-    let fileName = "empadronados_ule";
-    if (filtroFormato) fileName += `_${filtroFormato}`;
-    fileName += ".xlsx";
+      let fileName = "empadronados_ule";
+      if (filtroFormato) fileName += `_${filtroFormato}`;
+      fileName += ".xlsx";
 
-    XLSX.writeFile(wb, fileName);
+      XLSX.writeFile(wb, fileName);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const hayFiltrosActivos = searchTerm || filtroFormato || isEdadFiltered || isCumpleanosFiltered;
@@ -545,7 +569,7 @@ export default function ULEEmpadronadosPage() {
               variant="contained"
               startIcon={<Download />}
               onClick={descargarExcel}
-              disabled={isLoading || empadronadosFiltrados.length === 0}
+              disabled={isLoading || isExporting || empadronadosFiltrados.length === 0}
               sx={{
                 backgroundColor: subgerencia.color,
                 "&:hover": { backgroundColor: "#b01668" },

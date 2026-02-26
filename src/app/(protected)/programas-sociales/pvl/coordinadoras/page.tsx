@@ -209,21 +209,58 @@ export default function PVLCoordinadorasPage() {
 
   const dataFormateados = useFormatTableData(data);
 
-  const handleExport = () => {
-    const exportData = dataFormateados.map((c: CoordinadoraFrontend) => ({
-      "Nombre Completo": c.nombreCompleto,
-      DNI: c.dni,
-      "Teléfono": c.telefono,
-      "Fecha Nacimiento": formatearFecha(c.fechaNacimiento),
-      Edad: calcularEdad(c.fechaNacimiento),
-      "Fecha Registro": formatearFecha(c.fechaCreacion),
-    }));
-    if (exportData.length === 0) return;
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Coordinadoras PVL");
-    worksheet["!cols"] = Object.keys(exportData[0]).map(() => ({ wch: 20 }));
-    XLSX.writeFile(workbook, `coordinadoras_pvl_${new Date().toISOString().split("T")[0]}.xlsx`);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("page", "1");
+      params.set("limit", "99999");
+
+      if (searchTerm.trim()) {
+        params.set("search", searchTerm.trim());
+      }
+
+      if (edadRange[0] > 0 || edadRange[1] < 100) {
+        params.set("age_min", String(edadRange[0]));
+        params.set("age_max", String(edadRange[1]));
+      }
+
+      if (cumpleanosModo === "mes" && mesesCumpleanos.length > 0) {
+        params.set("birthday_month", mesesCumpleanos.map((m) => m + 1).join(","));
+      } else if (cumpleanosModo === "dia" && diaCumpleanos) {
+        const parts = diaCumpleanos.split("-");
+        params.set("birthday_day", `${parts[1]}-${parts[2]}`);
+      }
+
+      const response = await getData<BackendResponse>(`pvl/coordinator?${params.toString()}`);
+
+      if (!response?.data) return;
+
+      const exportData = response.data.data.map((item) => {
+        const c = mapBackendToFrontend(item);
+        return {
+          "Nombre Completo": c.nombreCompleto,
+          DNI: c.dni,
+          "Teléfono": c.telefono,
+          "Fecha Nacimiento": formatearFecha(c.fechaNacimiento),
+          Edad: calcularEdad(c.fechaNacimiento),
+          "Fecha Registro": formatearFecha(c.fechaCreacion),
+        };
+      });
+
+      if (exportData.length === 0) return;
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Coordinadoras PVL");
+      worksheet["!cols"] = Object.keys(exportData[0]).map(() => ({ wch: 20 }));
+      XLSX.writeFile(workbook, `coordinadoras_pvl_${new Date().toISOString().split("T")[0]}.xlsx`);
+    } catch (error) {
+      console.error("Error exportando:", error);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -291,7 +328,7 @@ export default function PVLCoordinadorasPage() {
                 </IconButton>
               </Tooltip>
               <Tooltip title="Exportar a Excel">
-                <IconButton onClick={handleExport} sx={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", "&:hover": { backgroundColor: "#dcfce7", borderColor: "#22c55e" } }}>
+                <IconButton onClick={handleExport} disabled={isLoading || isExporting} sx={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", "&:hover": { backgroundColor: "#dcfce7", borderColor: "#22c55e" } }}>
                   <FileDownload sx={{ color: "#22c55e", fontSize: 20 }} />
                 </IconButton>
               </Tooltip>

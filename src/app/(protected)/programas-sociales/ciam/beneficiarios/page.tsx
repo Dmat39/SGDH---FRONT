@@ -974,27 +974,59 @@ export default function CIAMBeneficiariosPage() {
     return matchesSexo && matchesSeguro;
   });
 
+  const [isExporting, setIsExporting] = useState(false);
+
   // Exportar a Excel (todos los datos filtrados)
-  const handleExport = () => {
-    const exportData = filteredData.map((b: BeneficiarioTabla) => ({
-      "Nombre Completo": b.nombreCompleto,
-      "Tipo Doc": b.tipoDoc,
-      "Sexo": b.sexo,
-      "Edad": b.edad,
-      "Fecha Nacimiento": formatearFecha(b.fechaNacimiento),
-      "Estado Civil": b.estadoCivil,
-      "Seguro de Salud": b.seguroSalud,
-      "Celular": b.celular,
-      "Vivienda": b.housingStatus,
-    }));
-    if (exportData.length === 0) {
-      return;
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("page", "1");
+      params.set("limit", "99999");
+
+      if (debouncedSearch.trim()) {
+        params.set("search", debouncedSearch.trim());
+      }
+
+      if (edadRange[0] > 60 || edadRange[1] < 110) {
+        params.set("age_min", String(edadRange[0]));
+        params.set("age_max", String(edadRange[1]));
+      }
+
+      if (cumpleanosModo === "mes" && mesSeleccionado !== null) {
+        params.set("month", String(mesSeleccionado + 1));
+      } else if (cumpleanosModo === "dia" && diaCumpleanos) {
+        const parts = diaCumpleanos.split("-");
+        params.set("birthday", `${parts[1]}-${parts[2]}`);
+      }
+
+      const response = await getData<BackendListaResponse>(`pam/benefited?${params.toString()}`);
+
+      if (!response?.data) return;
+
+      const exportData = response.data.data.map((b) => ({
+        "Nombre Completo": `${b.name} ${b.lastname}`,
+        "Tipo Doc": b.doc_type || "DNI",
+        "Sexo": traducir("sex", b.sex),
+        "Edad": calcularEdad(b.birthday),
+        "Fecha Nacimiento": formatearFecha(b.birthday),
+        "Estado Civil": traducir("civil", b.civil),
+        "Seguro de Salud": traducir("health", b.health),
+        "Celular": b.cellphone || "-",
+        "Vivienda": traducir("housing_status", b.housing_status),
+      }));
+
+      if (exportData.length === 0) return;
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Beneficiarios CIAM");
+      worksheet["!cols"] = Object.keys(exportData[0] || {}).map(() => ({ wch: 20 }));
+      XLSX.writeFile(workbook, `beneficiarios_ciam_${new Date().toISOString().split("T")[0]}.xlsx`);
+    } catch (error) {
+      console.error("Error exportando:", error);
+    } finally {
+      setIsExporting(false);
     }
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Beneficiarios CIAM");
-    worksheet["!cols"] = Object.keys(exportData[0] || {}).map(() => ({ wch: 20 }));
-    XLSX.writeFile(workbook, `beneficiarios_ciam_${new Date().toISOString().split("T")[0]}.xlsx`);
   };
 
   const limpiarFiltros = () => {
@@ -1093,6 +1125,7 @@ export default function CIAMBeneficiariosPage() {
               <Tooltip title="Exportar a Excel">
                 <IconButton
                   onClick={handleExport}
+                  disabled={isLoading || isExporting}
                   sx={{
                     backgroundColor: "#f8fafc",
                     border: "1px solid #e2e8f0",

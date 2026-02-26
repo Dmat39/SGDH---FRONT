@@ -493,29 +493,53 @@ export default function DirigentesPage() {
 
   const dataFormateados = useFormatTableData(rawData);
 
+  const [isExporting, setIsExporting] = useState(false);
+
   // Exportar a Excel
-  const handleExport = () => {
-    const fechaISO = new Date().toISOString().slice(0, 10);
-    const exportData = dataFormateados.map((r: DirigenteTabla) => ({
-      "Nombre Completo": r.nombreCompleto,
-      DNI: r.dni,
-      Celular: formatearTelefono(r.celular),
-      "F. Nacimiento": formatearFecha(r.fechaNacimiento),
-      Edad: r.edad,
-      Pueblo: r.pueblo,
-    }));
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    ws["!cols"] = [
-      { wch: 30 },
-      { wch: 12 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 6 },
-      { wch: 40 },
-    ];
-    XLSX.utils.book_append_sheet(wb, ws, "Dirigentes");
-    XLSX.writeFile(wb, `dirigentes_participacion_${fechaISO}.xlsx`);
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const fechaISO = new Date().toISOString().slice(0, 10);
+      const params = new URLSearchParams();
+      params.set("limit", "99999");
+      params.set("page", "1");
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+      if (edadRange[0] > 0 || edadRange[1] < 110) {
+        params.set("age_min", String(edadRange[0]));
+        params.set("age_max", String(edadRange[1]));
+      }
+      if (filtroMes && filtroDia) {
+        const mm = String(filtroMes).padStart(2, "0");
+        const dd = String(filtroDia).padStart(2, "0");
+        params.set("birthday", `${mm}-${dd}`);
+      } else if (filtroMes) {
+        params.set("month", String(filtroMes));
+      }
+      const response = await getData<BackendResponse>(`participation/neighbors?${params.toString()}`);
+      if (!response?.data) return;
+      const exportData = response.data.data.map((item: DirigenteBackend) => ({
+        "Nombre Completo": `${item.name.trim()} ${item.lastname.trim()}`,
+        DNI: item.dni || "-",
+        Celular: formatearTelefono(item.phone),
+        "F. Nacimiento": formatearFecha(item.birthday),
+        Edad: calcularEdad(item.birthday),
+        Pueblo: item.pueblo?.trim() || "-",
+      }));
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      ws["!cols"] = [
+        { wch: 30 },
+        { wch: 12 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 6 },
+        { wch: 40 },
+      ];
+      XLSX.utils.book_append_sheet(wb, ws, "Dirigentes");
+      XLSX.writeFile(wb, `dirigentes_participacion_${fechaISO}.xlsx`);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Limpiar todos los filtros
@@ -763,7 +787,7 @@ export default function DirigentesPage() {
                   size="small"
                   startIcon={<FileDownload />}
                   onClick={handleExport}
-                  disabled={isLoading || dataFormateados.length === 0}
+                  disabled={isLoading || isExporting || dataFormateados.length === 0}
                   sx={{
                     borderColor: "#22c55e",
                     color: "#16a34a",

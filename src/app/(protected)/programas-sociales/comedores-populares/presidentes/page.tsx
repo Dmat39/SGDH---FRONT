@@ -219,24 +219,47 @@ export default function ComedoresPresidentesPage() {
   const handleRowClick = (presidente: PresidenteFrontend) => { setSelectedPresidente(presidente); setDetailOpen(true); };
   const handleDetailClose = () => { setDetailOpen(false); setSelectedPresidente(null); };
 
+  const [isExporting, setIsExporting] = useState(false);
   const dataFormateados = useFormatTableData(data);
 
-  const handleExport = () => {
-    const exportData = dataFormateados.map((c: PresidenteFrontend) => ({
-      "Nombre Completo": c.nombreCompleto,
-      DNI: c.dni,
-      "Telefono": c.telefono,
-      Sexo: formatearSexo(c.sexo),
-      "Fecha Nacimiento": formatearFecha(c.fechaNacimiento),
-      Edad: calcularEdad(c.fechaNacimiento),
-      "Fecha Registro": formatearFecha(c.fechaCreacion),
-    }));
-    if (exportData.length === 0) return;
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Presidentes Comedores");
-    worksheet["!cols"] = Object.keys(exportData[0]).map(() => ({ wch: 20 }));
-    XLSX.writeFile(workbook, `presidentes_comedores_${new Date().toISOString().split("T")[0]}.xlsx`);
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("limit", "99999");
+      params.set("page", "1");
+      params.set("modality", "EATER");
+      if (searchTerm.trim()) params.set("search", searchTerm.trim());
+      if (edadRange[0] > 0 || edadRange[1] < 100) {
+        params.set("age_min", String(edadRange[0]));
+        params.set("age_max", String(edadRange[1]));
+      }
+      if (cumpleanosModo === "mes" && mesesCumpleanos.length > 0) {
+        params.set("month", mesesCumpleanos.map((m) => m + 1).join(","));
+      } else if (cumpleanosModo === "dia" && diaCumpleanos) {
+        const parts = diaCumpleanos.split("-");
+        params.set("birthday", `${parts[1]}-${parts[2]}`);
+      }
+      const response = await getData<BackendResponse>(`pca/president?${params.toString()}`);
+      if (!response?.data) return;
+      const exportData = response.data.data.map((item: PresidentBackend) => ({
+        "Nombre Completo": `${item.name} ${item.lastname}`,
+        DNI: item.dni,
+        "Telefono": item.phone || "-",
+        Sexo: formatearSexo(item.sex),
+        "Fecha Nacimiento": formatearFecha(item.birthday),
+        Edad: calcularEdad(item.birthday),
+        "Fecha Registro": formatearFecha(item.created_at),
+      }));
+      if (exportData.length === 0) return;
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Presidentes Comedores");
+      worksheet["!cols"] = Object.keys(exportData[0]).map(() => ({ wch: 20 }));
+      XLSX.writeFile(workbook, `presidentes_comedores_${new Date().toISOString().split("T")[0]}.xlsx`);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -304,7 +327,7 @@ export default function ComedoresPresidentesPage() {
                 </IconButton>
               </Tooltip>
               <Tooltip title="Exportar a Excel">
-                <IconButton onClick={handleExport} sx={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", "&:hover": { backgroundColor: "#dcfce7", borderColor: "#22c55e" } }}>
+                <IconButton onClick={handleExport} disabled={isLoading || isExporting} sx={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", "&:hover": { backgroundColor: "#dcfce7", borderColor: "#22c55e" } }}>
                   <FileDownload sx={{ color: "#22c55e", fontSize: 20 }} />
                 </IconButton>
               </Tooltip>

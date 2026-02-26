@@ -160,21 +160,51 @@ export default function OllasBeneficiariosPage() {
   const handleRowClick = (b: BeneficiarioFrontend) => { setSelectedBeneficiario(b); setDetailOpen(true); };
   const handleDetailClose = () => { setDetailOpen(false); setSelectedBeneficiario(null); };
 
+  const [isExporting, setIsExporting] = useState(false);
   const dataFormateados = useFormatTableData(data);
 
-  const handleExport = () => {
-    const exportData = dataFormateados.map((c: BeneficiarioFrontend) => ({
-      "Nombre Completo": c.nombreCompleto, DNI: c.dni, "Teléfono": c.telefono, "Dirección": c.direccion,
-      "Fecha Nacimiento": formatearFecha(c.fechaNacimiento), Edad: c.fechaNacimiento ? calcularEdad(c.fechaNacimiento) : "-",
-      Sexo: c.sexo, Condición: c.social, Gestante: c.gestante ? "Sí" : "No", Discapacitado: c.discapacitado ? "Sí" : "No",
-      "Fecha Registro": formatearFecha(c.fechaRegistro),
-    }));
-    if (exportData.length === 0) return;
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Beneficiarios Ollas");
-    worksheet["!cols"] = Object.keys(exportData[0]).map(() => ({ wch: 20 }));
-    XLSX.writeFile(workbook, `beneficiarios_ollas_${new Date().toISOString().split("T")[0]}.xlsx`);
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("limit", "99999");
+      params.set("page", "1");
+      params.set("modality", "CPOT");
+      if (searchTerm.trim()) params.set("search", searchTerm.trim());
+      if (edadRange[0] > 0 || edadRange[1] < 110) {
+        params.set("age_min", String(edadRange[0]));
+        params.set("age_max", String(edadRange[1]));
+      }
+      if (cumpleanosModo === "mes" && mesesCumpleanos.length > 0) {
+        params.set("birthday_month", mesesCumpleanos.map((m) => m + 1).join(","));
+      } else if (cumpleanosModo === "dia" && diaCumpleanos) {
+        const parts = diaCumpleanos.split("-");
+        params.set("birthday_day", `${parts[1]}-${parts[2]}`);
+      }
+      const response = await getData<BackendResponse>(`pca/recipient?${params.toString()}`);
+      if (!response?.data) return;
+      const exportData = response.data.data.map((item: RecipientBackend) => ({
+        "Nombre Completo": `${item.name} ${item.lastname}`.trim(),
+        DNI: item.doc_num || "-",
+        "Teléfono": item.phone || "-",
+        "Dirección": item.address || "-",
+        "Fecha Nacimiento": formatearFecha(item.birthday),
+        Edad: item.birthday ? calcularEdad(item.birthday) : "-",
+        Sexo: TRADUCCIONES_SEXO[item.sex] || item.sex || "-",
+        Condición: TRADUCCIONES_SOCIAL[item.social] || item.social || "-",
+        Gestante: item.pregnant ? "Sí" : "No",
+        Discapacitado: item.disabled ? "Sí" : "No",
+        "Fecha Registro": formatearFecha(item.registered_at),
+      }));
+      if (exportData.length === 0) return;
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Beneficiarios Ollas");
+      worksheet["!cols"] = Object.keys(exportData[0]).map(() => ({ wch: 20 }));
+      XLSX.writeFile(workbook, `beneficiarios_ollas_${new Date().toISOString().split("T")[0]}.xlsx`);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -207,7 +237,7 @@ export default function OllasBeneficiariosPage() {
                 </IconButton>
               </Tooltip>
               <Tooltip title="Exportar a Excel">
-                <IconButton onClick={handleExport} sx={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", "&:hover": { backgroundColor: "#dcfce7", borderColor: "#22c55e" } }}>
+                <IconButton onClick={handleExport} disabled={isLoading || isExporting} sx={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", "&:hover": { backgroundColor: "#dcfce7", borderColor: "#22c55e" } }}>
                   <FileDownload sx={{ color: "#22c55e", fontSize: 20 }} />
                 </IconButton>
               </Tooltip>

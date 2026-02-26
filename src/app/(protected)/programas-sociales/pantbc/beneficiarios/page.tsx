@@ -512,30 +512,64 @@ export default function PANTBCBeneficiariosPage() {
   // La búsqueda es server-side; se usa dataFormateados directamente
   const filteredData = dataFormateados;
 
+  const [isExporting, setIsExporting] = useState(false);
+
   // Exportar a Excel
-  const handleExport = () => {
-    const exportData = filteredData.map((p: PacienteTabla) => ({
-      "Nombre Completo": p.nombreCompleto,
-      "Tipo Doc": p.tipoDoc,
-      "N° Documento": p.numDoc,
-      "Sexo": p.sexo,
-      "Edad": p.edad,
-      "Fecha Nacimiento": formatearFecha(p.fechaNacimiento),
-      "Tipo Paciente": p.tipoPaciente,
-      "Establecimiento": p.establecimiento,
-      "Celular": p.celular,
-      "Fecha Inicio": formatearFecha(p.fechaInicio),
-      "Sector": p.sector,
-    }));
-    if (exportData.length === 0) return;
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Pacientes PANTBC");
-    worksheet["!cols"] = Object.keys(exportData[0] || {}).map(() => ({ wch: 20 }));
-    XLSX.writeFile(
-      workbook,
-      `pacientes_pantbc_${new Date().toISOString().split("T")[0]}.xlsx`
-    );
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("page", "1");
+      params.set("limit", "99999");
+
+      if (debouncedSearch.trim()) {
+        params.set("search", debouncedSearch.trim());
+      }
+
+      if (edadRange[0] > 0 || edadRange[1] < 120) {
+        params.set("age_min", String(edadRange[0]));
+        params.set("age_max", String(edadRange[1]));
+      }
+
+      if (cumpleanosModo === "mes" && mesSeleccionado !== null) {
+        params.set("month", String(mesSeleccionado + 1));
+      } else if (cumpleanosModo === "dia" && diaCumpleanos) {
+        const parts = diaCumpleanos.split("-");
+        params.set("birthday", `${parts[1]}-${parts[2]}`);
+      }
+
+      const response = await getData<BackendListaResponse>(`pantbc/patient?${params.toString()}`);
+
+      if (!response?.data) return;
+
+      const exportData = response.data.data.map((p) => ({
+        "Nombre Completo": `${p.name} ${p.lastname}`,
+        "Tipo Doc": p.doc_type || "DNI",
+        "N° Documento": p.doc_num || "-",
+        "Sexo": traducir("sex", p.sex),
+        "Edad": calcularEdad(p.birthday),
+        "Fecha Nacimiento": formatearFecha(p.birthday),
+        "Tipo Paciente": traducir("patient_type", p.patient_type),
+        "Establecimiento": p.census?.name || "-",
+        "Celular": p.phone || "-",
+        "Fecha Inicio": formatearFecha(p.start_at),
+        "Sector": p.sector || "-",
+      }));
+
+      if (exportData.length === 0) return;
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Pacientes PANTBC");
+      worksheet["!cols"] = Object.keys(exportData[0] || {}).map(() => ({ wch: 20 }));
+      XLSX.writeFile(
+        workbook,
+        `pacientes_pantbc_${new Date().toISOString().split("T")[0]}.xlsx`
+      );
+    } catch (error) {
+      console.error("Error exportando:", error);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const limpiarFiltros = () => {
@@ -632,6 +666,7 @@ export default function PANTBCBeneficiariosPage() {
               <Tooltip title="Exportar a Excel">
                 <IconButton
                   onClick={handleExport}
+                  disabled={isLoading || isExporting}
                   sx={{
                     backgroundColor: "#f8fafc",
                     border: "1px solid #e2e8f0",

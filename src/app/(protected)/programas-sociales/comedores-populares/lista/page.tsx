@@ -203,32 +203,46 @@ export default function ComedoresListaPage() {
     });
   };
 
+  const [isExporting, setIsExporting] = useState(false);
+
   // Exportar a Excel
-  const handleExport = () => {
-    const exportData = dataFormateados.map((c: ComedorAPI) => ({
-      Código: c.code,
-      Nombre: c.name,
-      Dirección: c.address,
-      "Total Miembros": c.members,
-      Mujeres: c.members_female,
-      Varones: c.members_male,
-      Presidente: c.president ? `${c.president.name} ${c.president.lastname}` : "-",
-      "DNI Presidente": c.president?.dni || "-",
-      "Teléfono Presidente": c.president?.phone || "-",
-      "Fecha Nac. Presidente": c.president?.birthday ? formatDate(c.president.birthday) : "-",
-      Resolución: c.directive?.resolution || "-",
-      "Fecha Inicio": formatDate(c.directive?.start_at),
-      "Fecha Fin": formatDate(c.directive?.end_at),
-    }));
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("limit", "99999");
+      params.set("page", "1");
+      params.set("modality", "EATER");
+      if (searchTerm.trim()) params.set("search", searchTerm.trim());
+      const response = await getData<APIResponse>(`pca/center?${params.toString()}`);
+      if (!response?.data) return;
+      const exportData = response.data.data.map((c: ComedorAPI) => ({
+        Código: c.code,
+        Nombre: c.name,
+        Dirección: c.address,
+        "Total Miembros": c.members,
+        Mujeres: c.members_female,
+        Varones: c.members_male,
+        Presidente: c.president ? `${c.president.name} ${c.president.lastname}` : "-",
+        "DNI Presidente": c.president?.dni || "-",
+        "Teléfono Presidente": c.president?.phone || "-",
+        "Fecha Nac. Presidente": c.president?.birthday ? formatDate(c.president.birthday) : "-",
+        Resolución: c.directive?.resolution || "-",
+        "Fecha Inicio": formatDate(c.directive?.start_at),
+        "Fecha Fin": formatDate(c.directive?.end_at),
+      }));
+      if (exportData.length === 0) return;
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Comedores Populares");
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Comedores Populares");
+      const colWidths = Object.keys(exportData[0] || {}).map(() => ({ wch: 20 }));
+      worksheet["!cols"] = colWidths;
 
-    const colWidths = Object.keys(exportData[0] || {}).map(() => ({ wch: 20 }));
-    worksheet["!cols"] = colWidths;
-
-    XLSX.writeFile(workbook, `comedores_populares_${new Date().toISOString().split("T")[0]}.xlsx`);
+      XLSX.writeFile(workbook, `comedores_populares_${new Date().toISOString().split("T")[0]}.xlsx`);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -339,6 +353,7 @@ export default function ComedoresListaPage() {
               <Tooltip title="Exportar a Excel">
                 <IconButton
                   onClick={handleExport}
+                  disabled={isLoading || isExporting}
                   sx={{
                     backgroundColor: "#f8fafc",
                     border: "1px solid #e2e8f0",

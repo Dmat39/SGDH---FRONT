@@ -487,33 +487,57 @@ export default function Compromiso1Page() {
     setDetalleOpen(true);
   };
 
-  const handleExport = () => {
-    const fechaISO = new Date().toISOString().slice(0, 10);
-    const exportData = dataFormateados.map((row, index) => ({
-      "#": index + 1 + page * rowsPerPage,
-      "Nombre Completo": row.nombreCompleto,
-      "Tipo Documento": row.tipoDoc,
-      "N° Documento": row.numDoc,
-      Teléfono: row.telefono || "-",
-      "Fecha Nacimiento": formatearFecha(row.fechaNacimiento),
-      "Fecha Registro": formatearFecha(row.fechaRegistro),
-    }));
+  const [isExporting, setIsExporting] = useState(false);
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const colWidths = [
-      { wch: 5 },
-      { wch: 35 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 15 },
-      { wch: 18 },
-      { wch: 18 },
-    ];
-    worksheet["!cols"] = colWidths;
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const fechaISO = new Date().toISOString().slice(0, 10);
+      const params = new URLSearchParams();
+      params.set("limit", "99999");
+      params.set("page", "1");
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+      if (edadRange[0] > 0 || edadRange[1] < 110) {
+        params.set("age_min", String(edadRange[0]));
+        params.set("age_max", String(edadRange[1]));
+      }
+      if (filtroMes && filtroDia) {
+        const mm = String(filtroMes).padStart(2, "0");
+        const dd = String(filtroDia).padStart(2, "0");
+        params.set("birthday", `${mm}-${dd}`);
+      } else if (filtroMes) {
+        params.set("month", String(filtroMes));
+      }
+      const response = await getData<BackendResponse>(`compromise/mother?${params.toString()}`);
+      if (!response?.data) return;
+      const exportData = response.data.data.map((item: MadreBackend, index: number) => ({
+        "#": index + 1,
+        "Nombre Completo": toTitleCase(`${item.name} ${item.lastname}`),
+        "Tipo Documento": item.doc_type,
+        "N° Documento": item.doc_num,
+        Teléfono: formatearTelefono(item.phone),
+        "Fecha Nacimiento": formatearFecha(item.birthday),
+        "Fecha Registro": formatearFecha(item.created_at),
+      }));
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Madres");
-    XLSX.writeFile(workbook, `compromiso1_madres_${fechaISO}.xlsx`);
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const colWidths = [
+        { wch: 5 },
+        { wch: 35 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 18 },
+        { wch: 18 },
+      ];
+      worksheet["!cols"] = colWidths;
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Madres");
+      XLSX.writeFile(workbook, `compromiso1_madres_${fechaISO}.xlsx`);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -666,7 +690,7 @@ export default function Compromiso1Page() {
                   size="small"
                   startIcon={<FileDownload />}
                   onClick={handleExport}
-                  disabled={dataFormateados.length === 0}
+                  disabled={isLoading || isExporting || dataFormateados.length === 0}
                   sx={{
                     borderColor: "#22c55e",
                     color: "#16a34a",

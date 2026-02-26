@@ -463,24 +463,58 @@ export default function PVLBeneficiariosPage() {
   // La búsqueda es server-side; se usa dataFormateados directamente
   const filteredData = dataFormateados;
 
+  const [isExporting, setIsExporting] = useState(false);
+
   // Exportar a Excel
-  const handleExport = () => {
-    const exportData = filteredData.map((b: BeneficiarioTabla) => ({
-      "Nombre Completo": b.nombreCompleto,
-      "Tipo Doc": b.tipoDoc,
-      "N° Documento": b.numDoc,
-      "Edad": b.edad,
-      "Fecha Nacimiento": formatearFecha(b.fechaNacimiento),
-      "Prioridad": b.prioridad,
-      "Comité": b.comite,
-      "Celular": b.celular,
-    }));
-    if (exportData.length === 0) return;
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Beneficiarios PVL");
-    worksheet["!cols"] = Object.keys(exportData[0] || {}).map(() => ({ wch: 22 }));
-    XLSX.writeFile(workbook, `beneficiarios_pvl_${new Date().toISOString().split("T")[0]}.xlsx`);
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("page", "1");
+      params.set("limit", "99999");
+
+      if (debouncedSearch.trim()) {
+        params.set("search", debouncedSearch.trim());
+      }
+
+      if (edadRange[0] > 0 || edadRange[1] < 120) {
+        params.set("age_min", String(edadRange[0]));
+        params.set("age_max", String(edadRange[1]));
+      }
+
+      if (cumpleanosModo === "mes" && mesSeleccionado !== null) {
+        params.set("month", String(mesSeleccionado + 1));
+      } else if (cumpleanosModo === "dia" && diaCumpleanos) {
+        const parts = diaCumpleanos.split("-");
+        params.set("birthday", `${parts[1]}-${parts[2]}`);
+      }
+
+      const response = await getData<BackendListaResponse>(`pvl/dependent?${params.toString()}`);
+
+      if (!response?.data) return;
+
+      const exportData = response.data.data.map((b) => ({
+        "Nombre Completo": `${b.name} ${b.lastname}`,
+        "Tipo Doc": b.doc_type || "DNI",
+        "N° Documento": b.doc_num || "-",
+        "Edad": calcularEdad(b.birthday),
+        "Fecha Nacimiento": formatearFecha(b.birthday),
+        "Prioridad": b.priority,
+        "Comité": b.committee || "-",
+        "Celular": b.phone || "-",
+      }));
+
+      if (exportData.length === 0) return;
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Beneficiarios PVL");
+      worksheet["!cols"] = Object.keys(exportData[0] || {}).map(() => ({ wch: 22 }));
+      XLSX.writeFile(workbook, `beneficiarios_pvl_${new Date().toISOString().split("T")[0]}.xlsx`);
+    } catch (error) {
+      console.error("Error exportando:", error);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const limpiarFiltros = () => {
@@ -577,6 +611,7 @@ export default function PVLBeneficiariosPage() {
               <Tooltip title="Exportar a Excel">
                 <IconButton
                   onClick={handleExport}
+                  disabled={isLoading || isExporting}
                   sx={{
                     backgroundColor: "#f8fafc",
                     border: "1px solid #e2e8f0",

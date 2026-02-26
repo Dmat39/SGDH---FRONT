@@ -427,33 +427,66 @@ export default function OMAPEDBeneficiariosPage() {
   // La búsqueda es server-side; se usa dataFormateados directamente
   const filteredData = dataFormateados;
 
+  const [isExporting, setIsExporting] = useState(false);
+
   // Exportar a Excel
-  const handleExport = () => {
-    const exportData = filteredData.map((row: BeneficiarioTabla) => ({
-      "Nombre Completo": row.nombreCompleto,
-      "Tipo Doc": row.docType,
-      "Nro. Doc": row.docNum,
-      Teléfono: row.telefono,
-      "Fecha de Nacimiento": formatearFecha(row.fechaNacimiento),
-      Edad: row.edad,
-      Grado: row.grado,
-      Diagnóstico: row.diagnostico,
-      Certificado: row.certificado,
-      CONADIS: row.conadis,
-      Folio: row.folio,
-      Dirección: row.direccion,
-    }));
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("page", "1");
+      params.set("limit", "99999");
 
-    if (exportData.length === 0) return;
+      if (debouncedSearch.trim()) {
+        params.set("search", debouncedSearch.trim());
+      }
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "OMAPED Beneficiarios");
-    worksheet["!cols"] = Object.keys(exportData[0] || {}).map(() => ({ wch: 20 }));
-    XLSX.writeFile(
-      workbook,
-      `omaped_beneficiarios_${new Date().toISOString().split("T")[0]}.xlsx`
-    );
+      if (edadRange[0] > 0 || edadRange[1] < 110) {
+        params.set("age_min", String(edadRange[0]));
+        params.set("age_max", String(edadRange[1]));
+      }
+
+      if (cumpleanosModo === "mes" && mesSeleccionado !== null) {
+        params.set("month", String(mesSeleccionado + 1));
+      } else if (cumpleanosModo === "dia" && diaCumpleanos) {
+        const parts = diaCumpleanos.split("-");
+        params.set("birthday", `${parts[1]}-${parts[2]}`);
+      }
+
+      const response = await getData<BackendResponse>(`omaped/disabled?${params.toString()}`);
+
+      if (!response?.data) return;
+
+      const exportData = response.data.data.map((item) => ({
+        "Nombre Completo": `${item.name} ${item.lastname}`.trim(),
+        "Tipo Doc": item.doc_type || "DNI",
+        "Nro. Doc": item.doc_num || "-",
+        Teléfono: item.phone || "-",
+        "Fecha de Nacimiento": formatearFecha(item.birthday),
+        Edad: calcularEdad(item.birthday),
+        Grado: traducir("degree", item.degree),
+        Diagnóstico: item.diagnostic1 || "-",
+        Certificado: item.certificate || "-",
+        CONADIS: item.conadis || "-",
+        Folio: item.folio || "-",
+        Dirección: item.address || "-",
+      }));
+
+      if (exportData.length === 0) return;
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "OMAPED Beneficiarios");
+      worksheet["!cols"] = Object.keys(exportData[0] || {}).map(() => ({ wch: 20 }));
+      XLSX.writeFile(
+        workbook,
+        `omaped_beneficiarios_${new Date().toISOString().split("T")[0]}.xlsx`
+      );
+    } catch (error) {
+      console.error("Error exportando:", error);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Limpiar filtros
@@ -551,6 +584,7 @@ export default function OMAPEDBeneficiariosPage() {
               <Tooltip title="Exportar a Excel">
                 <IconButton
                   onClick={handleExport}
+                  disabled={isLoading || isExporting}
                   sx={{
                     backgroundColor: "#f8fafc",
                     border: "1px solid #e2e8f0",

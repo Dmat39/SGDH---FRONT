@@ -503,22 +503,47 @@ export default function ParticipantesPage() {
   const dataFormateados = useFormatTableData(rawData);
   const filteredData = dataFormateados;
 
+  const [isExporting, setIsExporting] = useState(false);
+
   // Exportar
-  const handleExport = () => {
-    const fechaISO = new Date().toISOString().slice(0, 10);
-    const exportData = filteredData.map((r: ParticipanteTabla) => ({
-      "Nombre Completo": r.nombreCompleto,
-      DNI: r.dni,
-      Celular: formatearTelefono(r.celular),
-      "F. Nacimiento": formatearFecha(r.fechaNacimiento),
-      Edad: r.edad,
-      Taller: r.taller,
-    }));
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    ws["!cols"] = [{ wch: 30 }, { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 6 }, { wch: 25 }];
-    XLSX.utils.book_append_sheet(wb, ws, "Participantes");
-    XLSX.writeFile(wb, `participantes_${fechaISO}.xlsx`);
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const fechaISO = new Date().toISOString().slice(0, 10);
+      const params = new URLSearchParams();
+      params.set("limit", "99999");
+      params.set("page", "1");
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+      if (filtroTaller) params.set("workshop", filtroTaller);
+      if (edadRange[0] > 0 || edadRange[1] < 110) {
+        params.set("age_min", String(edadRange[0]));
+        params.set("age_max", String(edadRange[1]));
+      }
+      if (filtroMes && filtroDia) {
+        const mm = String(filtroMes).padStart(2, "0");
+        const dd = String(filtroDia).padStart(2, "0");
+        params.set("birthday", `${mm}-${dd}`);
+      } else if (filtroMes) {
+        params.set("month", String(filtroMes));
+      }
+      const response = await getData<BackendResponse>(`recreation/participant?${params.toString()}`);
+      if (!response?.data) return;
+      const exportData = response.data.data.map((item: ParticipanteBackend) => ({
+        "Nombre Completo": `${item.name} ${item.lastname}`,
+        DNI: item.dni || "-",
+        Celular: formatearTelefono(item.phone),
+        "F. Nacimiento": formatearFecha(item.birthday),
+        Edad: calcularEdad(item.birthday),
+        Taller: item.workshop?.name || "-",
+      }));
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      ws["!cols"] = [{ wch: 30 }, { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 6 }, { wch: 25 }];
+      XLSX.utils.book_append_sheet(wb, ws, "Participantes");
+      XLSX.writeFile(wb, `participantes_${fechaISO}.xlsx`);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Limpiar filtros
@@ -722,7 +747,7 @@ export default function ParticipantesPage() {
                   size="small"
                   startIcon={<FileDownload />}
                   onClick={handleExport}
-                  disabled={isLoading || filteredData.length === 0}
+                  disabled={isLoading || isExporting || filteredData.length === 0}
                   sx={{
                     borderColor: "#22c55e",
                     color: "#16a34a",

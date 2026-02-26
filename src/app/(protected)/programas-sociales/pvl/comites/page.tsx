@@ -290,35 +290,67 @@ export default function PVLComitesPage() {
   // Formatear strings del backend (Title Case, preservar siglas en direcciones)
   const dataFormateados = useFormatTableData(data);
 
+  const [isExporting, setIsExporting] = useState(false);
+
   // Exportar a Excel
-  const handleExport = () => {
-    const exportData = dataFormateados.map((c: ComiteFrontend) => ({
-      Código: c.codigo,
-      "Centro de Acopio": c.centroAcopio,
-      Comité: c.comite,
-      Beneficiarios: c.beneficiarios,
-      Socios: c.socios,
-      Coordinadora: c.coordinadora,
-      "DNI Coordinadora": c.dniCoordinadora,
-      "Teléfono Coordinadora": c.telefonoCoordinadora,
-      "Dirección": c.direccionReferencia,
-      Pueblo: c.pueblo,
-      Comuna: c.comuna,
-      Ruta: c.ruta,
-      "Beneficiarios Extranjeros": c.beneficiariosExtranjeros,
-      Discapacitados: c.discapacitados,
-      Observaciones: c.observaciones || "-",
-    }));
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("page", "1");
+      params.set("limit", "99999");
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Comités PVL");
+      if (searchTerm.trim()) {
+        params.set("search", searchTerm.trim());
+      }
 
-    // Ajustar ancho de columnas
-    const colWidths = Object.keys(exportData[0] || {}).map(() => ({ wch: 20 }));
-    worksheet["!cols"] = colWidths;
+      if (beneficiariosRange[0] > 0 || beneficiariosRange[1] < 200) {
+        params.set("beneficiaries_min", String(beneficiariosRange[0]));
+        params.set("beneficiaries_max", String(beneficiariosRange[1]));
+      }
 
-    XLSX.writeFile(workbook, `comites_pvl_${new Date().toISOString().split("T")[0]}.xlsx`);
+      if (comunasSeleccionadas.length > 0) {
+        params.set("commune", comunasSeleccionadas.join(","));
+      }
+
+      const response = await getData<BackendResponse>(`pvl/committee?${params.toString()}`);
+
+      if (!response?.data) return;
+
+      const exportData = response.data.data.map((item) => {
+        const c = mapBackendToFrontend(item);
+        return {
+          Código: c.codigo,
+          "Centro de Acopio": c.centroAcopio,
+          Comité: c.comite,
+          Beneficiarios: c.beneficiarios,
+          Socios: c.socios,
+          Coordinadora: c.coordinadora,
+          "DNI Coordinadora": c.dniCoordinadora,
+          "Teléfono Coordinadora": c.telefonoCoordinadora,
+          "Dirección": c.direccionReferencia,
+          Pueblo: c.pueblo,
+          Comuna: c.comuna,
+          Ruta: c.ruta,
+          "Beneficiarios Extranjeros": c.beneficiariosExtranjeros,
+          Discapacitados: c.discapacitados,
+          Observaciones: c.observaciones || "-",
+        };
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Comités PVL");
+
+      const colWidths = Object.keys(exportData[0] || {}).map(() => ({ wch: 20 }));
+      worksheet["!cols"] = colWidths;
+
+      XLSX.writeFile(workbook, `comites_pvl_${new Date().toISOString().split("T")[0]}.xlsx`);
+    } catch (error) {
+      console.error("Error exportando:", error);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -414,7 +446,7 @@ export default function PVLComitesPage() {
                     size="small"
                     startIcon={<FileDownload />}
                     onClick={handleExport}
-                    disabled={dataFormateados.length === 0}
+                    disabled={isLoading || isExporting || dataFormateados.length === 0}
                     sx={{
                       borderColor: "#22c55e",
                       color: "#16a34a",
