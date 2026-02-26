@@ -40,6 +40,8 @@ import {
   Close,
   Visibility,
   Cake,
+  PhoneEnabled,
+  PhoneDisabled,
 } from "@mui/icons-material";
 import * as XLSX from "xlsx";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -171,6 +173,8 @@ export default function ComedoresBeneficiariosPage() {
   const [mesesCumpleanos, setMesesCumpleanos] = useState<number[]>([]);
   const [cumpleanosModo, setCumpleanosModo] = useState<CumpleanosModo>("mes");
   const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
+  const [filtroTelefono, setFiltroTelefono] = useState<"" | "con" | "sin">("");
+  const [filtroTelefonoDraft, setFiltroTelefonoDraft] = useState<"" | "con" | "sin">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
   const [selectedBeneficiario, setSelectedBeneficiario] = useState<BeneficiarioFrontend | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -201,6 +205,12 @@ export default function ComedoresBeneficiariosPage() {
           params.set("birthday_day", `${parts[1]}-${parts[2]}`);
         }
 
+        if (filtroTelefono === "con") {
+          params.set("phone", "true");
+        } else if (filtroTelefono === "sin") {
+          params.set("phone", "false");
+        }
+
         const response = await getData<BackendResponse>(`pca/recipient?${params.toString()}`);
         if (response?.data) {
           setData(response.data.data.map(mapBackendToFrontend));
@@ -219,7 +229,10 @@ export default function ComedoresBeneficiariosPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, rowsPerPage, searchTerm, fetchKey, getData]);
 
-  const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => setFilterAnchor(event.currentTarget);
+  const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setFiltroTelefonoDraft(filtroTelefono);
+    setFilterAnchor(event.currentTarget);
+  };
   const handleFilterClose = () => setFilterAnchor(null);
   const handleFilterTypeChange = (_event: React.MouseEvent<HTMLElement>, v: FilterType | null) => { if (v !== null) setFilterType(v); };
   const handleEdadChange = (_event: Event, v: number | number[]) => setEdadRange(v as number[]);
@@ -254,6 +267,11 @@ export default function ComedoresBeneficiariosPage() {
       } else if (cumpleanosModo === "dia" && diaCumpleanos) {
         const parts = diaCumpleanos.split("-");
         params.set("birthday_day", `${parts[1]}-${parts[2]}`);
+      }
+      if (filtroTelefono === "con") {
+        params.set("phone", "true");
+      } else if (filtroTelefono === "sin") {
+        params.set("phone", "false");
       }
       const response = await getData<BackendResponse>(`pca/recipient?${params.toString()}`);
       if (!response?.data) return;
@@ -330,6 +348,20 @@ export default function ComedoresBeneficiariosPage() {
                   <IconButton size="small" onClick={() => { setMesesCumpleanos([]); setDiaCumpleanos(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}><Close sx={{ fontSize: 14, color: "#be185d" }} /></IconButton>
                 </Box>
               )}
+              {filtroTelefono && (
+                <Box sx={{ backgroundColor: filtroTelefono === "con" ? "#dcfce7" : "#fee2e2", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                  {filtroTelefono === "con"
+                    ? <PhoneEnabled sx={{ fontSize: 14, color: "#16a34a" }} />
+                    : <PhoneDisabled sx={{ fontSize: 14, color: "#dc2626" }} />
+                  }
+                  <Typography variant="caption" color={filtroTelefono === "con" ? "#16a34a" : "#dc2626"}>
+                    {filtroTelefono === "con" ? "Con celular" : "Sin celular"}
+                  </Typography>
+                  <IconButton size="small" onClick={() => { setFiltroTelefono(""); setFiltroTelefonoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                    <Close sx={{ fontSize: 14, color: filtroTelefono === "con" ? "#16a34a" : "#dc2626" }} />
+                  </IconButton>
+                </Box>
+              )}
               <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
                 {totalCount.toLocaleString()} beneficiario(s)
               </Typography>
@@ -378,9 +410,28 @@ export default function ComedoresBeneficiariosPage() {
                     )}
                   </>
                 )}
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="subtitle2" fontWeight={600} color="#334155" mb={1.5}>
+                  Número de celular
+                </Typography>
+                <ToggleButtonGroup
+                  value={filtroTelefonoDraft}
+                  exclusive
+                  onChange={(_e, val) => { if (val !== null) setFiltroTelefonoDraft(val); }}
+                  size="small"
+                  fullWidth
+                >
+                  <ToggleButton value="" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#f1f5f9", color: "#334155", "&:hover": { backgroundColor: "#e2e8f0" } } }}>Todos</ToggleButton>
+                  <ToggleButton value="con" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#dcfce7", color: "#16a34a", "&:hover": { backgroundColor: "#bbf7d0" } } }}>
+                    <PhoneEnabled sx={{ fontSize: 15, mr: 0.5 }} />Con celular
+                  </ToggleButton>
+                  <ToggleButton value="sin" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fee2e2", color: "#dc2626", "&:hover": { backgroundColor: "#fecaca" } } }}>
+                    <PhoneDisabled sx={{ fontSize: 15, mr: 0.5 }} />Sin celular
+                  </ToggleButton>
+                </ToggleButtonGroup>
                 <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
-                  <Button size="small" onClick={() => { setEdadRange([0, 110]); setMesesCumpleanos([]); setCumpleanosModo("mes"); setDiaCumpleanos(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ color: "#64748b", textTransform: "none" }}>Limpiar todo</Button>
-                  <Button size="small" variant="contained" onClick={() => { setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }} sx={{ backgroundColor: "#475569", textTransform: "none", "&:hover": { backgroundColor: "#334155" } }}>Aplicar</Button>
+                  <Button size="small" onClick={() => { setEdadRange([0, 110]); setMesesCumpleanos([]); setCumpleanosModo("mes"); setDiaCumpleanos(""); setFiltroTelefono(""); setFiltroTelefonoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ color: "#64748b", textTransform: "none" }}>Limpiar todo</Button>
+                  <Button size="small" variant="contained" onClick={() => { setFiltroTelefono(filtroTelefonoDraft); setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }} sx={{ backgroundColor: "#475569", textTransform: "none", "&:hover": { backgroundColor: "#334155" } }}>Aplicar</Button>
                 </Box>
               </Box>
             </Popover>

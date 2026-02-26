@@ -41,6 +41,8 @@ import {
   Cake,
   LocalHospital,
   Person,
+  PhoneEnabled,
+  PhoneDisabled,
 } from "@mui/icons-material";
 import * as XLSX from "xlsx";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -367,6 +369,8 @@ export default function PANTBCBeneficiariosPage() {
   const [mesSeleccionado, setMesSeleccionado] = useState<number | null>(null);
   const [cumpleanosModo, setCumpleanosModo] = useState<CumpleanosModo>("mes");
   const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
+  const [filtroTelefono, setFiltroTelefono] = useState<"" | "con" | "sin">("");
+  const [filtroTelefonoDraft, setFiltroTelefonoDraft] = useState<"" | "con" | "sin">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
 
   // Detalle
@@ -412,6 +416,12 @@ export default function PANTBCBeneficiariosPage() {
         } else if (cumpleanosModo === "dia" && diaCumpleanos) {
           const parts = diaCumpleanos.split("-");
           params.set("birthday", `${parts[1]}-${parts[2]}`);
+        }
+
+        if (filtroTelefono === "con") {
+          params.set("phone", "true");
+        } else if (filtroTelefono === "sin") {
+          params.set("phone", "false");
         }
 
         const response = await getData<BackendListaResponse>(
@@ -472,8 +482,10 @@ export default function PANTBCBeneficiariosPage() {
   }, [selectedId, detailOpen, fetchDetalle]);
 
   // Handlers de filtros
-  const handleFilterClick = (e: React.MouseEvent<HTMLButtonElement>) =>
+  const handleFilterClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    setFiltroTelefonoDraft(filtroTelefono);
     setFilterAnchor(e.currentTarget);
+  };
   const handleFilterClose = () => setFilterAnchor(null);
   const handleFilterTypeChange = (
     _: React.MouseEvent<HTMLElement>,
@@ -538,6 +550,12 @@ export default function PANTBCBeneficiariosPage() {
         params.set("birthday", `${parts[1]}-${parts[2]}`);
       }
 
+      if (filtroTelefono === "con") {
+        params.set("phone", "true");
+      } else if (filtroTelefono === "sin") {
+        params.set("phone", "false");
+      }
+
       const response = await getData<BackendListaResponse>(`pantbc/patient?${params.toString()}`);
 
       if (!response?.data) return;
@@ -579,6 +597,8 @@ export default function PANTBCBeneficiariosPage() {
     setMesSeleccionado(null);
     setCumpleanosModo("mes");
     setDiaCumpleanos("");
+    setFiltroTelefono("");
+    setFiltroTelefonoDraft("");
     setPage(0);
     setFetchKey((k) => k + 1);
   };
@@ -736,6 +756,20 @@ export default function PANTBCBeneficiariosPage() {
                     sx={{ p: 0.25 }}
                   >
                     <Close sx={{ fontSize: 14, color: "#880e4f" }} />
+                  </IconButton>
+                </Box>
+              )}
+              {filtroTelefono && (
+                <Box sx={{ backgroundColor: filtroTelefono === "con" ? "#dcfce7" : "#fee2e2", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                  {filtroTelefono === "con"
+                    ? <PhoneEnabled sx={{ fontSize: 14, color: "#16a34a" }} />
+                    : <PhoneDisabled sx={{ fontSize: 14, color: "#dc2626" }} />
+                  }
+                  <Typography variant="caption" color={filtroTelefono === "con" ? "#16a34a" : "#dc2626"}>
+                    {filtroTelefono === "con" ? "Con celular" : "Sin celular"}
+                  </Typography>
+                  <IconButton size="small" onClick={() => { setFiltroTelefono(""); setFiltroTelefonoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                    <Close sx={{ fontSize: 14, color: filtroTelefono === "con" ? "#16a34a" : "#dc2626" }} />
                   </IconButton>
                 </Box>
               )}
@@ -936,6 +970,25 @@ export default function PANTBCBeneficiariosPage() {
                     )}
                   </>
                 )}
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="subtitle2" fontWeight={600} color="#334155" mb={1.5}>
+                  Número de celular
+                </Typography>
+                <ToggleButtonGroup
+                  value={filtroTelefonoDraft}
+                  exclusive
+                  onChange={(_e, val) => { if (val !== null) setFiltroTelefonoDraft(val); }}
+                  size="small"
+                  fullWidth
+                >
+                  <ToggleButton value="" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#f1f5f9", color: "#334155", "&:hover": { backgroundColor: "#e2e8f0" } } }}>Todos</ToggleButton>
+                  <ToggleButton value="con" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#dcfce7", color: "#16a34a", "&:hover": { backgroundColor: "#bbf7d0" } } }}>
+                    <PhoneEnabled sx={{ fontSize: 15, mr: 0.5 }} />Con celular
+                  </ToggleButton>
+                  <ToggleButton value="sin" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fee2e2", color: "#dc2626", "&:hover": { backgroundColor: "#fecaca" } } }}>
+                    <PhoneDisabled sx={{ fontSize: 15, mr: 0.5 }} />Sin celular
+                  </ToggleButton>
+                </ToggleButtonGroup>
                 <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
                   <Button
                     size="small"
@@ -948,6 +1001,7 @@ export default function PANTBCBeneficiariosPage() {
                     size="small"
                     variant="contained"
                     onClick={() => {
+                      setFiltroTelefono(filtroTelefonoDraft);
                       setPage(0);
                       setFetchKey((k) => k + 1);
                       handleFilterClose();

@@ -34,6 +34,8 @@ import {
   Cake,
   Clear,
   Close,
+  PhoneEnabled,
+  PhoneDisabled,
 } from "@mui/icons-material";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -181,6 +183,8 @@ export default function ListaGeneralPage() {
   const [edadRange, setEdadRange] = useState<number[]>([0, 110]);
   const [filtroMes, setFiltroMes] = useState<number | "">("");
   const [filtroDia, setFiltroDia] = useState("");
+  const [filtroTelefono, setFiltroTelefono] = useState<"" | "con" | "sin">("");
+  const [filtroTelefonoDraft, setFiltroTelefonoDraft] = useState<"" | "con" | "sin">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
 
   // Debounce de búsqueda (400ms)
@@ -243,6 +247,12 @@ export default function ListaGeneralPage() {
           params.set("birthday", `${mm}-${dd}`);
         } else if (filtroMes) {
           params.set("month", String(filtroMes));
+        }
+
+        if (filtroTelefono === "con") {
+          params.set("phone", "true");
+        } else if (filtroTelefono === "sin") {
+          params.set("phone", "false");
         }
 
         const response = await getData<BackendResponse>(
@@ -316,6 +326,12 @@ export default function ListaGeneralPage() {
         params.set("month", String(filtroMes));
       }
 
+      if (filtroTelefono === "con") {
+        params.set("phone", "true");
+      } else if (filtroTelefono === "sin") {
+        params.set("phone", "false");
+      }
+
       const response = await getData<BackendResponse>(`general?${params.toString()}`);
 
       if (!response?.data) return;
@@ -362,6 +378,8 @@ export default function ListaGeneralPage() {
     setEdadRange([0, 110]);
     setFiltroDia("");
     setFiltroMes("");
+    setFiltroTelefono("");
+    setFiltroTelefonoDraft("");
     setPage(0);
     setFetchKey((k) => k + 1);
   };
@@ -374,6 +392,7 @@ export default function ListaGeneralPage() {
 
   // Handlers de filtro
   const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setFiltroTelefonoDraft(filtroTelefono);
     setFilterAnchor(event.currentTarget);
   };
 
@@ -394,7 +413,7 @@ export default function ListaGeneralPage() {
 
   const filterOpen = Boolean(filterAnchor);
   const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 110;
-  const hayFiltrosActivos = searchTerm || filtroModulo || filtroDia || filtroMes || isEdadFiltered;
+  const hayFiltrosActivos = searchTerm || filtroModulo || filtroDia || filtroMes || isEdadFiltered || filtroTelefono;
 
   return (
     <Box>
@@ -484,11 +503,11 @@ export default function ListaGeneralPage() {
               onClick={handleFilterClick}
               sx={{
                 backgroundColor:
-                  filterOpen || isEdadFiltered || filtroDia || filtroMes
+                  filterOpen || isEdadFiltered || filtroDia || filtroMes || filtroTelefono
                     ? "#fce7f3"
                     : "#f8fafc",
                 border: `1px solid ${
-                  filterOpen || isEdadFiltered || filtroDia || filtroMes
+                  filterOpen || isEdadFiltered || filtroDia || filtroMes || filtroTelefono
                     ? subgerencia.color
                     : "#e2e8f0"
                 }`,
@@ -502,7 +521,7 @@ export default function ListaGeneralPage() {
               <FilterList
                 sx={{
                   color:
-                    filterOpen || isEdadFiltered || filtroDia || filtroMes
+                    filterOpen || isEdadFiltered || filtroDia || filtroMes || filtroTelefono
                       ? subgerencia.color
                       : "#64748b",
                   fontSize: 20,
@@ -657,7 +676,7 @@ export default function ListaGeneralPage() {
             {/* Filtro por edad */}
             {filterType === "edad" && (
               <>
-                <Typography variant="body2" color="#475569" mb={1.5}>
+                <Typography variant="subtitle2" fontWeight={600} color="#334155" mb={1.5}>
                   Rango de edad
                 </Typography>
                 <Slider
@@ -686,7 +705,7 @@ export default function ListaGeneralPage() {
             {/* Filtro por cumpleaños */}
             {filterType === "cumpleanos" && (
               <>
-                <Typography variant="body2" color="#475569" mb={1.5}>
+                <Typography variant="subtitle2" fontWeight={600} color="#334155" mb={1.5}>
                   Filtrar por cumpleaños
                 </Typography>
                 <TextField
@@ -723,6 +742,65 @@ export default function ListaGeneralPage() {
               </>
             )}
 
+            <Divider sx={{ my: 2 }} />
+
+            {/* Filtro por celular */}
+            <Typography variant="subtitle2" fontWeight={600} color="#334155" mb={1.5}>
+              Número de celular
+            </Typography>
+            <ToggleButtonGroup
+              value={filtroTelefonoDraft}
+              exclusive
+              onChange={(_e, val) => { if (val !== null) setFiltroTelefonoDraft(val); }}
+              size="small"
+              fullWidth
+            >
+              <ToggleButton
+                value=""
+                sx={{
+                  textTransform: "none",
+                  fontSize: "0.75rem",
+                  "&.Mui-selected": {
+                    backgroundColor: "#f1f5f9",
+                    color: "#334155",
+                    "&:hover": { backgroundColor: "#e2e8f0" },
+                  },
+                }}
+              >
+                Todos
+              </ToggleButton>
+              <ToggleButton
+                value="con"
+                sx={{
+                  textTransform: "none",
+                  fontSize: "0.75rem",
+                  "&.Mui-selected": {
+                    backgroundColor: "#dcfce7",
+                    color: "#16a34a",
+                    "&:hover": { backgroundColor: "#bbf7d0" },
+                  },
+                }}
+              >
+                <PhoneEnabled sx={{ fontSize: 15, mr: 0.5 }} />
+                Con celular
+              </ToggleButton>
+              <ToggleButton
+                value="sin"
+                sx={{
+                  textTransform: "none",
+                  fontSize: "0.75rem",
+                  "&.Mui-selected": {
+                    backgroundColor: "#fee2e2",
+                    color: "#dc2626",
+                    "&:hover": { backgroundColor: "#fecaca" },
+                  },
+                }}
+              >
+                <PhoneDisabled sx={{ fontSize: 15, mr: 0.5 }} />
+                Sin celular
+              </ToggleButton>
+            </ToggleButtonGroup>
+
             <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
               <Button
                 size="small"
@@ -730,6 +808,8 @@ export default function ListaGeneralPage() {
                   setEdadRange([0, 110]);
                   setFiltroDia("");
                   setFiltroMes("");
+                  setFiltroTelefono("");
+                  setFiltroTelefonoDraft("");
                   setPage(0);
                   setFetchKey((k) => k + 1);
                 }}
@@ -740,7 +820,7 @@ export default function ListaGeneralPage() {
               <Button
                 size="small"
                 variant="contained"
-                onClick={() => { setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
+                onClick={() => { setFiltroTelefono(filtroTelefonoDraft); setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
                 sx={{
                   backgroundColor: subgerencia.color,
                   textTransform: "none",
@@ -785,6 +865,22 @@ export default function ListaGeneralPage() {
                 label={`Día: ${filtroDia}`}
                 onDelete={() => { setFiltroDia(""); setPage(0); setFetchKey((k) => k + 1); }}
                 sx={{ backgroundColor: "#d81b7e", color: "white" }}
+              />
+            )}
+            {filtroTelefono && (
+              <Chip
+                size="small"
+                label={filtroTelefono === "con" ? "Con celular" : "Sin celular"}
+                onDelete={() => { setFiltroTelefono(""); setFiltroTelefonoDraft(""); setPage(0); setFetchKey((k) => k + 1); }}
+                icon={
+                  filtroTelefono === "con"
+                    ? <PhoneEnabled sx={{ color: "white !important", fontSize: 16 }} />
+                    : <PhoneDisabled sx={{ color: "white !important", fontSize: 16 }} />
+                }
+                sx={{
+                  backgroundColor: filtroTelefono === "con" ? "#16a34a" : "#dc2626",
+                  color: "white",
+                }}
               />
             )}
             {searchTerm && (
