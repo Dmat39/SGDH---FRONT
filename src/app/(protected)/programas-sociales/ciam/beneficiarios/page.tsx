@@ -51,6 +51,8 @@ import {
   Psychology,
   Warning,
   Assignment,
+  PhoneEnabled,
+  PhoneDisabled,
 } from "@mui/icons-material";
 import * as XLSX from "xlsx";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -285,7 +287,7 @@ const mapListaToTabla = (item: BeneficiarioListaBackend): BeneficiarioTabla => (
 // ============================================
 // CONSTANTES
 // ============================================
-type FilterType = "edad" | "cumpleanos" | "sexo" | "seguro";
+type FilterType = "edad" | "cumpleanos" | "sexo" | "seguro" | "telefono";
 type CumpleanosModo = "mes" | "dia";
 
 const MESES = [
@@ -838,6 +840,8 @@ export default function CIAMBeneficiariosPage() {
   const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
   const [sexosSeleccionados, setSexosSeleccionados] = useState<string[]>([]);
   const [segurosSeleccionados, setSegurosSeleccionados] = useState<string[]>([]);
+  const [filtroTelefono, setFiltroTelefono] = useState<"" | "con" | "sin">("");
+  const [filtroTelefonoDraft, setFiltroTelefonoDraft] = useState<"" | "con" | "sin">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
 
   // Detalle
@@ -880,6 +884,12 @@ export default function CIAMBeneficiariosPage() {
         } else if (cumpleanosModo === "dia" && diaCumpleanos) {
           const parts = diaCumpleanos.split("-"); // YYYY-MM-DD
           params.set("birthday", `${parts[1]}-${parts[2]}`);
+        }
+
+        if (filtroTelefono === "con") {
+          params.set("phone", "true");
+        } else if (filtroTelefono === "sin") {
+          params.set("phone", "false");
         }
 
         const response = await getData<BackendListaResponse>(
@@ -926,7 +936,10 @@ export default function CIAMBeneficiariosPage() {
   }, [selectedId, detailOpen, fetchDetalle]);
 
   // Handlers de filtros
-  const handleFilterClick = (e: React.MouseEvent<HTMLButtonElement>) => setFilterAnchor(e.currentTarget);
+  const handleFilterClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    setFiltroTelefonoDraft(filtroTelefono);
+    setFilterAnchor(e.currentTarget);
+  };
   const handleFilterClose = () => setFilterAnchor(null);
   const handleFilterTypeChange = (_: React.MouseEvent<HTMLElement>, v: FilterType | null) => {
     if (v !== null) setFilterType(v);
@@ -974,27 +987,65 @@ export default function CIAMBeneficiariosPage() {
     return matchesSexo && matchesSeguro;
   });
 
+  const [isExporting, setIsExporting] = useState(false);
+
   // Exportar a Excel (todos los datos filtrados)
-  const handleExport = () => {
-    const exportData = filteredData.map((b: BeneficiarioTabla) => ({
-      "Nombre Completo": b.nombreCompleto,
-      "Tipo Doc": b.tipoDoc,
-      "Sexo": b.sexo,
-      "Edad": b.edad,
-      "Fecha Nacimiento": formatearFecha(b.fechaNacimiento),
-      "Estado Civil": b.estadoCivil,
-      "Seguro de Salud": b.seguroSalud,
-      "Celular": b.celular,
-      "Vivienda": b.housingStatus,
-    }));
-    if (exportData.length === 0) {
-      return;
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("page", "1");
+      params.set("limit", "99999");
+
+      if (debouncedSearch.trim()) {
+        params.set("search", debouncedSearch.trim());
+      }
+
+      if (edadRange[0] > 60 || edadRange[1] < 110) {
+        params.set("age_min", String(edadRange[0]));
+        params.set("age_max", String(edadRange[1]));
+      }
+
+      if (cumpleanosModo === "mes" && mesSeleccionado !== null) {
+        params.set("month", String(mesSeleccionado + 1));
+      } else if (cumpleanosModo === "dia" && diaCumpleanos) {
+        const parts = diaCumpleanos.split("-");
+        params.set("birthday", `${parts[1]}-${parts[2]}`);
+      }
+
+      if (filtroTelefono === "con") {
+        params.set("phone", "true");
+      } else if (filtroTelefono === "sin") {
+        params.set("phone", "false");
+      }
+
+      const response = await getData<BackendListaResponse>(`pam/benefited?${params.toString()}`);
+
+      if (!response?.data) return;
+
+      const exportData = response.data.data.map((b) => ({
+        "Nombre Completo": `${b.name} ${b.lastname}`,
+        "Tipo Doc": b.doc_type || "DNI",
+        "Sexo": traducir("sex", b.sex),
+        "Edad": calcularEdad(b.birthday),
+        "Fecha Nacimiento": formatearFecha(b.birthday),
+        "Estado Civil": traducir("civil", b.civil),
+        "Seguro de Salud": traducir("health", b.health),
+        "Celular": b.cellphone || "-",
+        "Vivienda": traducir("housing_status", b.housing_status),
+      }));
+
+      if (exportData.length === 0) return;
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Beneficiarios CIAM");
+      worksheet["!cols"] = Object.keys(exportData[0] || {}).map(() => ({ wch: 20 }));
+      XLSX.writeFile(workbook, `beneficiarios_ciam_${new Date().toISOString().split("T")[0]}.xlsx`);
+    } catch (error) {
+      console.error("Error exportando:", error);
+    } finally {
+      setIsExporting(false);
     }
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Beneficiarios CIAM");
-    worksheet["!cols"] = Object.keys(exportData[0] || {}).map(() => ({ wch: 20 }));
-    XLSX.writeFile(workbook, `beneficiarios_ciam_${new Date().toISOString().split("T")[0]}.xlsx`);
   };
 
   const limpiarFiltros = () => {
@@ -1006,6 +1057,8 @@ export default function CIAMBeneficiariosPage() {
     setDiaCumpleanos("");
     setSexosSeleccionados([]);
     setSegurosSeleccionados([]);
+    setFiltroTelefono("");
+    setFiltroTelefonoDraft("");
     setPage(0);
     setFetchKey((k) => k + 1);
   };
@@ -1093,6 +1146,7 @@ export default function CIAMBeneficiariosPage() {
               <Tooltip title="Exportar a Excel">
                 <IconButton
                   onClick={handleExport}
+                  disabled={isLoading || isExporting}
                   sx={{
                     backgroundColor: "#f8fafc",
                     border: "1px solid #e2e8f0",
@@ -1148,6 +1202,20 @@ export default function CIAMBeneficiariosPage() {
                   </IconButton>
                 </Box>
               )}
+              {filtroTelefono && (
+                <Box sx={{ backgroundColor: filtroTelefono === "con" ? "#dcfce7" : "#fee2e2", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                  {filtroTelefono === "con"
+                    ? <PhoneEnabled sx={{ fontSize: 14, color: "#16a34a" }} />
+                    : <PhoneDisabled sx={{ fontSize: 14, color: "#dc2626" }} />
+                  }
+                  <Typography variant="caption" color={filtroTelefono === "con" ? "#16a34a" : "#dc2626"}>
+                    {filtroTelefono === "con" ? "Con celular" : "Sin celular"}
+                  </Typography>
+                  <IconButton size="small" onClick={() => { setFiltroTelefono(""); setFiltroTelefonoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                    <Close sx={{ fontSize: 14, color: filtroTelefono === "con" ? "#16a34a" : "#dc2626" }} />
+                  </IconButton>
+                </Box>
+              )}
 
               <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
                 {totalCount.toLocaleString()} beneficiario(s)
@@ -1186,6 +1254,9 @@ export default function CIAMBeneficiariosPage() {
                   </ToggleButton>
                   <ToggleButton value="seguro" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#e8f5e9", color: "#2e7d32", "&:hover": { backgroundColor: "#c8e6c9" } } }}>
                     Seguro
+                  </ToggleButton>
+                  <ToggleButton value="telefono" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#dcfce7", color: "#16a34a", "&:hover": { backgroundColor: "#bbf7d0" } } }}>
+                    Tel.
                   </ToggleButton>
                 </ToggleButtonGroup>
 
@@ -1354,6 +1425,26 @@ export default function CIAMBeneficiariosPage() {
                   </>
                 )}
 
+                {filterType === "telefono" && (
+                  <>
+                    <Typography variant="body2" color="#475569" mb={1.5}>Filtrar por número de celular</Typography>
+                    <ToggleButtonGroup
+                      value={filtroTelefonoDraft}
+                      exclusive
+                      onChange={(_e, val) => { if (val !== null) setFiltroTelefonoDraft(val); }}
+                      size="small"
+                      fullWidth
+                    >
+                      <ToggleButton value="" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#f1f5f9", color: "#334155", "&:hover": { backgroundColor: "#e2e8f0" } } }}>Todos</ToggleButton>
+                      <ToggleButton value="con" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#dcfce7", color: "#16a34a", "&:hover": { backgroundColor: "#bbf7d0" } } }}>
+                        <PhoneEnabled sx={{ fontSize: 15, mr: 0.5 }} />Con celular
+                      </ToggleButton>
+                      <ToggleButton value="sin" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fee2e2", color: "#dc2626", "&:hover": { backgroundColor: "#fecaca" } } }}>
+                        <PhoneDisabled sx={{ fontSize: 15, mr: 0.5 }} />Sin celular
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                  </>
+                )}
                 <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
                   <Button size="small" onClick={limpiarFiltros} sx={{ color: "#64748b", textTransform: "none" }}>
                     Limpiar todo
@@ -1361,7 +1452,7 @@ export default function CIAMBeneficiariosPage() {
                   <Button
                     size="small"
                     variant="contained"
-                    onClick={() => { setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
+                    onClick={() => { setFiltroTelefono(filtroTelefonoDraft); setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
                     sx={{ backgroundColor: "#475569", textTransform: "none", "&:hover": { backgroundColor: "#334155" } }}
                   >
                     Aplicar

@@ -40,6 +40,8 @@ import {
   Visibility,
   Cake,
   Accessible,
+  PhoneEnabled,
+  PhoneDisabled,
 } from "@mui/icons-material";
 import * as XLSX from "xlsx";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -278,7 +280,7 @@ const mapBackendToTabla = (item: BeneficiarioOMAPEDBackend): BeneficiarioTabla =
 });
 
 // Tipo de filtro
-type FilterType = "edad" | "cumpleanos";
+type FilterType = "edad" | "cumpleanos" | "telefono";
 type CumpleanosModo = "mes" | "dia";
 
 // ============================================
@@ -305,6 +307,8 @@ export default function OMAPEDBeneficiariosPage() {
   const [mesSeleccionado, setMesSeleccionado] = useState<number | null>(null);
   const [cumpleanosModo, setCumpleanosModo] = useState<CumpleanosModo>("mes");
   const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
+  const [filtroTelefono, setFiltroTelefono] = useState<"" | "con" | "sin">("");
+  const [filtroTelefonoDraft, setFiltroTelefonoDraft] = useState<"" | "con" | "sin">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
 
   // Estados para detalle
@@ -348,6 +352,12 @@ export default function OMAPEDBeneficiariosPage() {
           params.set("birthday", `${parts[1]}-${parts[2]}`);
         }
 
+        if (filtroTelefono === "con") {
+          params.set("phone", "true");
+        } else if (filtroTelefono === "sin") {
+          params.set("phone", "false");
+        }
+
         const response = await getData<BackendResponse>(
           `omaped/disabled?${params.toString()}`
         );
@@ -371,6 +381,7 @@ export default function OMAPEDBeneficiariosPage() {
 
   // Handlers de filtros
   const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setFiltroTelefonoDraft(filtroTelefono);
     setFilterAnchor(event.currentTarget);
   };
   const handleFilterClose = () => setFilterAnchor(null);
@@ -427,33 +438,72 @@ export default function OMAPEDBeneficiariosPage() {
   // La búsqueda es server-side; se usa dataFormateados directamente
   const filteredData = dataFormateados;
 
+  const [isExporting, setIsExporting] = useState(false);
+
   // Exportar a Excel
-  const handleExport = () => {
-    const exportData = filteredData.map((row: BeneficiarioTabla) => ({
-      "Nombre Completo": row.nombreCompleto,
-      "Tipo Doc": row.docType,
-      "Nro. Doc": row.docNum,
-      Teléfono: row.telefono,
-      "Fecha de Nacimiento": formatearFecha(row.fechaNacimiento),
-      Edad: row.edad,
-      Grado: row.grado,
-      Diagnóstico: row.diagnostico,
-      Certificado: row.certificado,
-      CONADIS: row.conadis,
-      Folio: row.folio,
-      Dirección: row.direccion,
-    }));
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("page", "1");
+      params.set("limit", "99999");
 
-    if (exportData.length === 0) return;
+      if (debouncedSearch.trim()) {
+        params.set("search", debouncedSearch.trim());
+      }
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "OMAPED Beneficiarios");
-    worksheet["!cols"] = Object.keys(exportData[0] || {}).map(() => ({ wch: 20 }));
-    XLSX.writeFile(
-      workbook,
-      `omaped_beneficiarios_${new Date().toISOString().split("T")[0]}.xlsx`
-    );
+      if (edadRange[0] > 0 || edadRange[1] < 110) {
+        params.set("age_min", String(edadRange[0]));
+        params.set("age_max", String(edadRange[1]));
+      }
+
+      if (cumpleanosModo === "mes" && mesSeleccionado !== null) {
+        params.set("month", String(mesSeleccionado + 1));
+      } else if (cumpleanosModo === "dia" && diaCumpleanos) {
+        const parts = diaCumpleanos.split("-");
+        params.set("birthday", `${parts[1]}-${parts[2]}`);
+      }
+
+      if (filtroTelefono === "con") {
+        params.set("phone", "true");
+      } else if (filtroTelefono === "sin") {
+        params.set("phone", "false");
+      }
+
+      const response = await getData<BackendResponse>(`omaped/disabled?${params.toString()}`);
+
+      if (!response?.data) return;
+
+      const exportData = response.data.data.map((item) => ({
+        "Nombre Completo": `${item.name} ${item.lastname}`.trim(),
+        "Tipo Doc": item.doc_type || "DNI",
+        "Nro. Doc": item.doc_num || "-",
+        Teléfono: item.phone || "-",
+        "Fecha de Nacimiento": formatearFecha(item.birthday),
+        Edad: calcularEdad(item.birthday),
+        Grado: traducir("degree", item.degree),
+        Diagnóstico: item.diagnostic1 || "-",
+        Certificado: item.certificate || "-",
+        CONADIS: item.conadis || "-",
+        Folio: item.folio || "-",
+        Dirección: item.address || "-",
+      }));
+
+      if (exportData.length === 0) return;
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "OMAPED Beneficiarios");
+      worksheet["!cols"] = Object.keys(exportData[0] || {}).map(() => ({ wch: 20 }));
+      XLSX.writeFile(
+        workbook,
+        `omaped_beneficiarios_${new Date().toISOString().split("T")[0]}.xlsx`
+      );
+    } catch (error) {
+      console.error("Error exportando:", error);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Limpiar filtros
@@ -464,6 +514,8 @@ export default function OMAPEDBeneficiariosPage() {
     setMesSeleccionado(null);
     setCumpleanosModo("mes");
     setDiaCumpleanos("");
+    setFiltroTelefono("");
+    setFiltroTelefonoDraft("");
     setPage(0);
     setFetchKey((k) => k + 1);
   };
@@ -551,6 +603,7 @@ export default function OMAPEDBeneficiariosPage() {
               <Tooltip title="Exportar a Excel">
                 <IconButton
                   onClick={handleExport}
+                  disabled={isLoading || isExporting}
                   sx={{
                     backgroundColor: "#f8fafc",
                     border: "1px solid #e2e8f0",
@@ -586,6 +639,20 @@ export default function OMAPEDBeneficiariosPage() {
                   </IconButton>
                 </Box>
               )}
+              {filtroTelefono && (
+                <Box sx={{ backgroundColor: filtroTelefono === "con" ? "#dcfce7" : "#fee2e2", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                  {filtroTelefono === "con"
+                    ? <PhoneEnabled sx={{ fontSize: 14, color: "#16a34a" }} />
+                    : <PhoneDisabled sx={{ fontSize: 14, color: "#dc2626" }} />
+                  }
+                  <Typography variant="caption" color={filtroTelefono === "con" ? "#16a34a" : "#dc2626"}>
+                    {filtroTelefono === "con" ? "Con celular" : "Sin celular"}
+                  </Typography>
+                  <IconButton size="small" onClick={() => { setFiltroTelefono(""); setFiltroTelefonoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                    <Close sx={{ fontSize: 14, color: filtroTelefono === "con" ? "#16a34a" : "#dc2626" }} />
+                  </IconButton>
+                </Box>
+              )}
 
               <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
                 {totalCount.toLocaleString()} beneficiario(s)
@@ -618,6 +685,9 @@ export default function OMAPEDBeneficiariosPage() {
                   </ToggleButton>
                   <ToggleButton value="cumpleanos" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#fce7f3", color: "#be185d", "&:hover": { backgroundColor: "#fbcfe8" } } }}>
                     Cumpleaños
+                  </ToggleButton>
+                  <ToggleButton value="telefono" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#dcfce7", color: "#16a34a", "&:hover": { backgroundColor: "#bbf7d0" } } }}>
+                    Teléfono
                   </ToggleButton>
                 </ToggleButtonGroup>
 
@@ -723,6 +793,26 @@ export default function OMAPEDBeneficiariosPage() {
                   </>
                 )}
 
+                {filterType === "telefono" && (
+                  <>
+                    <Typography variant="body2" color="#475569" mb={1.5}>Filtrar por número de celular</Typography>
+                    <ToggleButtonGroup
+                      value={filtroTelefonoDraft}
+                      exclusive
+                      onChange={(_e, val) => { if (val !== null) setFiltroTelefonoDraft(val); }}
+                      size="small"
+                      fullWidth
+                    >
+                      <ToggleButton value="" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#f1f5f9", color: "#334155", "&:hover": { backgroundColor: "#e2e8f0" } } }}>Todos</ToggleButton>
+                      <ToggleButton value="con" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#dcfce7", color: "#16a34a", "&:hover": { backgroundColor: "#bbf7d0" } } }}>
+                        <PhoneEnabled sx={{ fontSize: 15, mr: 0.5 }} />Con celular
+                      </ToggleButton>
+                      <ToggleButton value="sin" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fee2e2", color: "#dc2626", "&:hover": { backgroundColor: "#fecaca" } } }}>
+                        <PhoneDisabled sx={{ fontSize: 15, mr: 0.5 }} />Sin celular
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                  </>
+                )}
                 <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
                   <Button size="small" onClick={limpiarFiltros} sx={{ color: "#64748b", textTransform: "none" }}>
                     Limpiar todo
@@ -730,7 +820,7 @@ export default function OMAPEDBeneficiariosPage() {
                   <Button
                     size="small"
                     variant="contained"
-                    onClick={() => { setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
+                    onClick={() => { setFiltroTelefono(filtroTelefonoDraft); setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
                     sx={{ backgroundColor: OMAPED_COLOR, textTransform: "none", "&:hover": { backgroundColor: "#b01668" } }}
                   >
                     Aplicar
