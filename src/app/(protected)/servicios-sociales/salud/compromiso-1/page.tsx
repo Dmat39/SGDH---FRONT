@@ -49,6 +49,8 @@ import {
   FilterList,
   Clear,
   Cake,
+  PhoneEnabled,
+  PhoneDisabled,
 } from "@mui/icons-material";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -76,7 +78,7 @@ const MESES = [
   { value: 12, label: "Diciembre" },
 ];
 
-type FilterType = "edad" | "cumpleanos";
+type FilterType = "edad" | "cumpleanos" | "telefono";
 
 // ============================================
 // TIPOS
@@ -404,6 +406,8 @@ export default function Compromiso1Page() {
   const [edadRangePending, setEdadRangePending] = useState<number[]>([0, 110]);
   const [filtroMes, setFiltroMes] = useState<number | "">("");
   const [filtroDia, setFiltroDia] = useState("");
+  const [filtroTelefono, setFiltroTelefono] = useState<"" | "con" | "sin">("");
+  const [filtroTelefonoDraft, setFiltroTelefonoDraft] = useState<"" | "con" | "sin">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
 
   // --- Estado: Detalle ---
@@ -444,6 +448,11 @@ export default function Compromiso1Page() {
       } else if (filtroMes) {
         params.set("month", String(filtroMes));
       }
+      if (filtroTelefono === "con") {
+        params.set("phone", "true");
+      } else if (filtroTelefono === "sin") {
+        params.set("phone", "false");
+      }
 
       const response = await getData<BackendResponse>(`compromise/mother?${params.toString()}`);
 
@@ -458,7 +467,7 @@ export default function Compromiso1Page() {
     } finally {
       setIsLoading(false);
     }
-  }, [page, rowsPerPage, debouncedSearch, fetchKey, edadRange, filtroMes, filtroDia, getData]);
+  }, [page, rowsPerPage, debouncedSearch, fetchKey, edadRange, filtroMes, filtroDia, filtroTelefono, getData]);
 
   useEffect(() => {
     fetchData();
@@ -474,13 +483,15 @@ export default function Compromiso1Page() {
     setEdadRangePending([0, 110]);
     setFiltroMes("");
     setFiltroDia("");
+    setFiltroTelefono("");
+    setFiltroTelefonoDraft("");
     setPage(0);
     setFetchKey((k) => k + 1);
   };
 
   const filterOpen = Boolean(filterAnchor);
   const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 110;
-  const hayFiltrosActivos = searchTerm || filtroDia || filtroMes || isEdadFiltered;
+  const hayFiltrosActivos = searchTerm || filtroDia || filtroMes || isEdadFiltered || filtroTelefono;
 
   const handleVerDetalle = (madre: MadreTabla) => {
     setDetalleMadre(madre);
@@ -611,11 +622,11 @@ export default function Compromiso1Page() {
                 onClick={(e) => setFilterAnchor(e.currentTarget)}
                 sx={{
                   backgroundColor:
-                    filterOpen || isEdadFiltered || filtroDia || filtroMes
+                    filterOpen || isEdadFiltered || filtroDia || filtroMes || filtroTelefono
                       ? "#e0f7f7"
                       : "#f8fafc",
                   border: `1px solid ${
-                    filterOpen || isEdadFiltered || filtroDia || filtroMes
+                    filterOpen || isEdadFiltered || filtroDia || filtroMes || filtroTelefono
                       ? MODULE_COLOR
                       : "#e2e8f0"
                   }`,
@@ -626,7 +637,7 @@ export default function Compromiso1Page() {
                 <FilterList
                   sx={{
                     color:
-                      filterOpen || isEdadFiltered || filtroDia || filtroMes
+                      filterOpen || isEdadFiltered || filtroDia || filtroMes || filtroTelefono
                         ? MODULE_COLOR
                         : "#64748b",
                     fontSize: 20,
@@ -751,6 +762,16 @@ export default function Compromiso1Page() {
                 >
                   Cumpleaños
                 </ToggleButton>
+                <ToggleButton
+                  value="telefono"
+                  sx={{
+                    textTransform: "none",
+                    fontSize: "0.75rem",
+                    "&.Mui-selected": { backgroundColor: "#dcfce7", color: "#16a34a", "&:hover": { backgroundColor: "#bbf7d0" } },
+                  }}
+                >
+                  Teléfono
+                </ToggleButton>
               </ToggleButtonGroup>
 
               <Divider sx={{ mb: 2 }} />
@@ -810,6 +831,48 @@ export default function Compromiso1Page() {
                 </>
               )}
 
+              {filterType === "telefono" && (
+                <>
+                  <Typography variant="body2" color="#475569" mb={1.5}>
+                    Filtrar por celular registrado
+                  </Typography>
+                  <Box display="flex" gap={1}>
+                    <Button
+                      size="small"
+                      variant={filtroTelefonoDraft === "con" ? "contained" : "outlined"}
+                      startIcon={<PhoneEnabled fontSize="small" />}
+                      onClick={() => setFiltroTelefonoDraft(filtroTelefonoDraft === "con" ? "" : "con")}
+                      sx={{
+                        flex: 1,
+                        textTransform: "none",
+                        borderColor: "#16a34a",
+                        color: filtroTelefonoDraft === "con" ? "white" : "#16a34a",
+                        backgroundColor: filtroTelefonoDraft === "con" ? "#16a34a" : "transparent",
+                        "&:hover": { backgroundColor: filtroTelefonoDraft === "con" ? "#15803d" : "#dcfce7" },
+                      }}
+                    >
+                      Con celular
+                    </Button>
+                    <Button
+                      size="small"
+                      variant={filtroTelefonoDraft === "sin" ? "contained" : "outlined"}
+                      startIcon={<PhoneDisabled fontSize="small" />}
+                      onClick={() => setFiltroTelefonoDraft(filtroTelefonoDraft === "sin" ? "" : "sin")}
+                      sx={{
+                        flex: 1,
+                        textTransform: "none",
+                        borderColor: "#dc2626",
+                        color: filtroTelefonoDraft === "sin" ? "white" : "#dc2626",
+                        backgroundColor: filtroTelefonoDraft === "sin" ? "#dc2626" : "transparent",
+                        "&:hover": { backgroundColor: filtroTelefonoDraft === "sin" ? "#b91c1c" : "#fee2e2" },
+                      }}
+                    >
+                      Sin celular
+                    </Button>
+                  </Box>
+                </>
+              )}
+
               <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
                 <Button
                   size="small"
@@ -821,7 +884,7 @@ export default function Compromiso1Page() {
                 <Button
                   size="small"
                   variant="contained"
-                  onClick={() => { setEdadRange(edadRangePending); setPage(0); setFetchKey((k) => k + 1); setFilterAnchor(null); }}
+                  onClick={() => { setEdadRange(edadRangePending); setFiltroTelefono(filtroTelefonoDraft); setPage(0); setFetchKey((k) => k + 1); setFilterAnchor(null); }}
                   sx={{ backgroundColor: MODULE_COLOR, textTransform: "none", "&:hover": { backgroundColor: subgerencia.colorHover } }}
                 >
                   Aplicar
@@ -859,6 +922,15 @@ export default function Compromiso1Page() {
                   label={`Día: ${filtroDia}`}
                   onDelete={() => { setFiltroDia(""); setPage(0); setFetchKey((k) => k + 1); }}
                   sx={{ backgroundColor: MODULE_COLOR, color: "white" }}
+                />
+              )}
+              {filtroTelefono && (
+                <Chip
+                  size="small"
+                  label={filtroTelefono === "con" ? "Con celular" : "Sin celular"}
+                  icon={filtroTelefono === "con" ? <PhoneEnabled sx={{ fontSize: 14, color: "white !important" }} /> : <PhoneDisabled sx={{ fontSize: 14, color: "white !important" }} />}
+                  onDelete={() => { setFiltroTelefono(""); setFiltroTelefonoDraft(""); setPage(0); setFetchKey((k) => k + 1); }}
+                  sx={{ backgroundColor: filtroTelefono === "con" ? "#16a34a" : "#dc2626", color: "white" }}
                 />
               )}
               {searchTerm && (

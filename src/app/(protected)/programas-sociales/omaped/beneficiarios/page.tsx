@@ -280,7 +280,7 @@ const mapBackendToTabla = (item: BeneficiarioOMAPEDBackend): BeneficiarioTabla =
 });
 
 // Tipo de filtro
-type FilterType = "edad" | "cumpleanos";
+type FilterType = "edad" | "cumpleanos" | "telefono";
 type CumpleanosModo = "mes" | "dia";
 
 // ============================================
@@ -686,6 +686,9 @@ export default function OMAPEDBeneficiariosPage() {
                   <ToggleButton value="cumpleanos" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#fce7f3", color: "#be185d", "&:hover": { backgroundColor: "#fbcfe8" } } }}>
                     Cumpleaños
                   </ToggleButton>
+                  <ToggleButton value="telefono" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#dcfce7", color: "#16a34a", "&:hover": { backgroundColor: "#bbf7d0" } } }}>
+                    Teléfono
+                  </ToggleButton>
                 </ToggleButtonGroup>
 
                 <Divider sx={{ mb: 2 }} />
@@ -790,25 +793,26 @@ export default function OMAPEDBeneficiariosPage() {
                   </>
                 )}
 
-                <Divider sx={{ my: 2 }} />
-                <Typography variant="subtitle2" fontWeight={600} color="#334155" mb={1.5}>
-                  Número de celular
-                </Typography>
-                <ToggleButtonGroup
-                  value={filtroTelefonoDraft}
-                  exclusive
-                  onChange={(_e, val) => { if (val !== null) setFiltroTelefonoDraft(val); }}
-                  size="small"
-                  fullWidth
-                >
-                  <ToggleButton value="" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#f1f5f9", color: "#334155", "&:hover": { backgroundColor: "#e2e8f0" } } }}>Todos</ToggleButton>
-                  <ToggleButton value="con" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#dcfce7", color: "#16a34a", "&:hover": { backgroundColor: "#bbf7d0" } } }}>
-                    <PhoneEnabled sx={{ fontSize: 15, mr: 0.5 }} />Con celular
-                  </ToggleButton>
-                  <ToggleButton value="sin" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fee2e2", color: "#dc2626", "&:hover": { backgroundColor: "#fecaca" } } }}>
-                    <PhoneDisabled sx={{ fontSize: 15, mr: 0.5 }} />Sin celular
-                  </ToggleButton>
-                </ToggleButtonGroup>
+                {filterType === "telefono" && (
+                  <>
+                    <Typography variant="body2" color="#475569" mb={1.5}>Filtrar por número de celular</Typography>
+                    <ToggleButtonGroup
+                      value={filtroTelefonoDraft}
+                      exclusive
+                      onChange={(_e, val) => { if (val !== null) setFiltroTelefonoDraft(val); }}
+                      size="small"
+                      fullWidth
+                    >
+                      <ToggleButton value="" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#f1f5f9", color: "#334155", "&:hover": { backgroundColor: "#e2e8f0" } } }}>Todos</ToggleButton>
+                      <ToggleButton value="con" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#dcfce7", color: "#16a34a", "&:hover": { backgroundColor: "#bbf7d0" } } }}>
+                        <PhoneEnabled sx={{ fontSize: 15, mr: 0.5 }} />Con celular
+                      </ToggleButton>
+                      <ToggleButton value="sin" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fee2e2", color: "#dc2626", "&:hover": { backgroundColor: "#fecaca" } } }}>
+                        <PhoneDisabled sx={{ fontSize: 15, mr: 0.5 }} />Sin celular
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                  </>
+                )}
                 <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
                   <Button size="small" onClick={limpiarFiltros} sx={{ color: "#64748b", textTransform: "none" }}>
                     Limpiar todo
