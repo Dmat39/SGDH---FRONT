@@ -5,6 +5,8 @@ import {
   Box,
   Typography,
   Paper,
+  Card,
+  CardContent,
   Table,
   TableBody,
   TableCell,
@@ -32,7 +34,7 @@ import {
   Grid,
 } from "@mui/material";
 import {
-  Download,
+  FileDownload,
   Refresh,
   Search,
   FilterList,
@@ -46,6 +48,8 @@ import {
   PersonSearch,
   Groups,
   EmojiEvents,
+  PhoneEnabled,
+  PhoneDisabled,
 } from "@mui/icons-material";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -83,7 +87,7 @@ const MESES = [
   { value: 12, label: "Diciembre" },
 ];
 
-type FilterType = "edad" | "cumpleanos";
+type FilterType = "edad" | "cumpleanos" | "telefono";
 
 // ============================================
 // UTILIDADES
@@ -431,6 +435,8 @@ export default function ParticipantesPage() {
   const [edadRangePending, setEdadRangePending] = useState<number[]>([0, 110]);
   const [filtroMes, setFiltroMes] = useState<number | "">("");
   const [filtroDia, setFiltroDia] = useState("");
+  const [filtroTelefono, setFiltroTelefono] = useState<"" | "con" | "sin">("");
+  const [filtroTelefonoDraft, setFiltroTelefonoDraft] = useState<"" | "con" | "sin">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
 
   // Detalle
@@ -472,6 +478,11 @@ export default function ParticipantesPage() {
       } else if (filtroMes) {
         params.set("month", String(filtroMes));
       }
+      if (filtroTelefono === "con") {
+        params.set("phone", "true");
+      } else if (filtroTelefono === "sin") {
+        params.set("phone", "false");
+      }
 
       const response = await getData<BackendResponse>(
         `recreation/participant?${params.toString()}`
@@ -492,7 +503,7 @@ export default function ParticipantesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [page, rowsPerPage, fetchKey, debouncedSearch, filtroTaller, filtroMes, filtroDia, edadRange, getData]);
+  }, [page, rowsPerPage, fetchKey, debouncedSearch, filtroTaller, filtroMes, filtroDia, edadRange, filtroTelefono, getData]);
 
   useEffect(() => {
     fetchData();
@@ -501,22 +512,47 @@ export default function ParticipantesPage() {
   const dataFormateados = useFormatTableData(rawData);
   const filteredData = dataFormateados;
 
+  const [isExporting, setIsExporting] = useState(false);
+
   // Exportar
-  const handleExport = () => {
-    const fechaISO = new Date().toISOString().slice(0, 10);
-    const exportData = filteredData.map((r: ParticipanteTabla) => ({
-      "Nombre Completo": r.nombreCompleto,
-      DNI: r.dni,
-      Celular: formatearTelefono(r.celular),
-      "F. Nacimiento": formatearFecha(r.fechaNacimiento),
-      Edad: r.edad,
-      Taller: r.taller,
-    }));
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    ws["!cols"] = [{ wch: 30 }, { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 6 }, { wch: 25 }];
-    XLSX.utils.book_append_sheet(wb, ws, "Participantes");
-    XLSX.writeFile(wb, `participantes_${fechaISO}.xlsx`);
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const fechaISO = new Date().toISOString().slice(0, 10);
+      const params = new URLSearchParams();
+      params.set("limit", "99999");
+      params.set("page", "1");
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+      if (filtroTaller) params.set("workshop", filtroTaller);
+      if (edadRange[0] > 0 || edadRange[1] < 110) {
+        params.set("age_min", String(edadRange[0]));
+        params.set("age_max", String(edadRange[1]));
+      }
+      if (filtroMes && filtroDia) {
+        const mm = String(filtroMes).padStart(2, "0");
+        const dd = String(filtroDia).padStart(2, "0");
+        params.set("birthday", `${mm}-${dd}`);
+      } else if (filtroMes) {
+        params.set("month", String(filtroMes));
+      }
+      const response = await getData<BackendResponse>(`recreation/participant?${params.toString()}`);
+      if (!response?.data) return;
+      const exportData = response.data.data.map((item: ParticipanteBackend) => ({
+        "Nombre Completo": `${item.name} ${item.lastname}`,
+        DNI: item.dni || "-",
+        Celular: formatearTelefono(item.phone),
+        "F. Nacimiento": formatearFecha(item.birthday),
+        Edad: calcularEdad(item.birthday),
+        Taller: item.workshop?.name || "-",
+      }));
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      ws["!cols"] = [{ wch: 30 }, { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 6 }, { wch: 25 }];
+      XLSX.utils.book_append_sheet(wb, ws, "Participantes");
+      XLSX.writeFile(wb, `participantes_${fechaISO}.xlsx`);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Limpiar filtros
@@ -528,6 +564,8 @@ export default function ParticipantesPage() {
     setEdadRangePending([0, 110]);
     setFiltroMes("");
     setFiltroDia("");
+    setFiltroTelefono("");
+    setFiltroTelefonoDraft("");
     setPage(0);
     setFetchKey((k) => k + 1);
   };
@@ -553,164 +591,193 @@ export default function ParticipantesPage() {
 
   const filterOpen = Boolean(filterAnchor);
   const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 110;
-  const hayFiltrosActivos = searchTerm || filtroDia || filtroMes || isEdadFiltered || filtroTaller;
+  const hayFiltrosActivos = searchTerm || filtroDia || filtroMes || isEdadFiltered || filtroTaller || filtroTelefono;
 
   return (
     <Box>
       {/* ── Header ── */}
-      <Box mb={3} display="flex" alignItems="flex-start" justifyContent="space-between" flexWrap="wrap" gap={2}>
-        <Box>
-          <Box display="flex" alignItems="center" gap={1} mb={0.5}>
-            <Groups sx={{ color: MODULE_COLOR, fontSize: 32 }} />
-            <Typography variant="h4" fontWeight={700} color="text.primary">
-              Participantes
-            </Typography>
+      <Box mb={4}>
+        <Box display="flex" alignItems="center" gap={2} mb={1}>
+          <Box
+            sx={{
+              background: `linear-gradient(135deg, ${MODULE_COLOR}15 0%, ${MODULE_COLOR}30 100%)`,
+              color: MODULE_COLOR,
+              width: 48,
+              height: 48,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "12px",
+              boxShadow: `0 4px 12px ${MODULE_COLOR}25`,
+            }}
+          >
+            <Groups sx={{ fontSize: 28 }} />
           </Box>
-          <Typography variant="body1" color="text.secondary">
-            Listado de participantes del módulo de{" "}
-            <span style={{ color: MODULE_COLOR, fontWeight: 600 }}>Cultura y Deporte</span>
+          <Typography variant="h4" fontWeight="bold" sx={{ color: MODULE_COLOR }}>
+            Participantes
           </Typography>
         </Box>
-        <Box display="flex" gap={1}>
-          <Tooltip title="Actualizar datos">
-            <IconButton
-              onClick={() => { setPage(0); setFetchKey((k) => k + 1); }}
-              sx={{ color: MODULE_COLOR }}
-            >
-              <Refresh />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Exportar a Excel">
-            <span>
-              <Button
-                variant="outlined"
-                startIcon={<Download />}
-                onClick={handleExport}
-                disabled={isLoading || filteredData.length === 0}
-                sx={{ borderColor: MODULE_COLOR, color: MODULE_COLOR, "&:hover": { borderColor: MODULE_COLOR } }}
-              >
-                Exportar
-              </Button>
-            </span>
-          </Tooltip>
-        </Box>
+        <Typography variant="body1" color="text.secondary" sx={{ ml: 7.5 }}>
+          Listado de participantes del módulo de Cultura y Deporte
+        </Typography>
       </Box>
 
-      {/* ── Barra de filtros ── */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center" }}>
-          {/* Búsqueda */}
-          <TextField
-            size="small"
-            placeholder="Buscar por nombre o DNI..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            sx={{
-              minWidth: 280,
-              flexGrow: 1,
-              "& .MuiOutlinedInput-root": {
-                "&:hover fieldset": { borderColor: MODULE_COLOR },
-                "&.Mui-focused fieldset": { borderColor: MODULE_COLOR },
-              },
-            }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search sx={{ color: MODULE_COLOR }} fontSize="small" />
-                </InputAdornment>
-              ),
-            }}
-          />
-
-          {/* Filtro por taller */}
-          <TextField
-            select
-            size="small"
-            label="Taller"
-            value={filtroTaller}
-            onChange={(e) => { setFiltroTaller(e.target.value); setPage(0); setFetchKey((k) => k + 1); }}
-            sx={{ minWidth: 180 }}
-          >
-            <MenuItem value="">Todos los talleres</MenuItem>
-            {TALLERES.map((t) => (
-              <MenuItem key={t.id} value={t.id}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Box sx={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: getTallerColor(t.id) }} />
-                  {t.name}
-                </Box>
-              </MenuItem>
-            ))}
-          </TextField>
-
-          {/* Botón filtros avanzados */}
-          <Tooltip title="Filtros de edad y cumpleaños">
-            <IconButton
-              onClick={(e) => setFilterAnchor(e.currentTarget)}
+      {/* ── Tarjeta principal ── */}
+      <Card
+        sx={{
+          borderRadius: "16px",
+          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
+          overflow: "visible",
+        }}
+      >
+        <CardContent sx={{ p: 3 }}>
+          {/* ── Barra de búsqueda y filtros ── */}
+          <Box mb={2} display="flex" gap={1.5} alignItems="center" flexWrap="wrap">
+            {/* Búsqueda */}
+            <TextField
+              size="small"
+              placeholder="Buscar por nombre o DNI..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search sx={{ color: "#64748b", fontSize: 20 }} />
+                    </InputAdornment>
+                  ),
+                },
+              }}
               sx={{
-                backgroundColor:
-                  filterOpen || isEdadFiltered || filtroDia || filtroMes
-                    ? "#e0f7f7"
-                    : "#f8fafc",
-                border: `1px solid ${
-                  filterOpen || isEdadFiltered || filtroDia || filtroMes
-                    ? MODULE_COLOR
-                    : "#e2e8f0"
-                }`,
-                borderRadius: "8px",
-                "&:hover": { backgroundColor: "#e0f7f7", borderColor: MODULE_COLOR },
+                width: 280,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "8px",
+                  backgroundColor: "#f8fafc",
+                  "&:hover fieldset": { borderColor: "#64748b" },
+                  "&.Mui-focused fieldset": { borderColor: "#475569" },
+                },
+              }}
+            />
+
+            {/* Filtro por taller */}
+            <TextField
+              select
+              size="small"
+              label="Taller"
+              value={filtroTaller}
+              onChange={(e) => { setFiltroTaller(e.target.value); setPage(0); setFetchKey((k) => k + 1); }}
+              sx={{
+                minWidth: 180,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "8px",
+                  backgroundColor: "#f8fafc",
+                },
               }}
             >
-              <FilterList
+              <MenuItem value="">Todos los talleres</MenuItem>
+              {TALLERES.map((t) => (
+                <MenuItem key={t.id} value={t.id}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Box sx={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: getTallerColor(t.id) }} />
+                    {t.name}
+                  </Box>
+                </MenuItem>
+              ))}
+            </TextField>
+
+            {/* Filtros avanzados */}
+            <Tooltip title="Filtros de edad y cumpleaños">
+              <IconButton
+                onClick={(e) => setFilterAnchor(e.currentTarget)}
                 sx={{
-                  color:
-                    filterOpen || isEdadFiltered || filtroDia || filtroMes
-                      ? MODULE_COLOR
-                      : "#64748b",
-                  fontSize: 20,
+                  backgroundColor: filterOpen || isEdadFiltered || filtroDia || filtroMes || filtroTelefono ? "#e0f7f7" : "#f8fafc",
+                  border: `1px solid ${filterOpen || isEdadFiltered || filtroDia || filtroMes || filtroTelefono ? MODULE_COLOR : "#e2e8f0"}`,
+                  borderRadius: "8px",
+                  "&:hover": { backgroundColor: "#e0f7f7", borderColor: MODULE_COLOR },
                 }}
-              />
-            </IconButton>
-          </Tooltip>
-
-          {/* Chips filtros rápidos activos */}
-          {isEdadFiltered && (
-            <Box sx={{ backgroundColor: "#dbeafe", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
-              <Typography variant="caption" color="#1e40af">
-                Edad: {edadRange[0]} - {edadRange[1]} años
-              </Typography>
-              <IconButton size="small" onClick={() => { setEdadRange([0, 110]); setEdadRangePending([0, 110]); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
-                <Close sx={{ fontSize: 14, color: "#1e40af" }} />
-              </IconButton>
-            </Box>
-          )}
-          {(filtroDia || filtroMes) && (
-            <Box sx={{ backgroundColor: "#e0f7f7", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
-              <Cake sx={{ fontSize: 14, color: MODULE_COLOR }} />
-              <Typography variant="caption" color={MODULE_COLOR}>
-                {filtroMes && !filtroDia && MESES.find((m) => m.value === filtroMes)?.label}
-                {filtroDia && filtroMes && `${filtroDia}/${filtroMes}`}
-                {filtroDia && !filtroMes && `Día ${filtroDia}`}
-              </Typography>
-              <IconButton size="small" onClick={() => { setFiltroDia(""); setFiltroMes(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
-                <Close sx={{ fontSize: 14, color: MODULE_COLOR }} />
-              </IconButton>
-            </Box>
-          )}
-
-          <Box sx={{ flex: 1 }} />
-
-          {hayFiltrosActivos && (
-            <Tooltip title="Limpiar filtros">
-              <IconButton onClick={limpiarFiltros} size="small">
-                <Clear />
+              >
+                <FilterList sx={{ color: filterOpen || isEdadFiltered || filtroDia || filtroMes || filtroTelefono ? MODULE_COLOR : "#64748b", fontSize: 20 }} />
               </IconButton>
             </Tooltip>
-          )}
 
-          <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
-            {isLoading ? "Cargando..." : `${totalCount.toLocaleString()} participantes registrados`}
-          </Typography>
-        </Box>
+            {/* Chips de filtros activos */}
+            {isEdadFiltered && (
+              <Box sx={{ backgroundColor: "#dbeafe", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                <Typography variant="caption" color="#1e40af">
+                  Edad: {edadRange[0]} - {edadRange[1]} años
+                </Typography>
+                <IconButton size="small" onClick={() => { setEdadRange([0, 110]); setEdadRangePending([0, 110]); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                  <Close sx={{ fontSize: 14, color: "#1e40af" }} />
+                </IconButton>
+              </Box>
+            )}
+            {(filtroDia || filtroMes) && (
+              <Box sx={{ backgroundColor: "#e0f7f7", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                <Cake sx={{ fontSize: 14, color: MODULE_COLOR }} />
+                <Typography variant="caption" color={MODULE_COLOR}>
+                  {filtroMes && !filtroDia && MESES.find((m) => m.value === filtroMes)?.label}
+                  {filtroDia && filtroMes && `${filtroDia}/${filtroMes}`}
+                  {filtroDia && !filtroMes && `Día ${filtroDia}`}
+                </Typography>
+                <IconButton size="small" onClick={() => { setFiltroDia(""); setFiltroMes(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                  <Close sx={{ fontSize: 14, color: MODULE_COLOR }} />
+                </IconButton>
+              </Box>
+            )}
+
+            <Box sx={{ flex: 1 }} />
+
+            {hayFiltrosActivos && (
+              <Tooltip title="Limpiar filtros">
+                <IconButton onClick={limpiarFiltros} size="small" sx={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px" }}>
+                  <Clear sx={{ color: "#64748b", fontSize: 20 }} />
+                </IconButton>
+              </Tooltip>
+            )}
+
+            {/* Actualizar */}
+            <Tooltip title="Actualizar datos">
+              <IconButton
+                onClick={() => { setPage(0); setFetchKey((k) => k + 1); }}
+                sx={{
+                  backgroundColor: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "8px",
+                  "&:hover": { backgroundColor: "#e2e8f0" },
+                }}
+              >
+                <Refresh sx={{ color: "#64748b", fontSize: 20 }} />
+              </IconButton>
+            </Tooltip>
+
+            {/* Exportar Excel */}
+            <Tooltip title="Descargar listado en formato Excel">
+              <span>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<FileDownload />}
+                  onClick={handleExport}
+                  disabled={isLoading || isExporting || filteredData.length === 0}
+                  sx={{
+                    borderColor: "#22c55e",
+                    color: "#16a34a",
+                    borderRadius: "8px",
+                    textTransform: "none",
+                    fontWeight: 600,
+                    "&:hover": { backgroundColor: "#dcfce7", borderColor: "#16a34a" },
+                    "&.Mui-disabled": { opacity: 0.4 },
+                  }}
+                >
+                  Exportar Excel
+                </Button>
+              </span>
+            </Tooltip>
+
+            <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
+              {isLoading ? "Cargando..." : `${totalCount.toLocaleString()} participante(s)`}
+            </Typography>
+          </Box>
 
         {/* Popover filtros avanzados */}
         <Popover
@@ -752,6 +819,16 @@ export default function ParticipantesPage() {
                 }}
               >
                 Cumpleaños
+              </ToggleButton>
+              <ToggleButton
+                value="telefono"
+                sx={{
+                  textTransform: "none",
+                  fontSize: "0.75rem",
+                  "&.Mui-selected": { backgroundColor: "#dcfce7", color: "#16a34a", "&:hover": { backgroundColor: "#bbf7d0" } },
+                }}
+              >
+                Teléfono
               </ToggleButton>
             </ToggleButtonGroup>
 
@@ -812,6 +889,48 @@ export default function ParticipantesPage() {
               </>
             )}
 
+            {filterType === "telefono" && (
+              <>
+                <Typography variant="body2" color="#475569" mb={1.5}>
+                  Filtrar por celular registrado
+                </Typography>
+                <Box display="flex" gap={1}>
+                  <Button
+                    size="small"
+                    variant={filtroTelefonoDraft === "con" ? "contained" : "outlined"}
+                    startIcon={<PhoneEnabled fontSize="small" />}
+                    onClick={() => setFiltroTelefonoDraft(filtroTelefonoDraft === "con" ? "" : "con")}
+                    sx={{
+                      flex: 1,
+                      textTransform: "none",
+                      borderColor: "#16a34a",
+                      color: filtroTelefonoDraft === "con" ? "white" : "#16a34a",
+                      backgroundColor: filtroTelefonoDraft === "con" ? "#16a34a" : "transparent",
+                      "&:hover": { backgroundColor: filtroTelefonoDraft === "con" ? "#15803d" : "#dcfce7" },
+                    }}
+                  >
+                    Con celular
+                  </Button>
+                  <Button
+                    size="small"
+                    variant={filtroTelefonoDraft === "sin" ? "contained" : "outlined"}
+                    startIcon={<PhoneDisabled fontSize="small" />}
+                    onClick={() => setFiltroTelefonoDraft(filtroTelefonoDraft === "sin" ? "" : "sin")}
+                    sx={{
+                      flex: 1,
+                      textTransform: "none",
+                      borderColor: "#dc2626",
+                      color: filtroTelefonoDraft === "sin" ? "white" : "#dc2626",
+                      backgroundColor: filtroTelefonoDraft === "sin" ? "#dc2626" : "transparent",
+                      "&:hover": { backgroundColor: filtroTelefonoDraft === "sin" ? "#b91c1c" : "#fee2e2" },
+                    }}
+                  >
+                    Sin celular
+                  </Button>
+                </Box>
+              </>
+            )}
+
             <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
               <Button
                 size="small"
@@ -823,7 +942,7 @@ export default function ParticipantesPage() {
               <Button
                 size="small"
                 variant="contained"
-                onClick={() => { setEdadRange(edadRangePending); setPage(0); setFetchKey((k) => k + 1); setFilterAnchor(null); }}
+                onClick={() => { setEdadRange(edadRangePending); setFiltroTelefono(filtroTelefonoDraft); setPage(0); setFetchKey((k) => k + 1); setFilterAnchor(null); }}
                 sx={{ backgroundColor: MODULE_COLOR, textTransform: "none", "&:hover": { backgroundColor: subgerencia.colorHover } }}
               >
                 Aplicar
@@ -863,15 +982,31 @@ export default function ParticipantesPage() {
                 sx={{ backgroundColor: MODULE_COLOR, color: "white" }}
               />
             )}
+            {filtroTelefono && (
+              <Chip
+                size="small"
+                label={filtroTelefono === "con" ? "Con celular" : "Sin celular"}
+                icon={filtroTelefono === "con" ? <PhoneEnabled sx={{ fontSize: 14, color: "white !important" }} /> : <PhoneDisabled sx={{ fontSize: 14, color: "white !important" }} />}
+                onDelete={() => { setFiltroTelefono(""); setFiltroTelefonoDraft(""); setPage(0); setFetchKey((k) => k + 1); }}
+                sx={{ backgroundColor: filtroTelefono === "con" ? "#16a34a" : "#dc2626", color: "white" }}
+              />
+            )}
             {searchTerm && (
               <Chip size="small" label={`Búsqueda: "${searchTerm}"`} onDelete={() => setSearchTerm("")} />
             )}
           </Box>
         )}
-      </Paper>
 
-      {/* ── Tabla ── */}
-      <Paper sx={{ overflow: "hidden" }}>
+          {/* ── Tabla ── */}
+          <Paper
+            sx={{
+              borderRadius: "12px",
+              boxShadow: "none",
+              border: "1px solid #e2e8f0",
+              overflow: "hidden",
+              mt: 2,
+            }}
+          >
         {isLoading ? (
           <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center" py={8} gap={2}>
             <CircularProgress sx={{ color: MODULE_COLOR }} />
@@ -1051,12 +1186,16 @@ export default function ParticipantesPage() {
               }
               sx={{
                 borderTop: "1px solid #e2e8f0",
+                mt: 2,
                 "& .MuiTablePagination-select": { fontWeight: 500 },
+                "& .MuiTablePagination-selectIcon": { color: "#64748b" },
               }}
             />
           </>
         )}
-      </Paper>
+          </Paper>
+        </CardContent>
+      </Card>
 
       {/* ── Modal de Detalle ── */}
       <Dialog open={detalleOpen} onClose={() => setDetalleOpen(false)} maxWidth="sm" fullWidth>

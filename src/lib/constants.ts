@@ -89,8 +89,8 @@ export const ROLES = {
     permisos: ["ciam", "mapa_ciam"],
   },
   [RoleType.USUARIO_PARTICIPACION]: {
-    nombre: "Usuario Participación Ciudadana",
-    descripcion: "Acceso al área de Participación Ciudadana",
+    nombre: "Usuario Participación Vecinal",
+    descripcion: "Acceso al área de Participación Vecinal",
     permisos: ["participacion_ciudadana", "mapa_participacion"],
   },
   [RoleType.USUARIO_DEPORTES]: {
@@ -393,32 +393,39 @@ export const MODULOS_PROGRAMAS_SOCIALES: MenuItem[] = [
 export const MODULOS_SERVICIOS_SOCIALES: MenuItem[] = [
   {
     id: "participacion-ciudadana",
-    nombre: "Participación Ciudadana",
+    nombre: "Participación Vecinal",
     icono: "Groups",
-    descripcion: "Gestión de programas de participación ciudadana",
+    descripcion: "Gestión de programas de participación vecinal",
     permisos: ["participacion_ciudadana", "all_servicios_sociales", "all"],
     children: [
-      {
+      /*{
         id: "participacion-dashboard",
         nombre: "Dashboard",
         ruta: "/servicios-sociales/participacion-ciudadana",
         icono: "Dashboard",
         permisos: ["participacion_ciudadana", "all_servicios_sociales", "all"],
-      },
+      },*/
       {
+        id: "participacion-dirigentes",
+        nombre: "Dirigentes",
+        ruta: "/servicios-sociales/participacion-ciudadana/dirigentes",
+        icono: "People",
+        permisos: ["participacion_ciudadana", "all_servicios_sociales", "all"],
+      },
+     /* {
         id: "participacion-programas",
         nombre: "Programas",
         ruta: "/servicios-sociales/participacion-ciudadana/programas",
         icono: "List",
         permisos: ["participacion_ciudadana", "all_servicios_sociales", "all"],
-      },
-      {
+      },*/
+     /* {
         id: "participacion-mapa",
         nombre: "Mapa",
         ruta: "/servicios-sociales/participacion-ciudadana/mapa",
         icono: "Map",
         permisos: ["participacion_ciudadana", "mapa_participacion", "all_servicios_sociales", "all"],
-      },
+      },*/
     ],
   },
   {
@@ -446,18 +453,18 @@ export const MODULOS_SERVICIOS_SOCIALES: MenuItem[] = [
   },
   {
     id: "salud",
-    nombre: "Salud",
+    nombre: "Salud y Sanidad",
     icono: "HealthAndSafety",
     descripcion: "Gestión de servicios de salud y veterinaria",
     permisos: ["salud", "all_servicios_sociales", "all"],
     children: [
-      {
+      /* {
         id: "salud-dashboard",
         nombre: "Dashboard",
         ruta: "/servicios-sociales/salud",
         icono: "Dashboard",
         permisos: ["salud", "all_servicios_sociales", "all"],
-      },
+      }, */
       {
         id: "salud-compromiso-1",
         nombre: "Compromiso 1 · Bajo Hierro",
@@ -465,20 +472,6 @@ export const MODULOS_SERVICIOS_SOCIALES: MenuItem[] = [
         icono: "ChildCare",
         descripcion: "Madres con niños diagnosticados con anemia",
         permisos: ["salud", "all_servicios_sociales", "all"],
-      },
-      {
-        id: "salud-campanas",
-        nombre: "Campañas",
-        ruta: "/servicios-sociales/salud/campanas",
-        icono: "List",
-        permisos: ["salud", "all_servicios_sociales", "all"],
-      },
-      {
-        id: "salud-mapa",
-        nombre: "Mapa",
-        ruta: "/servicios-sociales/salud/mapa",
-        icono: "Map",
-        permisos: ["salud", "mapa_salud", "all_servicios_sociales", "all"],
       },
     ],
   },

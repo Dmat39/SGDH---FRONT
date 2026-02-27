@@ -52,6 +52,8 @@ import {
   Assignment,
   FilterList,
   Cake,
+  PhoneEnabled,
+  PhoneDisabled,
 } from "@mui/icons-material";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -70,7 +72,7 @@ const MESES = [
 type CumpleanosModo = "mes" | "dia";
 
 // Tipo de filtro
-type FilterType = "edad" | "cumpleanos";
+type FilterType = "edad" | "cumpleanos" | "telefono";
 
 // Función para calcular edad desde fecha de nacimiento
 const calcularEdad = (fechaNacimiento: string): number => {
@@ -146,6 +148,8 @@ export default function ULEEmpadronadosPage() {
   const [filtroFormato, setFiltroFormato] = useState<string>("");
 
   // Estados para filtros de edad y cumpleaños
+  const [filtroTelefono, setFiltroTelefono] = useState<"" | "con" | "sin">("");
+  const [filtroTelefonoDraft, setFiltroTelefonoDraft] = useState<"" | "con" | "sin">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
   const [filterType, setFilterType] = useState<FilterType>("edad");
   const [edadRange, setEdadRange] = useState<number[]>([0, 100]);
@@ -190,6 +194,12 @@ export default function ULEEmpadronadosPage() {
         } else if (cumpleanosModo === "dia" && diaCumpleanos) {
           const parts = diaCumpleanos.split("-"); // YYYY-MM-DD
           params.set("birthday_day", `${parts[1]}-${parts[2]}`);
+        }
+
+        if (filtroTelefono === "con") {
+          params.set("phone", "true");
+        } else if (filtroTelefono === "sin") {
+          params.set("phone", "false");
         }
 
         const response = await getData<BackendResponse>(
@@ -251,12 +261,15 @@ export default function ULEEmpadronadosPage() {
     setMesSeleccionado(null);
     setDiaCumpleanos("");
     setCumpleanosModo("mes");
+    setFiltroTelefono("");
+    setFiltroTelefonoDraft("");
     setPage(0);
     setFetchKey((k) => k + 1);
   };
 
   // Handlers para filtro de cumpleaños
   const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setFiltroTelefonoDraft(filtroTelefono);
     setFilterAnchor(event.currentTarget);
   };
 
@@ -296,53 +309,82 @@ export default function ULEEmpadronadosPage() {
     setSelectedEmpadronado(null);
   };
 
+  const [isExporting, setIsExporting] = useState(false);
+
   // Descargar Excel
-  const descargarExcel = () => {
-    const datosExcel = empadronadosFiltrados.map((e) => ({
-      "DNI": e.dni,
-      "Nombres": e.name,
-      "Apellidos": e.lastname,
-      "Teléfono": formatearTelefono(e.phone),
-      "Formato": e.format,
-      "FSU": e.fsu || "",
-      "S100": e.s100 || "",
-      "Nivel": e.level,
-      "Miembros": e.members,
-      "Urbanización": e.urban?.name || "",
-      "Empadronador": e.enumerator ? `${e.enumerator.name} ${e.enumerator.lastname}` : "",
-      "Fecha Registro": formatearFecha(e.registered_at),
-      "Fecha Nacimiento": formatearFecha(e.birthday),
-      "Edad": e.birthday ? calcularEdad(e.birthday) : "",
-    }));
+  const descargarExcel = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("limit", "99999");
+      params.set("page", "1");
+      if (searchTerm.trim()) params.set("search", searchTerm.trim());
+      if (filtroFormato) params.set("format", filtroFormato);
+      if (isEdadFiltered) {
+        params.set("age_min", String(edadRange[0]));
+        params.set("age_max", String(edadRange[1]));
+      }
+      if (cumpleanosModo === "mes" && mesSeleccionado !== null) {
+        params.set("birthday_month", String(mesSeleccionado + 1));
+      } else if (cumpleanosModo === "dia" && diaCumpleanos) {
+        const parts = diaCumpleanos.split("-");
+        params.set("birthday_day", `${parts[1]}-${parts[2]}`);
+      }
+      if (filtroTelefono === "con") {
+        params.set("phone", "true");
+      } else if (filtroTelefono === "sin") {
+        params.set("phone", "false");
+      }
+      const response = await getData<BackendResponse>(`ule/registered?${params.toString()}`);
+      if (!response?.data) return;
+      const datosExcel = response.data.data.map((e) => ({
+        "DNI": e.dni,
+        "Nombres": e.name,
+        "Apellidos": e.lastname,
+        "Teléfono": formatearTelefono(e.phone),
+        "Formato": e.format,
+        "FSU": e.fsu || "",
+        "S100": e.s100 || "",
+        "Nivel": e.level,
+        "Miembros": e.members,
+        "Urbanización": e.urban?.name || "",
+        "Empadronador": e.enumerator ? `${e.enumerator.name} ${e.enumerator.lastname}` : "",
+        "Fecha Registro": formatearFecha(e.registered_at),
+        "Fecha Nacimiento": formatearFecha(e.birthday),
+        "Edad": e.birthday ? calcularEdad(e.birthday) : "",
+      }));
 
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.json_to_sheet(datosExcel);
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(datosExcel);
 
-    const colWidths = [
-      { wch: 12 }, // DNI
-      { wch: 20 }, // Nombres
-      { wch: 20 }, // Apellidos
-      { wch: 14 }, // Teléfono
-      { wch: 10 }, // Formato
-      { wch: 12 }, // FSU
-      { wch: 12 }, // S100
-      { wch: 8 },  // Nivel
-      { wch: 10 }, // Miembros
-      { wch: 25 }, // Urbanización
-      { wch: 30 }, // Empadronador
-      { wch: 14 }, // Fecha Registro
-      { wch: 14 }, // Fecha Nacimiento
-      { wch: 6 },  // Edad
-    ];
-    ws["!cols"] = colWidths;
+      const colWidths = [
+        { wch: 12 }, // DNI
+        { wch: 20 }, // Nombres
+        { wch: 20 }, // Apellidos
+        { wch: 14 }, // Teléfono
+        { wch: 10 }, // Formato
+        { wch: 12 }, // FSU
+        { wch: 12 }, // S100
+        { wch: 8 },  // Nivel
+        { wch: 10 }, // Miembros
+        { wch: 25 }, // Urbanización
+        { wch: 30 }, // Empadronador
+        { wch: 14 }, // Fecha Registro
+        { wch: 14 }, // Fecha Nacimiento
+        { wch: 6 },  // Edad
+      ];
+      ws["!cols"] = colWidths;
 
-    XLSX.utils.book_append_sheet(wb, ws, "Empadronados ULE");
+      XLSX.utils.book_append_sheet(wb, ws, "Empadronados ULE");
 
-    let fileName = "empadronados_ule";
-    if (filtroFormato) fileName += `_${filtroFormato}`;
-    fileName += ".xlsx";
+      let fileName = "empadronados_ule";
+      if (filtroFormato) fileName += `_${filtroFormato}`;
+      fileName += ".xlsx";
 
-    XLSX.writeFile(wb, fileName);
+      XLSX.writeFile(wb, fileName);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const hayFiltrosActivos = searchTerm || filtroFormato || isEdadFiltered || isCumpleanosFiltered;
@@ -530,6 +572,20 @@ export default function ULEEmpadronadosPage() {
                 </IconButton>
               </Box>
             )}
+            {filtroTelefono && (
+              <Box sx={{ backgroundColor: filtroTelefono === "con" ? "#dcfce7" : "#fee2e2", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                {filtroTelefono === "con"
+                  ? <PhoneEnabled sx={{ fontSize: 14, color: "#16a34a" }} />
+                  : <PhoneDisabled sx={{ fontSize: 14, color: "#dc2626" }} />
+                }
+                <Typography variant="caption" color={filtroTelefono === "con" ? "#16a34a" : "#dc2626"}>
+                  {filtroTelefono === "con" ? "Con celular" : "Sin celular"}
+                </Typography>
+                <IconButton size="small" onClick={() => { setFiltroTelefono(""); setFiltroTelefonoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                  <Close sx={{ fontSize: 14, color: filtroTelefono === "con" ? "#16a34a" : "#dc2626" }} />
+                </IconButton>
+              </Box>
+            )}
 
             <Box sx={{ flex: 1 }} />
 
@@ -545,7 +601,7 @@ export default function ULEEmpadronadosPage() {
               variant="contained"
               startIcon={<Download />}
               onClick={descargarExcel}
-              disabled={isLoading || empadronadosFiltrados.length === 0}
+              disabled={isLoading || isExporting || empadronadosFiltrados.length === 0}
               sx={{
                 backgroundColor: subgerencia.color,
                 "&:hover": { backgroundColor: "#b01668" },
@@ -610,6 +666,20 @@ export default function ULEEmpadronadosPage() {
                   }}
                 >
                   Cumpleaños
+                </ToggleButton>
+                <ToggleButton
+                  value="telefono"
+                  sx={{
+                    textTransform: "none",
+                    fontSize: "0.75rem",
+                    "&.Mui-selected": {
+                      backgroundColor: "#dcfce7",
+                      color: "#16a34a",
+                      "&:hover": { backgroundColor: "#bbf7d0" },
+                    },
+                  }}
+                >
+                  Teléfono
                 </ToggleButton>
               </ToggleButtonGroup>
 
@@ -755,6 +825,26 @@ export default function ULEEmpadronadosPage() {
                 </>
               )}
 
+              {filterType === "telefono" && (
+                <>
+                  <Typography variant="body2" color="#475569" mb={1.5}>Filtrar por número de celular</Typography>
+                  <ToggleButtonGroup
+                    value={filtroTelefonoDraft}
+                    exclusive
+                    onChange={(_e, val) => { if (val !== null) setFiltroTelefonoDraft(val); }}
+                    size="small"
+                    fullWidth
+                  >
+                    <ToggleButton value="" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#f1f5f9", color: "#334155", "&:hover": { backgroundColor: "#e2e8f0" } } }}>Todos</ToggleButton>
+                    <ToggleButton value="con" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#dcfce7", color: "#16a34a", "&:hover": { backgroundColor: "#bbf7d0" } } }}>
+                      <PhoneEnabled sx={{ fontSize: 15, mr: 0.5 }} />Con celular
+                    </ToggleButton>
+                    <ToggleButton value="sin" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fee2e2", color: "#dc2626", "&:hover": { backgroundColor: "#fecaca" } } }}>
+                      <PhoneDisabled sx={{ fontSize: 15, mr: 0.5 }} />Sin celular
+                    </ToggleButton>
+                  </ToggleButtonGroup>
+                </>
+              )}
               <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
                 <Button
                   size="small"
@@ -776,7 +866,7 @@ export default function ULEEmpadronadosPage() {
                 <Button
                   size="small"
                   variant="contained"
-                  onClick={() => { setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
+                  onClick={() => { setFiltroTelefono(filtroTelefonoDraft); setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
                   sx={{
                     backgroundColor: subgerencia.color,
                     textTransform: "none",

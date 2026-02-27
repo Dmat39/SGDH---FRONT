@@ -7,7 +7,7 @@ import {
   Slider, Button, Dialog, DialogTitle, DialogContent, DialogActions, Grid, Divider,
   ToggleButton, ToggleButtonGroup, CircularProgress, Chip,
 } from "@mui/material";
-import { Search, SoupKitchen, FilterList, FileDownload, Close, Visibility, Cake } from "@mui/icons-material";
+import { Search, SoupKitchen, FilterList, FileDownload, Close, Visibility, Cake, PhoneEnabled, PhoneDisabled } from "@mui/icons-material";
 import * as XLSX from "xlsx";
 import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
@@ -76,7 +76,7 @@ const mapBackendToFrontend = (item: RecipientBackend): BeneficiarioFrontend => (
   fechaCreacion: item.created_at,
 });
 
-type FilterType = "edad" | "cumpleanos";
+type FilterType = "edad" | "cumpleanos" | "telefono";
 type CumpleanosModo = "mes" | "dia";
 
 export default function OllasBeneficiariosPage() {
@@ -97,6 +97,8 @@ export default function OllasBeneficiariosPage() {
   const [mesesCumpleanos, setMesesCumpleanos] = useState<number[]>([]);
   const [cumpleanosModo, setCumpleanosModo] = useState<CumpleanosModo>("mes");
   const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
+  const [filtroTelefono, setFiltroTelefono] = useState<"" | "con" | "sin">("");
+  const [filtroTelefonoDraft, setFiltroTelefonoDraft] = useState<"" | "con" | "sin">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
   const [selectedBeneficiario, setSelectedBeneficiario] = useState<BeneficiarioFrontend | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -127,6 +129,12 @@ export default function OllasBeneficiariosPage() {
           params.set("birthday_day", `${parts[1]}-${parts[2]}`);
         }
 
+        if (filtroTelefono === "con") {
+          params.set("phone", "true");
+        } else if (filtroTelefono === "sin") {
+          params.set("phone", "false");
+        }
+
         const response = await getData<BackendResponse>(`pca/recipient?${params.toString()}`);
         if (response?.data) {
           setData(response.data.data.map(mapBackendToFrontend));
@@ -145,7 +153,10 @@ export default function OllasBeneficiariosPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, rowsPerPage, searchTerm, fetchKey, getData]);
 
-  const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => setFilterAnchor(event.currentTarget);
+  const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setFiltroTelefonoDraft(filtroTelefono);
+    setFilterAnchor(event.currentTarget);
+  };
   const handleFilterClose = () => setFilterAnchor(null);
   const handleFilterTypeChange = (_event: React.MouseEvent<HTMLElement>, v: FilterType | null) => { if (v !== null) setFilterType(v); };
   const handleEdadChange = (_event: Event, v: number | number[]) => setEdadRange(v as number[]);
@@ -160,21 +171,56 @@ export default function OllasBeneficiariosPage() {
   const handleRowClick = (b: BeneficiarioFrontend) => { setSelectedBeneficiario(b); setDetailOpen(true); };
   const handleDetailClose = () => { setDetailOpen(false); setSelectedBeneficiario(null); };
 
+  const [isExporting, setIsExporting] = useState(false);
   const dataFormateados = useFormatTableData(data);
 
-  const handleExport = () => {
-    const exportData = dataFormateados.map((c: BeneficiarioFrontend) => ({
-      "Nombre Completo": c.nombreCompleto, DNI: c.dni, "Teléfono": c.telefono, "Dirección": c.direccion,
-      "Fecha Nacimiento": formatearFecha(c.fechaNacimiento), Edad: c.fechaNacimiento ? calcularEdad(c.fechaNacimiento) : "-",
-      Sexo: c.sexo, Condición: c.social, Gestante: c.gestante ? "Sí" : "No", Discapacitado: c.discapacitado ? "Sí" : "No",
-      "Fecha Registro": formatearFecha(c.fechaRegistro),
-    }));
-    if (exportData.length === 0) return;
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Beneficiarios Ollas");
-    worksheet["!cols"] = Object.keys(exportData[0]).map(() => ({ wch: 20 }));
-    XLSX.writeFile(workbook, `beneficiarios_ollas_${new Date().toISOString().split("T")[0]}.xlsx`);
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("limit", "99999");
+      params.set("page", "1");
+      params.set("modality", "CPOT");
+      if (searchTerm.trim()) params.set("search", searchTerm.trim());
+      if (edadRange[0] > 0 || edadRange[1] < 110) {
+        params.set("age_min", String(edadRange[0]));
+        params.set("age_max", String(edadRange[1]));
+      }
+      if (cumpleanosModo === "mes" && mesesCumpleanos.length > 0) {
+        params.set("birthday_month", mesesCumpleanos.map((m) => m + 1).join(","));
+      } else if (cumpleanosModo === "dia" && diaCumpleanos) {
+        const parts = diaCumpleanos.split("-");
+        params.set("birthday_day", `${parts[1]}-${parts[2]}`);
+      }
+      if (filtroTelefono === "con") {
+        params.set("phone", "true");
+      } else if (filtroTelefono === "sin") {
+        params.set("phone", "false");
+      }
+      const response = await getData<BackendResponse>(`pca/recipient?${params.toString()}`);
+      if (!response?.data) return;
+      const exportData = response.data.data.map((item: RecipientBackend) => ({
+        "Nombre Completo": `${item.name} ${item.lastname}`.trim(),
+        DNI: item.doc_num || "-",
+        "Teléfono": item.phone || "-",
+        "Dirección": item.address || "-",
+        "Fecha Nacimiento": formatearFecha(item.birthday),
+        Edad: item.birthday ? calcularEdad(item.birthday) : "-",
+        Sexo: TRADUCCIONES_SEXO[item.sex] || item.sex || "-",
+        Condición: TRADUCCIONES_SOCIAL[item.social] || item.social || "-",
+        Gestante: item.pregnant ? "Sí" : "No",
+        Discapacitado: item.disabled ? "Sí" : "No",
+        "Fecha Registro": formatearFecha(item.registered_at),
+      }));
+      if (exportData.length === 0) return;
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Beneficiarios Ollas");
+      worksheet["!cols"] = Object.keys(exportData[0]).map(() => ({ wch: 20 }));
+      XLSX.writeFile(workbook, `beneficiarios_ollas_${new Date().toISOString().split("T")[0]}.xlsx`);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -207,7 +253,7 @@ export default function OllasBeneficiariosPage() {
                 </IconButton>
               </Tooltip>
               <Tooltip title="Exportar a Excel">
-                <IconButton onClick={handleExport} sx={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", "&:hover": { backgroundColor: "#dcfce7", borderColor: "#22c55e" } }}>
+                <IconButton onClick={handleExport} disabled={isLoading || isExporting} sx={{ backgroundColor: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", "&:hover": { backgroundColor: "#dcfce7", borderColor: "#22c55e" } }}>
                   <FileDownload sx={{ color: "#22c55e", fontSize: 20 }} />
                 </IconButton>
               </Tooltip>
@@ -226,6 +272,20 @@ export default function OllasBeneficiariosPage() {
                   <IconButton size="small" onClick={() => { setMesesCumpleanos([]); setDiaCumpleanos(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}><Close sx={{ fontSize: 14, color: "#be185d" }} /></IconButton>
                 </Box>
               )}
+              {filtroTelefono && (
+                <Box sx={{ backgroundColor: filtroTelefono === "con" ? "#dcfce7" : "#fee2e2", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                  {filtroTelefono === "con"
+                    ? <PhoneEnabled sx={{ fontSize: 14, color: "#16a34a" }} />
+                    : <PhoneDisabled sx={{ fontSize: 14, color: "#dc2626" }} />
+                  }
+                  <Typography variant="caption" color={filtroTelefono === "con" ? "#16a34a" : "#dc2626"}>
+                    {filtroTelefono === "con" ? "Con celular" : "Sin celular"}
+                  </Typography>
+                  <IconButton size="small" onClick={() => { setFiltroTelefono(""); setFiltroTelefonoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                    <Close sx={{ fontSize: 14, color: filtroTelefono === "con" ? "#16a34a" : "#dc2626" }} />
+                  </IconButton>
+                </Box>
+              )}
               <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
                 {totalCount.toLocaleString()} beneficiario(s)
               </Typography>
@@ -237,6 +297,7 @@ export default function OllasBeneficiariosPage() {
                 <ToggleButtonGroup value={filterType} exclusive onChange={handleFilterTypeChange} size="small" fullWidth sx={{ mb: 2.5 }}>
                   <ToggleButton value="edad" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#dbeafe", color: "#1e40af", "&:hover": { backgroundColor: "#bfdbfe" } } }}>Edad</ToggleButton>
                   <ToggleButton value="cumpleanos" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#fce7f3", color: "#be185d", "&:hover": { backgroundColor: "#fbcfe8" } } }}>Cumpleaños</ToggleButton>
+                  <ToggleButton value="telefono" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#dcfce7", color: "#16a34a", "&:hover": { backgroundColor: "#bbf7d0" } } }}>Teléfono</ToggleButton>
                 </ToggleButtonGroup>
                 <Divider sx={{ mb: 2 }} />
                 {filterType === "edad" && (
@@ -274,9 +335,29 @@ export default function OllasBeneficiariosPage() {
                     )}
                   </>
                 )}
+                {filterType === "telefono" && (
+                  <>
+                    <Typography variant="body2" color="#475569" mb={1.5}>Filtrar por número de celular</Typography>
+                    <ToggleButtonGroup
+                      value={filtroTelefonoDraft}
+                      exclusive
+                      onChange={(_e, val) => { if (val !== null) setFiltroTelefonoDraft(val); }}
+                      size="small"
+                      fullWidth
+                    >
+                      <ToggleButton value="" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#f1f5f9", color: "#334155", "&:hover": { backgroundColor: "#e2e8f0" } } }}>Todos</ToggleButton>
+                      <ToggleButton value="con" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#dcfce7", color: "#16a34a", "&:hover": { backgroundColor: "#bbf7d0" } } }}>
+                        <PhoneEnabled sx={{ fontSize: 15, mr: 0.5 }} />Con celular
+                      </ToggleButton>
+                      <ToggleButton value="sin" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fee2e2", color: "#dc2626", "&:hover": { backgroundColor: "#fecaca" } } }}>
+                        <PhoneDisabled sx={{ fontSize: 15, mr: 0.5 }} />Sin celular
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                  </>
+                )}
                 <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
-                  <Button size="small" onClick={() => { setEdadRange([0, 110]); setMesesCumpleanos([]); setCumpleanosModo("mes"); setDiaCumpleanos(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ color: "#64748b", textTransform: "none" }}>Limpiar todo</Button>
-                  <Button size="small" variant="contained" onClick={() => { setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }} sx={{ backgroundColor: "#475569", textTransform: "none", "&:hover": { backgroundColor: "#334155" } }}>Aplicar</Button>
+                  <Button size="small" onClick={() => { setEdadRange([0, 110]); setMesesCumpleanos([]); setCumpleanosModo("mes"); setDiaCumpleanos(""); setFiltroTelefono(""); setFiltroTelefonoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ color: "#64748b", textTransform: "none" }}>Limpiar todo</Button>
+                  <Button size="small" variant="contained" onClick={() => { setFiltroTelefono(filtroTelefonoDraft); setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }} sx={{ backgroundColor: "#475569", textTransform: "none", "&:hover": { backgroundColor: "#334155" } }}>Aplicar</Button>
                 </Box>
               </Box>
             </Popover>
