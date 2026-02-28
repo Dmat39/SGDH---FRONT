@@ -43,6 +43,7 @@ import {
   Person,
   PhoneEnabled,
   PhoneDisabled,
+  Wc,
 } from "@mui/icons-material";
 import * as XLSX from "xlsx";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -169,7 +170,7 @@ const mapListaToTabla = (item: PacienteListaBackend): PacienteTabla => ({
 // ============================================
 // CONSTANTES
 // ============================================
-type FilterType = "edad" | "cumpleanos" | "telefono";
+type FilterType = "edad" | "cumpleanos" | "telefono" | "genero";
 type CumpleanosModo = "mes" | "dia";
 
 const MESES = [
@@ -371,6 +372,8 @@ export default function PANTBCBeneficiariosPage() {
   const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
   const [filtroTelefono, setFiltroTelefono] = useState<"" | "con" | "sin">("");
   const [filtroTelefonoDraft, setFiltroTelefonoDraft] = useState<"" | "con" | "sin">("");
+  const [filtroSexo, setFiltroSexo] = useState<"" | "MALE" | "FEMALE">("");
+  const [filtroSexoDraft, setFiltroSexoDraft] = useState<"" | "MALE" | "FEMALE">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
 
   // Detalle
@@ -422,6 +425,10 @@ export default function PANTBCBeneficiariosPage() {
           params.set("phone", "true");
         } else if (filtroTelefono === "sin") {
           params.set("phone", "false");
+        }
+
+        if (filtroSexo) {
+          params.set("sex", filtroSexo);
         }
 
         const response = await getData<BackendListaResponse>(
@@ -484,6 +491,7 @@ export default function PANTBCBeneficiariosPage() {
   // Handlers de filtros
   const handleFilterClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     setFiltroTelefonoDraft(filtroTelefono);
+    setFiltroSexoDraft(filtroSexo);
     setFilterAnchor(e.currentTarget);
   };
   const handleFilterClose = () => setFilterAnchor(null);
@@ -556,6 +564,10 @@ export default function PANTBCBeneficiariosPage() {
         params.set("phone", "false");
       }
 
+      if (filtroSexo) {
+        params.set("sex", filtroSexo);
+      }
+
       const response = await getData<BackendListaResponse>(`pantbc/patient?${params.toString()}`);
 
       if (!response?.data) return;
@@ -599,6 +611,8 @@ export default function PANTBCBeneficiariosPage() {
     setDiaCumpleanos("");
     setFiltroTelefono("");
     setFiltroTelefonoDraft("");
+    setFiltroSexo("");
+    setFiltroSexoDraft("");
     setPage(0);
     setFetchKey((k) => k + 1);
   };
@@ -773,6 +787,17 @@ export default function PANTBCBeneficiariosPage() {
                   </IconButton>
                 </Box>
               )}
+              {filtroSexo && (
+                <Box sx={{ backgroundColor: filtroSexo === "MALE" ? "#e3f2fd" : "#fce4ec", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                  <Wc sx={{ fontSize: 14, color: filtroSexo === "MALE" ? "#1565c0" : "#c2185b" }} />
+                  <Typography variant="caption" color={filtroSexo === "MALE" ? "#1565c0" : "#c2185b"}>
+                    {filtroSexo === "MALE" ? "Masculino" : "Femenino"}
+                  </Typography>
+                  <IconButton size="small" onClick={() => { setFiltroSexo(""); setFiltroSexoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                    <Close sx={{ fontSize: 14, color: filtroSexo === "MALE" ? "#1565c0" : "#c2185b" }} />
+                  </IconButton>
+                </Box>
+              )}
               <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
                 {totalCount.toLocaleString()} paciente(s)
               </Typography>
@@ -840,6 +865,20 @@ export default function PANTBCBeneficiariosPage() {
                     }}
                   >
                     Teléfono
+                  </ToggleButton>
+                  <ToggleButton
+                    value="genero"
+                    sx={{
+                      textTransform: "none",
+                      fontSize: "0.7rem",
+                      "&.Mui-selected": {
+                        backgroundColor: "#e3f2fd",
+                        color: "#1565c0",
+                        "&:hover": { backgroundColor: "#bbdefb" },
+                      },
+                    }}
+                  >
+                    Género
                   </ToggleButton>
                 </ToggleButtonGroup>
 
@@ -1004,6 +1043,26 @@ export default function PANTBCBeneficiariosPage() {
                     </ToggleButtonGroup>
                   </>
                 )}
+                {filterType === "genero" && (
+                  <>
+                    <Typography variant="body2" color="#475569" mb={1.5}>Filtrar por género</Typography>
+                    <ToggleButtonGroup
+                      value={filtroSexoDraft}
+                      exclusive
+                      onChange={(_e, val) => { if (val !== null) setFiltroSexoDraft(val); }}
+                      size="small"
+                      fullWidth
+                    >
+                      <ToggleButton value="" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#f1f5f9", color: "#334155", "&:hover": { backgroundColor: "#e2e8f0" } } }}>Todos</ToggleButton>
+                      <ToggleButton value="MALE" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#e3f2fd", color: "#1565c0", "&:hover": { backgroundColor: "#bbdefb" } } }}>
+                        Masculino
+                      </ToggleButton>
+                      <ToggleButton value="FEMALE" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fce4ec", color: "#c2185b", "&:hover": { backgroundColor: "#f8bbd0" } } }}>
+                        Femenino
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                  </>
+                )}
                 <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
                   <Button
                     size="small"
@@ -1017,6 +1076,7 @@ export default function PANTBCBeneficiariosPage() {
                     variant="contained"
                     onClick={() => {
                       setFiltroTelefono(filtroTelefonoDraft);
+                      setFiltroSexo(filtroSexoDraft);
                       setPage(0);
                       setFetchKey((k) => k + 1);
                       handleFilterClose();

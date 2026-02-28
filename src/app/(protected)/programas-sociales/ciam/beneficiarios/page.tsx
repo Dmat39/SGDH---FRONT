@@ -53,6 +53,9 @@ import {
   Assignment,
   PhoneEnabled,
   PhoneDisabled,
+  Wc,
+  Male,
+  Female,
 } from "@mui/icons-material";
 import * as XLSX from "xlsx";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -295,13 +298,7 @@ const MESES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-const SEXOS = ["Masculino", "Femenino"];
 const SEGUROS_SALUD = ["SIS", "EsSalud", "Privado", "Sin seguro", "Otro"];
-
-const SEXO_CHIP_COLORS: Record<string, { bg: string; color: string }> = {
-  Masculino: { bg: "#e3f2fd", color: "#1565c0" },
-  Femenino: { bg: "#fce4ec", color: "#c2185b" },
-};
 
 const SEGURO_CHIP_COLORS: Record<string, { bg: string; color: string }> = {
   SIS: { bg: "#e3f2fd", color: "#1565c0" },
@@ -838,7 +835,8 @@ export default function CIAMBeneficiariosPage() {
   const [mesSeleccionado, setMesSeleccionado] = useState<number | null>(null);
   const [cumpleanosModo, setCumpleanosModo] = useState<CumpleanosModo>("mes");
   const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
-  const [sexosSeleccionados, setSexosSeleccionados] = useState<string[]>([]);
+  const [filtroSexo, setFiltroSexo] = useState<"" | "MALE" | "FEMALE">("");
+  const [filtroSexoDraft, setFiltroSexoDraft] = useState<"" | "MALE" | "FEMALE">("");
   const [segurosSeleccionados, setSegurosSeleccionados] = useState<string[]>([]);
   const [filtroTelefono, setFiltroTelefono] = useState<"" | "con" | "sin">("");
   const [filtroTelefonoDraft, setFiltroTelefonoDraft] = useState<"" | "con" | "sin">("");
@@ -892,6 +890,10 @@ export default function CIAMBeneficiariosPage() {
           params.set("phone", "false");
         }
 
+        if (filtroSexo) {
+          params.set("sex", filtroSexo);
+        }
+
         const response = await getData<BackendListaResponse>(
           `pam/benefited?${params.toString()}`
         );
@@ -938,6 +940,7 @@ export default function CIAMBeneficiariosPage() {
   // Handlers de filtros
   const handleFilterClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     setFiltroTelefonoDraft(filtroTelefono);
+    setFiltroSexoDraft(filtroSexo);
     setFilterAnchor(e.currentTarget);
   };
   const handleFilterClose = () => setFilterAnchor(null);
@@ -948,9 +951,6 @@ export default function CIAMBeneficiariosPage() {
   const handleMesToggle = (mes: number) => {
     setMesSeleccionado((prev) => prev === mes ? null : mes);
   };
-  const handleSexoToggle = (sexo: string) => {
-    setSexosSeleccionados((prev) => prev.includes(sexo) ? prev.filter((s) => s !== sexo) : [...prev, sexo]);
-  };
   const handleSeguroToggle = (seguro: string) => {
     setSegurosSeleccionados((prev) => prev.includes(seguro) ? prev.filter((s) => s !== seguro) : [...prev, seguro]);
   };
@@ -958,7 +958,7 @@ export default function CIAMBeneficiariosPage() {
   const filterOpen = Boolean(filterAnchor);
   const isEdadFiltered = edadRange[0] > 60 || edadRange[1] < 110;
   const isCumpleanosFiltered = cumpleanosModo === "mes" ? mesSeleccionado !== null : diaCumpleanos !== "";
-  const isSexoFiltered = sexosSeleccionados.length > 0;
+  const isSexoFiltered = filtroSexo !== "";
   const isSeguroFiltered = segurosSeleccionados.length > 0;
 
   const handleChangePage = (_: unknown, newPage: number) => setPage(newPage);
@@ -980,11 +980,10 @@ export default function CIAMBeneficiariosPage() {
   // Formatear datos de la página actual
   const dataFormateados = useFormatTableData(data);
 
-  // Filtrado client-side (solo sexo y seguro - búsqueda/edad/cumpleaños se filtran en el servidor)
+  // Filtrado client-side (solo seguro - sexo se filtra en el servidor)
   const filteredData = dataFormateados.filter((b: BeneficiarioTabla) => {
-    const matchesSexo = sexosSeleccionados.length === 0 || sexosSeleccionados.includes(b.sexo);
     const matchesSeguro = segurosSeleccionados.length === 0 || segurosSeleccionados.includes(b.seguroSalud);
-    return matchesSexo && matchesSeguro;
+    return matchesSeguro;
   });
 
   const [isExporting, setIsExporting] = useState(false);
@@ -1017,6 +1016,10 @@ export default function CIAMBeneficiariosPage() {
         params.set("phone", "true");
       } else if (filtroTelefono === "sin") {
         params.set("phone", "false");
+      }
+
+      if (filtroSexo) {
+        params.set("sex", filtroSexo);
       }
 
       const response = await getData<BackendListaResponse>(`pam/benefited?${params.toString()}`);
@@ -1055,7 +1058,8 @@ export default function CIAMBeneficiariosPage() {
     setMesSeleccionado(null);
     setCumpleanosModo("mes");
     setDiaCumpleanos("");
-    setSexosSeleccionados([]);
+    setFiltroSexo("");
+    setFiltroSexoDraft("");
     setSegurosSeleccionados([]);
     setFiltroTelefono("");
     setFiltroTelefonoDraft("");
@@ -1182,13 +1186,14 @@ export default function CIAMBeneficiariosPage() {
                   </IconButton>
                 </Box>
               )}
-              {isSexoFiltered && (
-                <Box sx={{ backgroundColor: "#e3f2fd", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
-                  <Typography variant="caption" color="#1565c0">
-                    Sexo: {sexosSeleccionados.join(", ")}
+              {filtroSexo && (
+                <Box sx={{ backgroundColor: filtroSexo === "MALE" ? "#e3f2fd" : "#fce4ec", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                  <Wc sx={{ fontSize: 14, color: filtroSexo === "MALE" ? "#1565c0" : "#c2185b" }} />
+                  <Typography variant="caption" color={filtroSexo === "MALE" ? "#1565c0" : "#c2185b"}>
+                    {filtroSexo === "MALE" ? "Masculino" : "Femenino"}
                   </Typography>
-                  <IconButton size="small" onClick={() => setSexosSeleccionados([])} sx={{ p: 0.25 }}>
-                    <Close sx={{ fontSize: 14, color: "#1565c0" }} />
+                  <IconButton size="small" onClick={() => { setFiltroSexo(""); setFiltroSexoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                    <Close sx={{ fontSize: 14, color: filtroSexo === "MALE" ? "#1565c0" : "#c2185b" }} />
                   </IconButton>
                 </Box>
               )}
@@ -1362,33 +1367,22 @@ export default function CIAMBeneficiariosPage() {
                 {/* Filtro por sexo */}
                 {filterType === "sexo" && (
                   <>
-                    <Typography variant="body2" color="#475569" mb={1.5}>
-                      Sexo
-                    </Typography>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
-                      {SEXOS.map((sexo) => (
-                        <Button
-                          key={sexo}
-                          size="small"
-                          variant={sexosSeleccionados.includes(sexo) ? "contained" : "outlined"}
-                          onClick={() => handleSexoToggle(sexo)}
-                          sx={{
-                            textTransform: "none",
-                            fontSize: "0.8rem",
-                            justifyContent: "flex-start",
-                            borderColor: sexosSeleccionados.includes(sexo) ? "#1565c0" : "#e2e8f0",
-                            backgroundColor: sexosSeleccionados.includes(sexo) ? "#1565c0" : "transparent",
-                            color: sexosSeleccionados.includes(sexo) ? "white" : "#64748b",
-                            "&:hover": {
-                              backgroundColor: sexosSeleccionados.includes(sexo) ? "#0d47a1" : "#e3f2fd",
-                              borderColor: "#1565c0",
-                            },
-                          }}
-                        >
-                          {sexo}
-                        </Button>
-                      ))}
-                    </Box>
+                    <Typography variant="body2" color="#475569" mb={1.5}>Filtrar por género</Typography>
+                    <ToggleButtonGroup
+                      value={filtroSexoDraft}
+                      exclusive
+                      onChange={(_e, val) => { if (val !== null) setFiltroSexoDraft(val); }}
+                      size="small"
+                      fullWidth
+                    >
+                      <ToggleButton value="" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#f1f5f9", color: "#334155", "&:hover": { backgroundColor: "#e2e8f0" } } }}>Todos</ToggleButton>
+                      <ToggleButton value="MALE" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#dbeafe", color: "#1e40af", "&:hover": { backgroundColor: "#bfdbfe" } } }}>
+                        <Male sx={{ fontSize: 15, mr: 0.5 }} />Masculino
+                      </ToggleButton>
+                      <ToggleButton value="FEMALE" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fce7f3", color: "#be185d", "&:hover": { backgroundColor: "#fbcfe8" } } }}>
+                        <Female sx={{ fontSize: 15, mr: 0.5 }} />Femenino
+                      </ToggleButton>
+                    </ToggleButtonGroup>
                   </>
                 )}
 
@@ -1452,7 +1446,7 @@ export default function CIAMBeneficiariosPage() {
                   <Button
                     size="small"
                     variant="contained"
-                    onClick={() => { setFiltroTelefono(filtroTelefonoDraft); setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
+                    onClick={() => { setFiltroTelefono(filtroTelefonoDraft); setFiltroSexo(filtroSexoDraft); setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
                     sx={{ backgroundColor: "#475569", textTransform: "none", "&:hover": { backgroundColor: "#334155" } }}
                   >
                     Aplicar
@@ -1500,7 +1494,6 @@ export default function CIAMBeneficiariosPage() {
                     </TableRow>
                   ) : (
                     filteredData.map((row: BeneficiarioTabla, index: number) => {
-                      const sexoColors = SEXO_CHIP_COLORS[row.sexo] || { bg: "#f5f5f5", color: "#757575" };
                       const seguroColors = SEGURO_CHIP_COLORS[row.seguroSalud] || SEGURO_CHIP_COLORS["Otro"];
                       return (
                         <TableRow
@@ -1517,7 +1510,16 @@ export default function CIAMBeneficiariosPage() {
                           </TableCell>
                           <TableCell>{row.tipoDoc}</TableCell>
                           <TableCell align="center">
-                            <Chip label={row.sexo} size="small" sx={{ backgroundColor: sexoColors.bg, color: sexoColors.color, fontWeight: 600, fontSize: "0.7rem" }} />
+                            {row.sexo === "Masculino" ? (
+                              <Chip icon={<Male sx={{ fontSize: "0.9rem !important", color: "white !important" }} />} label="Hombre" size="small"
+                                sx={{ backgroundColor: "#1e40af", color: "white", fontWeight: 700, fontSize: "0.75rem", borderRadius: "20px", "& .MuiChip-icon": { color: "white" } }} />
+                            ) : row.sexo === "Femenino" ? (
+                              <Chip icon={<Female sx={{ fontSize: "0.9rem !important", color: "white !important" }} />} label="Mujer" size="small"
+                                sx={{ backgroundColor: "#be185d", color: "white", fontWeight: 700, fontSize: "0.75rem", borderRadius: "20px", "& .MuiChip-icon": { color: "white" } }} />
+                            ) : (
+                              <Chip label="Sin dato" size="small"
+                                sx={{ backgroundColor: "#f1f5f9", color: "#94a3b8", fontWeight: 600, fontSize: "0.75rem", borderRadius: "20px" }} />
+                            )}
                           </TableCell>
                           <TableCell align="center">
                             <Box display="flex" flexDirection="column" alignItems="center" gap={0.3}>

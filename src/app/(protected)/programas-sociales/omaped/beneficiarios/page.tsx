@@ -42,6 +42,9 @@ import {
   Accessible,
   PhoneEnabled,
   PhoneDisabled,
+  Wc,
+  Male,
+  Female,
 } from "@mui/icons-material";
 import * as XLSX from "xlsx";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -121,6 +124,7 @@ interface BeneficiarioOMAPEDBackend {
   conadis: string | null;
   folio: string | null;
   degree: string | null;
+  sex?: string | null;
 }
 
 // Interfaz completa del GET ONE (más campos que el listado)
@@ -176,6 +180,7 @@ interface BeneficiarioTabla {
   telefono: string;
   fechaNacimiento: string;
   edad: number;
+  sexo: string;
   grado: string;
   diagnostico: string;
   certificado: string;
@@ -271,6 +276,7 @@ const mapBackendToTabla = (item: BeneficiarioOMAPEDBackend): BeneficiarioTabla =
   telefono: item.phone || "-",
   fechaNacimiento: item.birthday,
   edad: calcularEdad(item.birthday),
+  sexo: item.sex === "MALE" ? "Masculino" : item.sex === "FEMALE" ? "Femenino" : "-",
   grado: traducir("degree", item.degree),
   diagnostico: item.diagnostic1 || "-",
   certificado: item.certificate || "-",
@@ -280,7 +286,7 @@ const mapBackendToTabla = (item: BeneficiarioOMAPEDBackend): BeneficiarioTabla =
 });
 
 // Tipo de filtro
-type FilterType = "edad" | "cumpleanos" | "telefono";
+type FilterType = "edad" | "cumpleanos" | "telefono" | "genero";
 type CumpleanosModo = "mes" | "dia";
 
 // ============================================
@@ -309,6 +315,8 @@ export default function OMAPEDBeneficiariosPage() {
   const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
   const [filtroTelefono, setFiltroTelefono] = useState<"" | "con" | "sin">("");
   const [filtroTelefonoDraft, setFiltroTelefonoDraft] = useState<"" | "con" | "sin">("");
+  const [filtroSexo, setFiltroSexo] = useState<"" | "MALE" | "FEMALE">("");
+  const [filtroSexoDraft, setFiltroSexoDraft] = useState<"" | "MALE" | "FEMALE">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
 
   // Estados para detalle
@@ -358,6 +366,10 @@ export default function OMAPEDBeneficiariosPage() {
           params.set("phone", "false");
         }
 
+        if (filtroSexo) {
+          params.set("sex", filtroSexo);
+        }
+
         const response = await getData<BackendResponse>(
           `omaped/disabled?${params.toString()}`
         );
@@ -382,6 +394,7 @@ export default function OMAPEDBeneficiariosPage() {
   // Handlers de filtros
   const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setFiltroTelefonoDraft(filtroTelefono);
+    setFiltroSexoDraft(filtroSexo);
     setFilterAnchor(event.currentTarget);
   };
   const handleFilterClose = () => setFilterAnchor(null);
@@ -469,6 +482,9 @@ export default function OMAPEDBeneficiariosPage() {
       } else if (filtroTelefono === "sin") {
         params.set("phone", "false");
       }
+      if (filtroSexo) {
+        params.set("sex", filtroSexo);
+      }
 
       const response = await getData<BackendResponse>(`omaped/disabled?${params.toString()}`);
 
@@ -516,6 +532,8 @@ export default function OMAPEDBeneficiariosPage() {
     setDiaCumpleanos("");
     setFiltroTelefono("");
     setFiltroTelefonoDraft("");
+    setFiltroSexo("");
+    setFiltroSexoDraft("");
     setPage(0);
     setFetchKey((k) => k + 1);
   };
@@ -654,6 +672,18 @@ export default function OMAPEDBeneficiariosPage() {
                 </Box>
               )}
 
+              {filtroSexo && (
+                <Box sx={{ backgroundColor: filtroSexo === "MALE" ? "#e3f2fd" : "#fce4ec", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                  <Wc sx={{ fontSize: 14, color: filtroSexo === "MALE" ? "#1565c0" : "#c2185b" }} />
+                  <Typography variant="caption" color={filtroSexo === "MALE" ? "#1565c0" : "#c2185b"}>
+                    {filtroSexo === "MALE" ? "Masculino" : "Femenino"}
+                  </Typography>
+                  <IconButton size="small" onClick={() => { setFiltroSexo(""); setFiltroSexoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                    <Close sx={{ fontSize: 14, color: filtroSexo === "MALE" ? "#1565c0" : "#c2185b" }} />
+                  </IconButton>
+                </Box>
+              )}
+
               <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
                 {totalCount.toLocaleString()} beneficiario(s)
               </Typography>
@@ -688,6 +718,9 @@ export default function OMAPEDBeneficiariosPage() {
                   </ToggleButton>
                   <ToggleButton value="telefono" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#dcfce7", color: "#16a34a", "&:hover": { backgroundColor: "#bbf7d0" } } }}>
                     Teléfono
+                  </ToggleButton>
+                  <ToggleButton value="genero" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#e3f2fd", color: "#1565c0", "&:hover": { backgroundColor: "#bbdefb" } } }}>
+                    Género
                   </ToggleButton>
                 </ToggleButtonGroup>
 
@@ -813,6 +846,16 @@ export default function OMAPEDBeneficiariosPage() {
                     </ToggleButtonGroup>
                   </>
                 )}
+                {filterType === "genero" && (
+                  <>
+                    <Typography variant="body2" color="#475569" mb={1.5}>Filtrar por género</Typography>
+                    <ToggleButtonGroup value={filtroSexoDraft} exclusive onChange={(_e, val) => { if (val !== null) setFiltroSexoDraft(val); }} size="small" fullWidth>
+                      <ToggleButton value="" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#f1f5f9", color: "#334155", "&:hover": { backgroundColor: "#e2e8f0" } } }}>Todos</ToggleButton>
+                      <ToggleButton value="MALE" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#e3f2fd", color: "#1565c0", "&:hover": { backgroundColor: "#bbdefb" } } }}>Masculino</ToggleButton>
+                      <ToggleButton value="FEMALE" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fce4ec", color: "#c2185b", "&:hover": { backgroundColor: "#f8bbd0" } } }}>Femenino</ToggleButton>
+                    </ToggleButtonGroup>
+                  </>
+                )}
                 <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
                   <Button size="small" onClick={limpiarFiltros} sx={{ color: "#64748b", textTransform: "none" }}>
                     Limpiar todo
@@ -820,7 +863,7 @@ export default function OMAPEDBeneficiariosPage() {
                   <Button
                     size="small"
                     variant="contained"
-                    onClick={() => { setFiltroTelefono(filtroTelefonoDraft); setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
+                    onClick={() => { setFiltroTelefono(filtroTelefonoDraft); setFiltroSexo(filtroSexoDraft); setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
                     sx={{ backgroundColor: OMAPED_COLOR, textTransform: "none", "&:hover": { backgroundColor: "#b01668" } }}
                   >
                     Aplicar
@@ -840,6 +883,7 @@ export default function OMAPEDBeneficiariosPage() {
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Nombre Completo</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>DNI</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Teléfono</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Sexo</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Edad</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Grado</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Diagnóstico</TableCell>
@@ -850,7 +894,7 @@ export default function OMAPEDBeneficiariosPage() {
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
                         <CircularProgress size={32} sx={{ color: OMAPED_COLOR }} />
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                           Cargando beneficiarios...
@@ -859,7 +903,7 @@ export default function OMAPEDBeneficiariosPage() {
                     </TableRow>
                   ) : filteredData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">
                           No se encontraron beneficiarios
                         </Typography>
@@ -881,6 +925,18 @@ export default function OMAPEDBeneficiariosPage() {
                           <TableCell sx={{ fontWeight: 500 }}>{row.nombreCompleto}</TableCell>
                           <TableCell>{row.docNum}</TableCell>
                           <TableCell>{row.telefono}</TableCell>
+                          <TableCell>
+                            {row.sexo === "Masculino" ? (
+                              <Chip icon={<Male sx={{ fontSize: "0.9rem !important", color: "white !important" }} />} label="Hombre" size="small"
+                                sx={{ backgroundColor: "#1e40af", color: "white", fontWeight: 700, fontSize: "0.75rem", borderRadius: "20px", "& .MuiChip-icon": { color: "white" } }} />
+                            ) : row.sexo === "Femenino" ? (
+                              <Chip icon={<Female sx={{ fontSize: "0.9rem !important", color: "white !important" }} />} label="Mujer" size="small"
+                                sx={{ backgroundColor: "#be185d", color: "white", fontWeight: 700, fontSize: "0.75rem", borderRadius: "20px", "& .MuiChip-icon": { color: "white" } }} />
+                            ) : (
+                              <Chip label="Sin dato" size="small"
+                                sx={{ backgroundColor: "#f1f5f9", color: "#94a3b8", fontWeight: 600, fontSize: "0.75rem", borderRadius: "20px" }} />
+                            )}
+                          </TableCell>
                           <TableCell align="center">
                             <Box display="flex" flexDirection="column" alignItems="center" gap={0.3}>
                               <Chip label={`${row.edad} años`} size="small" sx={{ backgroundColor: "#f3e5f5", color: "#7b1fa2", fontWeight: 600, fontSize: "0.75rem" }} />
