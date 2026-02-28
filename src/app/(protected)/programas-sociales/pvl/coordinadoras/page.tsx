@@ -44,6 +44,8 @@ import {
   Cake,
   PhoneEnabled,
   PhoneDisabled,
+  Female,
+  Male,
 } from "@mui/icons-material";
 import * as XLSX from "xlsx";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -79,6 +81,7 @@ interface CoordinatorBackend {
   lastname: string;
   dni: string;
   phone: string;
+  sex: "MALE" | "FEMALE" | null;
   birthday: string | null;
   created_at: string;
   updated_at: string;
@@ -103,6 +106,7 @@ interface CoordinadoraFrontend {
   apellido: string;
   dni: string;
   telefono: string;
+  sexo: "MALE" | "FEMALE" | null;
   fechaNacimiento: string | null;
   fechaCreacion: string;
 }
@@ -114,11 +118,12 @@ const mapBackendToFrontend = (item: CoordinatorBackend): CoordinadoraFrontend =>
   apellido: item.lastname,
   dni: item.dni,
   telefono: item.phone || "-",
+  sexo: item.sex ?? null,
   fechaNacimiento: item.birthday,
   fechaCreacion: item.created_at,
 });
 
-type FilterType = "edad" | "cumpleanos" | "telefono";
+type FilterType = "edad" | "cumpleanos" | "telefono" | "sexo";
 type CumpleanosModo = "mes" | "dia";
 
 const MESES = [
@@ -147,6 +152,8 @@ export default function PVLCoordinadorasPage() {
   const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
   const [filtroTelefono, setFiltroTelefono] = useState<"" | "con" | "sin">("");
   const [filtroTelefonoDraft, setFiltroTelefonoDraft] = useState<"" | "con" | "sin">("");
+  const [filtroSexo, setFiltroSexo] = useState<"" | "FEMALE" | "MALE">("");
+  const [filtroSexoDraft, setFiltroSexoDraft] = useState<"" | "FEMALE" | "MALE">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
 
   // Detalle
@@ -184,6 +191,10 @@ export default function PVLCoordinadorasPage() {
           params.set("phone", "false");
         }
 
+        if (filtroSexo) {
+          params.set("sex", filtroSexo);
+        }
+
         const response = await getData<BackendResponse>(`pvl/coordinator?${params.toString()}`);
         if (response?.data) {
           setData(response.data.data.map(mapBackendToFrontend));
@@ -204,6 +215,7 @@ export default function PVLCoordinadorasPage() {
 
   const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setFiltroTelefonoDraft(filtroTelefono);
+    setFiltroSexoDraft(filtroSexo);
     setFilterAnchor(event.currentTarget);
   };
   const handleFilterClose = () => setFilterAnchor(null);
@@ -251,6 +263,10 @@ export default function PVLCoordinadorasPage() {
         params.set("phone", "true");
       } else if (filtroTelefono === "sin") {
         params.set("phone", "false");
+      }
+
+      if (filtroSexo) {
+        params.set("sex", filtroSexo);
       }
 
       const response = await getData<BackendResponse>(`pvl/coordinator?${params.toString()}`);
@@ -386,6 +402,20 @@ export default function PVLCoordinadorasPage() {
                   </IconButton>
                 </Box>
               )}
+              {filtroSexo && (
+                <Box sx={{ backgroundColor: filtroSexo === "FEMALE" ? "#fce7f3" : "#dbeafe", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                  {filtroSexo === "FEMALE"
+                    ? <Female sx={{ fontSize: 14, color: "#be185d" }} />
+                    : <Male sx={{ fontSize: 14, color: "#1d4ed8" }} />
+                  }
+                  <Typography variant="caption" color={filtroSexo === "FEMALE" ? "#be185d" : "#1d4ed8"}>
+                    {filtroSexo === "FEMALE" ? "Mujeres" : "Hombres"}
+                  </Typography>
+                  <IconButton size="small" onClick={() => { setFiltroSexo(""); setFiltroSexoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                    <Close sx={{ fontSize: 14, color: filtroSexo === "FEMALE" ? "#be185d" : "#1d4ed8" }} />
+                  </IconButton>
+                </Box>
+              )}
               <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
                 {totalCount.toLocaleString()} coordinadora(s)
               </Typography>
@@ -399,6 +429,7 @@ export default function PVLCoordinadorasPage() {
                   <ToggleButton value="edad" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#dbeafe", color: "#1e40af", "&:hover": { backgroundColor: "#bfdbfe" } } }}>Edad</ToggleButton>
                   <ToggleButton value="cumpleanos" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#fce7f3", color: "#be185d", "&:hover": { backgroundColor: "#fbcfe8" } } }}>Cumpleaños</ToggleButton>
                   <ToggleButton value="telefono" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#dcfce7", color: "#16a34a", "&:hover": { backgroundColor: "#bbf7d0" } } }}>Teléfono</ToggleButton>
+                  <ToggleButton value="sexo" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#ede9fe", color: "#7c3aed", "&:hover": { backgroundColor: "#ddd6fe" } } }}>Sexo</ToggleButton>
                 </ToggleButtonGroup>
                 <Divider sx={{ mb: 2 }} />
 
@@ -463,9 +494,30 @@ export default function PVLCoordinadorasPage() {
                   </>
                 )}
 
+                {filterType === "sexo" && (
+                  <>
+                    <Typography variant="body2" color="#475569" mb={1.5}>Filtrar por sexo</Typography>
+                    <ToggleButtonGroup
+                      value={filtroSexoDraft}
+                      exclusive
+                      onChange={(_e, val) => { if (val !== null) setFiltroSexoDraft(val); }}
+                      size="small"
+                      fullWidth
+                    >
+                      <ToggleButton value="" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#f1f5f9", color: "#334155", "&:hover": { backgroundColor: "#e2e8f0" } } }}>Todos</ToggleButton>
+                      <ToggleButton value="FEMALE" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fce7f3", color: "#be185d", "&:hover": { backgroundColor: "#fbcfe8" } } }}>
+                        <Female sx={{ fontSize: 15, mr: 0.5 }} />Mujeres
+                      </ToggleButton>
+                      <ToggleButton value="MALE" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#dbeafe", color: "#1d4ed8", "&:hover": { backgroundColor: "#bfdbfe" } } }}>
+                        <Male sx={{ fontSize: 15, mr: 0.5 }} />Hombres
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                  </>
+                )}
+
                 <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
-                  <Button size="small" onClick={() => { setEdadRange([0, 100]); setMesesCumpleanos([]); setCumpleanosModo("mes"); setDiaCumpleanos(""); setFiltroTelefono(""); setFiltroTelefonoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ color: "#64748b", textTransform: "none" }}>Limpiar todo</Button>
-                  <Button size="small" variant="contained" onClick={() => { setFiltroTelefono(filtroTelefonoDraft); setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }} sx={{ backgroundColor: "#475569", textTransform: "none", "&:hover": { backgroundColor: "#334155" } }}>Aplicar</Button>
+                  <Button size="small" onClick={() => { setEdadRange([0, 100]); setMesesCumpleanos([]); setCumpleanosModo("mes"); setDiaCumpleanos(""); setFiltroTelefono(""); setFiltroTelefonoDraft(""); setFiltroSexo(""); setFiltroSexoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ color: "#64748b", textTransform: "none" }}>Limpiar todo</Button>
+                  <Button size="small" variant="contained" onClick={() => { setFiltroTelefono(filtroTelefonoDraft); setFiltroSexo(filtroSexoDraft); setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }} sx={{ backgroundColor: "#475569", textTransform: "none", "&:hover": { backgroundColor: "#334155" } }}>Aplicar</Button>
                 </Box>
               </Box>
             </Popover>
@@ -477,6 +529,7 @@ export default function PVLCoordinadorasPage() {
                   <TableRow sx={{ backgroundColor: "#f8fafc" }}>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Nombre Completo</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>DNI</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Sexo</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Teléfono</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Edad</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
@@ -485,14 +538,14 @@ export default function PVLCoordinadorasPage() {
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                         <CircularProgress size={32} sx={{ color: "#64748b" }} />
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Cargando coordinadoras...</Typography>
                       </TableCell>
                     </TableRow>
                   ) : dataFormateados.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">No se encontraron coordinadoras</Typography>
                       </TableCell>
                     </TableRow>
@@ -501,6 +554,18 @@ export default function PVLCoordinadorasPage() {
                       <TableRow key={row.id} onClick={() => handleRowClick(row)} sx={{ backgroundColor: index % 2 === 0 ? "white" : "#f8fafc", "&:hover": { backgroundColor: "#f1f5f9", cursor: "pointer" }, transition: "background-color 0.2s" }}>
                         <TableCell sx={{ fontWeight: 500 }}>{row.nombreCompleto}</TableCell>
                         <TableCell>{row.dni}</TableCell>
+                        <TableCell>
+                          {row.sexo ? (
+                            <Chip
+                              size="small"
+                              icon={row.sexo === "FEMALE" ? <Female sx={{ fontSize: "14px !important", color: "white !important" }} /> : <Male sx={{ fontSize: "14px !important", color: "white !important" }} />}
+                              label={row.sexo === "FEMALE" ? "Mujer" : "Hombre"}
+                              sx={{ backgroundColor: row.sexo === "FEMALE" ? "#be185d" : "#1d4ed8", color: "white", fontSize: "0.7rem", height: 22, fontWeight: 600 }}
+                            />
+                          ) : (
+                            <Chip size="small" label="Sin dato" sx={{ backgroundColor: "#e2e8f0", color: "#64748b", fontSize: "0.7rem", height: 22 }} />
+                          )}
+                        </TableCell>
                         <TableCell>{row.telefono}</TableCell>
                         <TableCell align="center">
                           <Box display="flex" flexDirection="column" alignItems="center" gap={0.3}>

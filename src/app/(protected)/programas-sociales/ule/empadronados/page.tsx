@@ -54,6 +54,9 @@ import {
   Cake,
   PhoneEnabled,
   PhoneDisabled,
+  Wc,
+  Male,
+  Female,
 } from "@mui/icons-material";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -72,7 +75,7 @@ const MESES = [
 type CumpleanosModo = "mes" | "dia";
 
 // Tipo de filtro
-type FilterType = "edad" | "cumpleanos" | "telefono";
+type FilterType = "edad" | "cumpleanos" | "telefono" | "genero";
 
 // Función para calcular edad desde fecha de nacimiento
 const calcularEdad = (fechaNacimiento: string): number => {
@@ -92,6 +95,7 @@ interface RegisteredPerson {
   fsu: string;
   s100: string;
   dni: string;
+  sex?: string | null;
   name: string;
   lastname: string;
   phone: string;
@@ -150,6 +154,8 @@ export default function ULEEmpadronadosPage() {
   // Estados para filtros de edad y cumpleaños
   const [filtroTelefono, setFiltroTelefono] = useState<"" | "con" | "sin">("");
   const [filtroTelefonoDraft, setFiltroTelefonoDraft] = useState<"" | "con" | "sin">("");
+  const [filtroSexo, setFiltroSexo] = useState<"" | "MALE" | "FEMALE">("");
+  const [filtroSexoDraft, setFiltroSexoDraft] = useState<"" | "MALE" | "FEMALE">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
   const [filterType, setFilterType] = useState<FilterType>("edad");
   const [edadRange, setEdadRange] = useState<number[]>([0, 100]);
@@ -200,6 +206,10 @@ export default function ULEEmpadronadosPage() {
           params.set("phone", "true");
         } else if (filtroTelefono === "sin") {
           params.set("phone", "false");
+        }
+
+        if (filtroSexo) {
+          params.set("sex", filtroSexo);
         }
 
         const response = await getData<BackendResponse>(
@@ -263,6 +273,8 @@ export default function ULEEmpadronadosPage() {
     setCumpleanosModo("mes");
     setFiltroTelefono("");
     setFiltroTelefonoDraft("");
+    setFiltroSexo("");
+    setFiltroSexoDraft("");
     setPage(0);
     setFetchKey((k) => k + 1);
   };
@@ -270,6 +282,7 @@ export default function ULEEmpadronadosPage() {
   // Handlers para filtro de cumpleaños
   const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setFiltroTelefonoDraft(filtroTelefono);
+    setFiltroSexoDraft(filtroSexo);
     setFilterAnchor(event.currentTarget);
   };
 
@@ -334,6 +347,9 @@ export default function ULEEmpadronadosPage() {
         params.set("phone", "true");
       } else if (filtroTelefono === "sin") {
         params.set("phone", "false");
+      }
+      if (filtroSexo) {
+        params.set("sex", filtroSexo);
       }
       const response = await getData<BackendResponse>(`ule/registered?${params.toString()}`);
       if (!response?.data) return;
@@ -586,6 +602,17 @@ export default function ULEEmpadronadosPage() {
                 </IconButton>
               </Box>
             )}
+            {filtroSexo && (
+              <Box sx={{ backgroundColor: filtroSexo === "MALE" ? "#e3f2fd" : "#fce4ec", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                <Wc sx={{ fontSize: 14, color: filtroSexo === "MALE" ? "#1565c0" : "#c2185b" }} />
+                <Typography variant="caption" color={filtroSexo === "MALE" ? "#1565c0" : "#c2185b"}>
+                  {filtroSexo === "MALE" ? "Masculino" : "Femenino"}
+                </Typography>
+                <IconButton size="small" onClick={() => { setFiltroSexo(""); setFiltroSexoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                  <Close sx={{ fontSize: 14, color: filtroSexo === "MALE" ? "#1565c0" : "#c2185b" }} />
+                </IconButton>
+              </Box>
+            )}
 
             <Box sx={{ flex: 1 }} />
 
@@ -680,6 +707,9 @@ export default function ULEEmpadronadosPage() {
                   }}
                 >
                   Teléfono
+                </ToggleButton>
+                <ToggleButton value="genero" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#e3f2fd", color: "#1565c0", "&:hover": { backgroundColor: "#bbdefb" } } }}>
+                  Género
                 </ToggleButton>
               </ToggleButtonGroup>
 
@@ -845,6 +875,16 @@ export default function ULEEmpadronadosPage() {
                   </ToggleButtonGroup>
                 </>
               )}
+              {filterType === "genero" && (
+                <>
+                  <Typography variant="body2" color="#475569" mb={1.5}>Filtrar por género</Typography>
+                  <ToggleButtonGroup value={filtroSexoDraft} exclusive onChange={(_e, val) => { if (val !== null) setFiltroSexoDraft(val); }} size="small" fullWidth>
+                    <ToggleButton value="" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#f1f5f9", color: "#334155", "&:hover": { backgroundColor: "#e2e8f0" } } }}>Todos</ToggleButton>
+                    <ToggleButton value="MALE" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#e3f2fd", color: "#1565c0", "&:hover": { backgroundColor: "#bbdefb" } } }}>Masculino</ToggleButton>
+                    <ToggleButton value="FEMALE" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fce4ec", color: "#c2185b", "&:hover": { backgroundColor: "#f8bbd0" } } }}>Femenino</ToggleButton>
+                  </ToggleButtonGroup>
+                </>
+              )}
               <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
                 <Button
                   size="small"
@@ -853,6 +893,8 @@ export default function ULEEmpadronadosPage() {
                     setMesSeleccionado(null);
                     setDiaCumpleanos("");
                     setCumpleanosModo("mes");
+                    setFiltroSexo("");
+                    setFiltroSexoDraft("");
                     setPage(0);
                     setFetchKey((k) => k + 1);
                   }}
@@ -866,7 +908,7 @@ export default function ULEEmpadronadosPage() {
                 <Button
                   size="small"
                   variant="contained"
-                  onClick={() => { setFiltroTelefono(filtroTelefonoDraft); setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
+                  onClick={() => { setFiltroTelefono(filtroTelefonoDraft); setFiltroSexo(filtroSexoDraft); setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
                   sx={{
                     backgroundColor: subgerencia.color,
                     textTransform: "none",
@@ -921,6 +963,7 @@ export default function ULEEmpadronadosPage() {
                       <TableCell sx={{ fontWeight: 600, color: "#334155" }}>DNI</TableCell>
                       <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Nombre Completo</TableCell>
                       <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Teléfono</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Sexo</TableCell>
                       <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Formato</TableCell>
                       <TableCell sx={{ fontWeight: 600, color: "#334155" }}>FSU / S100</TableCell>
                       <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Nivel</TableCell>
@@ -933,7 +976,7 @@ export default function ULEEmpadronadosPage() {
                   <TableBody>
                     {empadronadosFiltrados.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
+                        <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
                           <Typography variant="body2" color="text.secondary">
                             No se encontraron registros con los filtros aplicados
                           </Typography>
@@ -962,6 +1005,18 @@ export default function ULEEmpadronadosPage() {
                             <Typography variant="body2">
                               {formatearTelefono(empadronado.phone) || "-"}
                             </Typography>
+                          </TableCell>
+                          <TableCell>
+                            {empadronado.sex === "MALE" ? (
+                              <Chip icon={<Male sx={{ fontSize: "0.9rem !important", color: "white !important" }} />} label="Hombre" size="small"
+                                sx={{ backgroundColor: "#1e40af", color: "white", fontWeight: 700, fontSize: "0.75rem", borderRadius: "20px", "& .MuiChip-icon": { color: "white" } }} />
+                            ) : empadronado.sex === "FEMALE" ? (
+                              <Chip icon={<Female sx={{ fontSize: "0.9rem !important", color: "white !important" }} />} label="Mujer" size="small"
+                                sx={{ backgroundColor: "#be185d", color: "white", fontWeight: 700, fontSize: "0.75rem", borderRadius: "20px", "& .MuiChip-icon": { color: "white" } }} />
+                            ) : (
+                              <Chip label="Sin dato" size="small"
+                                sx={{ backgroundColor: "#f1f5f9", color: "#94a3b8", fontWeight: 600, fontSize: "0.75rem", borderRadius: "20px" }} />
+                            )}
                           </TableCell>
                           <TableCell>
                             <Chip

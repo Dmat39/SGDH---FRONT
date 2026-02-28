@@ -391,6 +391,15 @@ export const MODULOS_PROGRAMAS_SOCIALES: MenuItem[] = [
 // MÓDULOS DE SERVICIOS SOCIALES
 // ============================================
 export const MODULOS_SERVICIOS_SOCIALES: MenuItem[] = [
+  // Lista General (búsqueda unificada de todos los módulos)
+  {
+    id: "servicios-lista-general",
+    nombre: "Lista General",
+    ruta: "/servicios-sociales/lista-general",
+    icono: "List",
+    descripcion: "Lista unificada de personas registradas en todos los módulos",
+    permisos: ["all_servicios_sociales", "all"],
+  },
   {
     id: "participacion-ciudadana",
     nombre: "Participación Vecinal",

@@ -44,21 +44,23 @@ import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import * as XLSX from "xlsx";
 
-const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
+const subgerencia = SUBGERENCIAS[SubgerenciaType.SERVICIOS_SOCIALES];
+const PROGRAM_ID = "a343b6c5-9b32-4c2e-bb59-895bce9d55ae";
 
-// Lista fija de módulos con colores
+// Módulos del área de Servicios Sociales
+// apiName = valor exacto que devuelve module.name en la API
+// name    = etiqueta visible en la UI
 const MODULOS_FIJOS = [
-  { name: "ULE", color: "#d81b7e" },
-  { name: "PVL", color: "#4caf50" },
-  { name: "CIAM", color: "#ff9800" },
-  { name: "OMAPED", color: "#e53935" },
-  { name: "PANTBC", color: "#00897b" },
-  { name: "Ollas Comunes", color: "#2196f3" },
-  { name: "Comedores Populares", color: "#9c27b0" },
+  { name: "Participación Vecinal", apiName: "PARTICIPACION VECINAL", color: "#00a3a8" },
+  { name: "Cultura y Deporte",     apiName: "CULTURA Y DEPORTE",     color: "#0288d1" },
+  { name: "Salud y Sanidad",       apiName: "COMPROMISO I",           color: "#2e7d32" },
 ];
 
+// Normaliza a minúsculas sin tildes para comparaciones robustas
+const normalize = (s: string) =>
+  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
-// Meses para el filtro
+// Meses para el filtro de cumpleaños
 const MESES = [
   { value: 1, label: "Enero" },
   { value: 2, label: "Febrero" },
@@ -158,7 +160,7 @@ interface PersonaTabla {
 // ============================================
 // COMPONENTE PRINCIPAL
 // ============================================
-export default function ListaGeneralPage() {
+export default function ListaGeneralServiciosSocialesPage() {
   const { getData } = useFetch();
 
   // Datos
@@ -172,10 +174,10 @@ export default function ListaGeneralPage() {
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [fetchKey, setFetchKey] = useState(0);
 
-  // Mapa de módulos fijo (por nombre)
+  // Mapa de módulos indexado por apiName (valor que devuelve la API)
   const moduloMap = useMemo(() => {
-    const map: Record<string, { name: string; color: string }> = {};
-    MODULOS_FIJOS.forEach((m) => { map[m.name] = m; });
+    const map: Record<string, { name: string; apiName: string; color: string }> = {};
+    MODULOS_FIJOS.forEach((m) => { map[normalize(m.apiName)] = m; });
     return map;
   }, []);
 
@@ -202,42 +204,45 @@ export default function ListaGeneralPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Cargar datos con paginación y filtros server-side
-  // Cargar totales por módulo (limit=1 para obtener solo totalCount)
+  // Cargar totales por módulo (filtrado en cliente)
   useEffect(() => {
     const fetchTotals = async () => {
-      const totals: Record<string, number> = {};
-      await Promise.all(
-        MODULOS_FIJOS.map(async (mod) => {
-          try {
-            const res = await getData<BackendResponse>(
-              `general?page=1&limit=1&module_name=${encodeURIComponent(mod.name)}`
-            );
-            totals[mod.name] = res?.data?.totalCount ?? 0;
-          } catch {
-            totals[mod.name] = 0;
-          }
-        })
-      );
-      setModuloTotals(totals);
+      try {
+        const res = await getData<BackendResponse>(
+          `general?page=1&limit=99999&program_id=${PROGRAM_ID}`
+        );
+        if (!res?.data?.data) return;
+        const totals: Record<string, number> = {};
+        MODULOS_FIJOS.forEach((mod) => { totals[mod.name] = 0; });
+        res.data.data.forEach((item) => {
+          const apiName = normalize(item.module?.name || "");
+          const match = MODULOS_FIJOS.find((m) => normalize(m.apiName) === apiName);
+          if (match) totals[match.name] = (totals[match.name] || 0) + 1;
+        });
+        setModuloTotals(totals);
+      } catch {
+        // silencioso
+      }
     };
     fetchTotals();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getData]);
 
-  // Cargar datos con paginación y filtros server-side
+  // Cargar datos de la tabla
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
         const params = new URLSearchParams();
-        params.set("page", String(page + 1));
-        params.set("limit", String(rowsPerPage));
+        params.set("program_id", PROGRAM_ID);
 
+        // Si hay módulo seleccionado, trae todo y filtra en cliente
         if (filtroModulo) {
-          params.set("module_name", filtroModulo);
+          params.set("page", "1");
+          params.set("limit", "99999");
         } else {
-          params.set("program_id", "d7762788-5835-428c-b2fa-9068c4b17489");
+          params.set("page", String(page + 1));
+          params.set("limit", String(rowsPerPage));
         }
 
         if (debouncedSearch) {
@@ -267,12 +272,10 @@ export default function ListaGeneralPage() {
           params.set("sex", filtroSexo);
         }
 
-        const response = await getData<BackendResponse>(
-          `general?${params.toString()}`
-        );
+        const response = await getData<BackendResponse>(`general?${params.toString()}`);
 
         if (response?.data) {
-          const items = response.data.data.map((item) => ({
+          let items = response.data.data.map((item) => ({
             id: item.id,
             nombreCompleto: `${item.name} ${item.lastname}`.trim(),
             nombre: item.name,
@@ -286,8 +289,15 @@ export default function ListaGeneralPage() {
             moduloNombre: item.module?.name || "-",
           }));
 
+          // Filtro por módulo en cliente usando el apiName exacto
+          if (filtroModulo) {
+            const selected = MODULOS_FIJOS.find((m) => m.name === filtroModulo);
+            const targetApiName = selected ? normalize(selected.apiName) : normalize(filtroModulo);
+            items = items.filter((item) => normalize(item.moduloNombre) === targetApiName);
+          }
+
           setData(items);
-          setTotalCount(response.data.totalCount);
+          setTotalCount(filtroModulo ? items.length : response.data.totalCount);
         }
       } catch (error) {
         console.error("Error cargando datos:", error);
@@ -302,10 +312,7 @@ export default function ListaGeneralPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, rowsPerPage, fetchKey, debouncedSearch, filtroModulo, getData]);
 
-  // Formatear strings (Title Case)
   const formattedData = useFormatTableData(data);
-
-  // Todos los filtros ahora son server-side
   const filteredData = formattedData;
 
   const [isExporting, setIsExporting] = useState(false);
@@ -317,12 +324,7 @@ export default function ListaGeneralPage() {
       const params = new URLSearchParams();
       params.set("page", "1");
       params.set("limit", "99999");
-
-      if (filtroModulo) {
-        params.set("module_name", filtroModulo);
-      } else {
-        params.set("program_id", "d7762788-5835-428c-b2fa-9068c4b17489");
-      }
+      params.set("program_id", PROGRAM_ID);
 
       if (debouncedSearch) {
         params.set("search", debouncedSearch);
@@ -352,10 +354,20 @@ export default function ListaGeneralPage() {
       }
 
       const response = await getData<BackendResponse>(`general?${params.toString()}`);
-
       if (!response?.data) return;
 
-      const exportData = response.data.data.map((item) => ({
+      let exportItems = response.data.data;
+
+      // Filtro por módulo en cliente usando el apiName exacto
+      if (filtroModulo) {
+        const selected = MODULOS_FIJOS.find((m) => m.name === filtroModulo);
+        const targetApiName = selected ? normalize(selected.apiName) : normalize(filtroModulo);
+        exportItems = exportItems.filter((item) =>
+          normalize(item.module?.name || "") === targetApiName
+        );
+      }
+
+      const exportData = exportItems.map((item) => ({
         "Nombre Completo": `${item.name} ${item.lastname}`.trim(),
         DNI: item.dni || "-",
         Teléfono: formatearTelefono(item.phone),
@@ -372,11 +384,11 @@ export default function ListaGeneralPage() {
         { wch: 15 },
         { wch: 15 },
         { wch: 6 },
-        { wch: 20 },
+        { wch: 25 },
       ];
       XLSX.utils.book_append_sheet(wb, ws, "Lista General");
 
-      let fileName = "lista_general";
+      let fileName = "lista_general_servicios_sociales";
       if (filtroModulo) fileName += `_${filtroModulo}`;
       fileName += `_${new Date().toISOString().split("T")[0]}`;
       fileName += ".xlsx";
@@ -405,22 +417,18 @@ export default function ListaGeneralPage() {
     setFetchKey((k) => k + 1);
   };
 
-  // Refrescar datos
   const handleRefresh = () => {
     setPage(0);
     setFetchKey((k) => k + 1);
   };
 
-  // Handlers de filtro
   const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setFiltroTelefonoDraft(filtroTelefono);
     setFiltroSexoDraft(filtroSexo);
     setFilterAnchor(event.currentTarget);
   };
 
-  const handleFilterClose = () => {
-    setFilterAnchor(null);
-  };
+  const handleFilterClose = () => setFilterAnchor(null);
 
   const handleFilterTypeChange = (
     _event: React.MouseEvent<HTMLElement>,
@@ -457,7 +465,7 @@ export default function ListaGeneralPage() {
         </Typography>
       </Box>
 
-      {/* Filtros */}
+      {/* Barra de herramientas y filtros */}
       <Paper
         sx={{
           p: 2,
@@ -466,14 +474,7 @@ export default function ListaGeneralPage() {
           boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
         }}
       >
-        <Box
-          sx={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 2,
-            alignItems: "center",
-          }}
-        >
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center" }}>
           {/* Búsqueda */}
           <TextField
             size="small"
@@ -505,28 +506,21 @@ export default function ListaGeneralPage() {
             {MODULOS_FIJOS.map((mod) => (
               <MenuItem key={mod.name} value={mod.name}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Box
-                    sx={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: "50%",
-                      backgroundColor: mod.color,
-                    }}
-                  />
+                  <Box sx={{ width: 12, height: 12, borderRadius: "50%", backgroundColor: mod.color }} />
                   {mod.name}
                 </Box>
               </MenuItem>
             ))}
           </TextField>
 
-          {/* Botón filtros de edad/cumpleaños */}
+          {/* Botón filtros avanzados */}
           <Tooltip title="Filtros de edad, cumpleaños, teléfono y sexo">
             <IconButton
               onClick={handleFilterClick}
               sx={{
                 backgroundColor:
                   filterOpen || isEdadFiltered || filtroDia || filtroMes || filtroTelefono || filtroSexo
-                    ? "#fce7f3"
+                    ? "#e0f7fa"
                     : "#f8fafc",
                 border: `1px solid ${
                   filterOpen || isEdadFiltered || filtroDia || filtroMes || filtroTelefono || filtroSexo
@@ -534,10 +528,7 @@ export default function ListaGeneralPage() {
                     : "#e2e8f0"
                 }`,
                 borderRadius: "8px",
-                "&:hover": {
-                  backgroundColor: "#fce7f3",
-                  borderColor: subgerencia.color,
-                },
+                "&:hover": { backgroundColor: "#e0f7fa", borderColor: subgerencia.color },
               }}
             >
               <FilterList
@@ -552,60 +543,27 @@ export default function ListaGeneralPage() {
             </IconButton>
           </Tooltip>
 
-          {/* Chips de filtros activos */}
+          {/* Chips de filtros activos inline */}
           {isEdadFiltered && (
-            <Box
-              sx={{
-                backgroundColor: "#dbeafe",
-                borderRadius: "16px",
-                px: 1.5,
-                py: 0.5,
-                display: "flex",
-                alignItems: "center",
-                gap: 0.5,
-              }}
-            >
-              <Typography variant="caption" color="#1e40af">
+            <Box sx={{ backgroundColor: "#e0f7fa", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+              <Typography variant="caption" color={subgerencia.color}>
                 Edad: {edadRange[0]} - {edadRange[1]} años
               </Typography>
-              <IconButton
-                size="small"
-                onClick={() => { setEdadRange([0, 110]); setPage(0); setFetchKey((k) => k + 1); }}
-                sx={{ p: 0.25 }}
-              >
-                <Close sx={{ fontSize: 14, color: "#1e40af" }} />
+              <IconButton size="small" onClick={() => { setEdadRange([0, 110]); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                <Close sx={{ fontSize: 14, color: subgerencia.color }} />
               </IconButton>
             </Box>
           )}
           {(filtroDia || filtroMes) && (
-            <Box
-              sx={{
-                backgroundColor: "#fce7f3",
-                borderRadius: "16px",
-                px: 1.5,
-                py: 0.5,
-                display: "flex",
-                alignItems: "center",
-                gap: 0.5,
-              }}
-            >
-              <Cake sx={{ fontSize: 14, color: "#be185d" }} />
-              <Typography variant="caption" color="#be185d">
+            <Box sx={{ backgroundColor: "#e0f7fa", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+              <Cake sx={{ fontSize: 14, color: subgerencia.color }} />
+              <Typography variant="caption" color={subgerencia.color}>
                 {filtroMes && !filtroDia && MESES.find((m) => m.value === filtroMes)?.label}
                 {filtroDia && filtroMes && `${filtroDia}/${filtroMes}`}
                 {filtroDia && !filtroMes && `Día ${filtroDia}`}
               </Typography>
-              <IconButton
-                size="small"
-                onClick={() => {
-                  setFiltroDia("");
-                  setFiltroMes("");
-                  setPage(0);
-                  setFetchKey((k) => k + 1);
-                }}
-                sx={{ p: 0.25 }}
-              >
-                <Close sx={{ fontSize: 14, color: "#be185d" }} />
+              <IconButton size="small" onClick={() => { setFiltroDia(""); setFiltroMes(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                <Close sx={{ fontSize: 14, color: subgerencia.color }} />
               </IconButton>
             </Box>
           )}
@@ -613,7 +571,7 @@ export default function ListaGeneralPage() {
           {/* Espaciador */}
           <Box sx={{ flex: 1 }} />
 
-          {/* Botones de acción */}
+          {/* Acciones */}
           {hayFiltrosActivos && (
             <Tooltip title="Limpiar filtros">
               <IconButton onClick={limpiarFiltros} size="small">
@@ -621,13 +579,11 @@ export default function ListaGeneralPage() {
               </IconButton>
             </Tooltip>
           )}
-
           <Tooltip title="Actualizar datos">
             <IconButton onClick={handleRefresh} disabled={isLoading} size="small">
               <Refresh />
             </IconButton>
           </Tooltip>
-
           <Button
             variant="contained"
             startIcon={<Download />}
@@ -635,14 +591,14 @@ export default function ListaGeneralPage() {
             disabled={isLoading || isExporting || filteredData.length === 0}
             sx={{
               backgroundColor: subgerencia.color,
-              "&:hover": { backgroundColor: "#b01668" },
+              "&:hover": { backgroundColor: subgerencia.colorHover },
             }}
           >
             {isExporting ? "Exportando..." : "Descargar Excel"}
           </Button>
         </Box>
 
-        {/* Popover de filtro de edad y cumpleaños */}
+        {/* Popover de filtros avanzados */}
         <Popover
           open={filterOpen}
           anchorEl={filterAnchor}
@@ -663,61 +619,17 @@ export default function ListaGeneralPage() {
               fullWidth
               sx={{ mb: 2.5 }}
             >
-              <ToggleButton
-                value="edad"
-                sx={{
-                  textTransform: "none",
-                  fontSize: "0.75rem",
-                  "&.Mui-selected": {
-                    backgroundColor: "#dbeafe",
-                    color: "#1e40af",
-                    "&:hover": { backgroundColor: "#bfdbfe" },
-                  },
-                }}
-              >
+              <ToggleButton value="edad" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#e0f7fa", color: subgerencia.color, "&:hover": { backgroundColor: "#b2ebf2" } } }}>
                 Edad
               </ToggleButton>
-              <ToggleButton
-                value="cumpleanos"
-                sx={{
-                  textTransform: "none",
-                  fontSize: "0.75rem",
-                  "&.Mui-selected": {
-                    backgroundColor: "#fce7f3",
-                    color: "#be185d",
-                    "&:hover": { backgroundColor: "#fbcfe8" },
-                  },
-                }}
-              >
+              <ToggleButton value="cumpleanos" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#e0f7fa", color: subgerencia.color, "&:hover": { backgroundColor: "#b2ebf2" } } }}>
                 Cumpleaños
               </ToggleButton>
-              <ToggleButton
-                value="telefono"
-                sx={{
-                  textTransform: "none",
-                  fontSize: "0.75rem",
-                  "&.Mui-selected": {
-                    backgroundColor: "#dcfce7",
-                    color: "#16a34a",
-                    "&:hover": { backgroundColor: "#bbf7d0" },
-                  },
-                }}
-              >
+              <ToggleButton value="telefono" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#dcfce7", color: "#16a34a", "&:hover": { backgroundColor: "#bbf7d0" } } }}>
                 Teléfono
               </ToggleButton>
-              <ToggleButton
-                value="sexo"
-                sx={{
-                  textTransform: "none",
-                  fontSize: "0.75rem",
-                  "&.Mui-selected": {
-                    backgroundColor: "#ede9fe",
-                    color: "#7c3aed",
-                    "&:hover": { backgroundColor: "#ddd6fe" },
-                  },
-                }}
-              >
-                Sexo
+              <ToggleButton value="sexo" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#e0f7fa", color: subgerencia.color, "&:hover": { backgroundColor: "#b2ebf2" } } }}>
+                Género
               </ToggleButton>
             </ToggleButtonGroup>
 
@@ -736,18 +648,14 @@ export default function ListaGeneralPage() {
                   min={0}
                   max={110}
                   sx={{
-                    color: "#3b82f6",
-                    "& .MuiSlider-thumb": { backgroundColor: "#1e40af" },
-                    "& .MuiSlider-track": { backgroundColor: "#3b82f6" },
+                    color: subgerencia.color,
+                    "& .MuiSlider-thumb": { backgroundColor: subgerencia.color },
+                    "& .MuiSlider-track": { backgroundColor: subgerencia.color },
                   }}
                 />
                 <Box display="flex" justifyContent="space-between" mt={1}>
-                  <Typography variant="caption" color="text.secondary">
-                    {edadRange[0]} años
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {edadRange[1]} años
-                  </Typography>
+                  <Typography variant="caption" color="text.secondary">{edadRange[0]} años</Typography>
+                  <Typography variant="caption" color="text.secondary">{edadRange[1]} años</Typography>
                 </Box>
               </>
             )}
@@ -765,20 +673,21 @@ export default function ListaGeneralPage() {
                   fullWidth
                   value={filtroMes}
                   onChange={(e) => setFiltroMes(e.target.value as number | "")}
-                  sx={{ mb: 2 }}
+                  sx={{
+                    mb: 2,
+                    "& .MuiOutlinedInput-root": { "&.Mui-focused fieldset": { borderColor: subgerencia.color } },
+                  }}
                 >
                   <MenuItem value="">Todos los meses</MenuItem>
                   {MESES.map((mes) => (
-                    <MenuItem key={mes.value} value={mes.value}>
-                      {mes.label}
-                    </MenuItem>
+                    <MenuItem key={mes.value} value={mes.value}>{mes.label}</MenuItem>
                   ))}
                 </TextField>
                 <TextField
                   size="small"
                   label="Día (opcional)"
                   type="number"
-                   fullWidth
+                  fullWidth
                   value={filtroDia}
                   onChange={(e) => {
                     const value = e.target.value;
@@ -788,10 +697,12 @@ export default function ListaGeneralPage() {
                   }}
                   slotProps={{ htmlInput: { min: 1, max: 31 } }}
                   helperText="Selecciona un día específico (opcional)"
+                  sx={{ "& .MuiOutlinedInput-root": { "&.Mui-focused fieldset": { borderColor: subgerencia.color } } }}
                 />
               </>
             )}
 
+            {/* Filtro por teléfono */}
             {filterType === "telefono" && (
               <>
                 <Typography variant="body2" color="#475569" mb={1.5}>Filtrar por número de celular</Typography>
@@ -813,9 +724,10 @@ export default function ListaGeneralPage() {
               </>
             )}
 
+            {/* Filtro por sexo */}
             {filterType === "sexo" && (
               <>
-                <Typography variant="body2" color="#475569" mb={1.5}>Filtrar por sexo</Typography>
+                <Typography variant="body2" color="#475569" mb={1.5}>Filtrar por género</Typography>
                 <ToggleButtonGroup
                   value={filtroSexoDraft}
                   exclusive
@@ -865,7 +777,7 @@ export default function ListaGeneralPage() {
                 sx={{
                   backgroundColor: subgerencia.color,
                   textTransform: "none",
-                  "&:hover": { backgroundColor: "#be185d" },
+                  "&:hover": { backgroundColor: subgerencia.colorHover },
                 }}
               >
                 Aplicar
@@ -884,11 +796,8 @@ export default function ListaGeneralPage() {
               <Chip
                 size="small"
                 label={filtroModulo}
-                onDelete={() => { setFiltroModulo(""); setPage(0); }}
-                sx={{
-                  backgroundColor: moduloMap[filtroModulo]?.color || "#666",
-                  color: "white",
-                }}
+                onDelete={() => { setFiltroModulo(""); setPage(0); setFetchKey((k) => k + 1); }}
+                sx={{ backgroundColor: moduloMap[filtroModulo]?.color || subgerencia.color, color: "white" }}
               />
             )}
             {filtroMes && (
@@ -897,7 +806,7 @@ export default function ListaGeneralPage() {
                 label={`Mes: ${MESES.find((m) => m.value === filtroMes)?.label}`}
                 onDelete={() => { setFiltroMes(""); setPage(0); setFetchKey((k) => k + 1); }}
                 icon={<Cake sx={{ color: "white !important", fontSize: 16 }} />}
-                sx={{ backgroundColor: "#d81b7e", color: "white" }}
+                sx={{ backgroundColor: subgerencia.color, color: "white" }}
               />
             )}
             {filtroDia && (
@@ -905,7 +814,7 @@ export default function ListaGeneralPage() {
                 size="small"
                 label={`Día: ${filtroDia}`}
                 onDelete={() => { setFiltroDia(""); setPage(0); setFetchKey((k) => k + 1); }}
-                sx={{ backgroundColor: "#d81b7e", color: "white" }}
+                sx={{ backgroundColor: subgerencia.color, color: "white" }}
               />
             )}
             {filtroTelefono && (
@@ -918,10 +827,7 @@ export default function ListaGeneralPage() {
                     ? <PhoneEnabled sx={{ color: "white !important", fontSize: 16 }} />
                     : <PhoneDisabled sx={{ color: "white !important", fontSize: 16 }} />
                 }
-                sx={{
-                  backgroundColor: filtroTelefono === "con" ? "#16a34a" : "#dc2626",
-                  color: "white",
-                }}
+                sx={{ backgroundColor: filtroTelefono === "con" ? "#16a34a" : "#dc2626", color: "white" }}
               />
             )}
             {filtroSexo && (
@@ -934,10 +840,7 @@ export default function ListaGeneralPage() {
                     ? <Female sx={{ color: "white !important", fontSize: 16 }} />
                     : <Male sx={{ color: "white !important", fontSize: 16 }} />
                 }
-                sx={{
-                  backgroundColor: filtroSexo === "FEMALE" ? "#be185d" : "#1d4ed8",
-                  color: "white",
-                }}
+                sx={{ backgroundColor: filtroSexo === "FEMALE" ? "#be185d" : "#1d4ed8", color: "white" }}
               />
             )}
             {searchTerm && (
@@ -951,18 +854,9 @@ export default function ListaGeneralPage() {
         )}
       </Paper>
 
-      {/* Estadísticas rápidas */}
+      {/* Estadísticas por módulo */}
       <Box sx={{ display: "flex", gap: 2, mb: 3, flexWrap: "wrap" }}>
-        <Paper
-          sx={{
-            px: 2,
-            py: 1,
-            borderRadius: "12px",
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
-          }}
-        >
+        <Paper sx={{ px: 2, py: 1, borderRadius: "12px", display: "flex", alignItems: "center", gap: 1 }}>
           <FilterList fontSize="small" color="action" />
           <Typography variant="body2">
             <strong>{totalCount.toLocaleString()}</strong> registros
@@ -989,24 +883,9 @@ export default function ListaGeneralPage() {
       </Box>
 
       {/* Tabla */}
-      <Paper
-        sx={{
-          borderRadius: "16px",
-          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
-          overflow: "hidden",
-        }}
-      >
+      <Paper sx={{ borderRadius: "16px", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)", overflow: "hidden" }}>
         {isLoading ? (
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
-              alignItems: "center",
-              height: 400,
-              gap: 2,
-            }}
-          >
+          <Box sx={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", height: 400, gap: 2 }}>
             <CircularProgress sx={{ color: subgerencia.color }} />
             <Typography variant="body2" color="text.secondary">
               Cargando registros...
@@ -1018,24 +897,12 @@ export default function ListaGeneralPage() {
               <Table stickyHeader size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>
-                      Nombre Completo
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>
-                      DNI
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc", whiteSpace: "nowrap" }}>
-                      Sexo
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>
-                      Teléfono
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>
-                      Cumpleaños / Edad
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>
-                      Módulo
-                    </TableCell>
+                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>Nombre Completo</TableCell>
+                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>DNI</TableCell>
+                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc", whiteSpace: "nowrap" }}>Sexo</TableCell>
+                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>Teléfono</TableCell>
+                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>Cumpleaños / Edad</TableCell>
+                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>Módulo</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1049,25 +916,23 @@ export default function ListaGeneralPage() {
                     </TableRow>
                   ) : (
                     filteredData.map((row: PersonaTabla, index: number) => {
-                      const modColor = moduloMap[row.moduloNombre]?.color || "#666";
+                      const modInfo = moduloMap[normalize(row.moduloNombre)];
+                      const modColor = modInfo?.color || subgerencia.color;
+                      const modLabel = modInfo?.name || row.moduloNombre;
                       return (
                         <TableRow
                           key={row.id}
                           hover
                           sx={{
                             backgroundColor: index % 2 === 0 ? "white" : "#f8fafc",
-                            "&:hover": { backgroundColor: "#f1f5f9" },
+                            "&:hover": { backgroundColor: "#e0f7fa" },
                           }}
                         >
                           <TableCell>
-                            <Typography variant="body2" fontWeight={500}>
-                              {row.nombreCompleto}
-                            </Typography>
+                            <Typography variant="body2" fontWeight={500}>{row.nombreCompleto}</Typography>
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
-                              {row.dni}
-                            </Typography>
+                            <Typography variant="body2" sx={{ fontFamily: "monospace" }}>{row.dni}</Typography>
                           </TableCell>
                           <TableCell>
                             {row.sexo ? (
@@ -1091,20 +956,12 @@ export default function ListaGeneralPage() {
                               <Chip
                                 size="small"
                                 label="Sin dato"
-                                sx={{
-                                  backgroundColor: "#e2e8f0",
-                                  color: "#64748b",
-                                  fontSize: "0.7rem",
-                                  height: 22,
-                                  fontWeight: 500,
-                                }}
+                                sx={{ backgroundColor: "#e2e8f0", color: "#64748b", fontSize: "0.7rem", height: 22, fontWeight: 500 }}
                               />
                             )}
                           </TableCell>
                           <TableCell>
-                            <Typography variant="body2">
-                              {formatearTelefono(row.telefono)}
-                            </Typography>
+                            <Typography variant="body2">{formatearTelefono(row.telefono)}</Typography>
                           </TableCell>
                           <TableCell>
                             {row.fechaNacimiento ? (
@@ -1112,45 +969,28 @@ export default function ListaGeneralPage() {
                                 <Chip
                                   label={`${row.edad} años`}
                                   size="small"
-                                  sx={{
-                                    backgroundColor: "#dbeafe",
-                                    color: "#1e40af",
-                                    fontWeight: 600,
-                                    fontSize: "0.75rem",
-                                    height: 22,
-                                    width: "fit-content",
-                                  }}
+                                  sx={{ backgroundColor: "#e0f7fa", color: subgerencia.color, fontWeight: 600, fontSize: "0.75rem", height: 22, width: "fit-content" }}
                                 />
                                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                  <Cake sx={{ fontSize: 12, color: "#d81b7e" }} />
+                                  <Cake sx={{ fontSize: 12, color: subgerencia.color }} />
                                   <Typography variant="caption" color="text.secondary">
                                     {formatearFecha(row.fechaNacimiento)}
                                   </Typography>
                                 </Box>
                               </Box>
                             ) : (
-                              <Typography variant="body2" color="text.secondary">
-                                -
-                              </Typography>
+                              <Typography variant="body2" color="text.secondary">-</Typography>
                             )}
                           </TableCell>
                           <TableCell>
                             {row.moduloNombre && row.moduloNombre !== "-" ? (
                               <Chip
                                 size="small"
-                                label={row.moduloNombre}
-                                sx={{
-                                  backgroundColor: modColor,
-                                  color: "white",
-                                  fontSize: "0.7rem",
-                                  height: 24,
-                                  fontWeight: 600,
-                                }}
+                                label={modLabel}
+                                sx={{ backgroundColor: modColor, color: "white", fontSize: "0.7rem", height: 24, fontWeight: 600 }}
                               />
                             ) : (
-                              <Typography variant="body2" color="text.secondary">
-                                -
-                              </Typography>
+                              <Typography variant="body2" color="text.secondary">-</Typography>
                             )}
                           </TableCell>
                         </TableRow>
@@ -1166,10 +1006,7 @@ export default function ListaGeneralPage() {
               page={page}
               onPageChange={(_, newPage) => setPage(newPage)}
               rowsPerPage={rowsPerPage}
-              onRowsPerPageChange={(e) => {
-                setRowsPerPage(parseInt(e.target.value, 10));
-                setPage(0);
-              }}
+              onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
               rowsPerPageOptions={[10, 25, 50, 100]}
               labelRowsPerPage="Filas por página:"
               labelDisplayedRows={({ from, to, count }) =>

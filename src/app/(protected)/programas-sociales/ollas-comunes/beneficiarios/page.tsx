@@ -7,7 +7,7 @@ import {
   Slider, Button, Dialog, DialogTitle, DialogContent, DialogActions, Grid, Divider,
   ToggleButton, ToggleButtonGroup, CircularProgress, Chip,
 } from "@mui/material";
-import { Search, SoupKitchen, FilterList, FileDownload, Close, Visibility, Cake, PhoneEnabled, PhoneDisabled } from "@mui/icons-material";
+import { Search, SoupKitchen, FilterList, FileDownload, Close, Visibility, Cake, PhoneEnabled, PhoneDisabled, Wc, Male, Female } from "@mui/icons-material";
 import * as XLSX from "xlsx";
 import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
@@ -76,7 +76,7 @@ const mapBackendToFrontend = (item: RecipientBackend): BeneficiarioFrontend => (
   fechaCreacion: item.created_at,
 });
 
-type FilterType = "edad" | "cumpleanos" | "telefono";
+type FilterType = "edad" | "cumpleanos" | "telefono" | "genero";
 type CumpleanosModo = "mes" | "dia";
 
 export default function OllasBeneficiariosPage() {
@@ -99,6 +99,8 @@ export default function OllasBeneficiariosPage() {
   const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
   const [filtroTelefono, setFiltroTelefono] = useState<"" | "con" | "sin">("");
   const [filtroTelefonoDraft, setFiltroTelefonoDraft] = useState<"" | "con" | "sin">("");
+  const [filtroSexo, setFiltroSexo] = useState<"" | "MALE" | "FEMALE">("");
+  const [filtroSexoDraft, setFiltroSexoDraft] = useState<"" | "MALE" | "FEMALE">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
   const [selectedBeneficiario, setSelectedBeneficiario] = useState<BeneficiarioFrontend | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -135,6 +137,10 @@ export default function OllasBeneficiariosPage() {
           params.set("phone", "false");
         }
 
+        if (filtroSexo) {
+          params.set("sex", filtroSexo);
+        }
+
         const response = await getData<BackendResponse>(`pca/recipient?${params.toString()}`);
         if (response?.data) {
           setData(response.data.data.map(mapBackendToFrontend));
@@ -155,6 +161,7 @@ export default function OllasBeneficiariosPage() {
 
   const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     setFiltroTelefonoDraft(filtroTelefono);
+    setFiltroSexoDraft(filtroSexo);
     setFilterAnchor(event.currentTarget);
   };
   const handleFilterClose = () => setFilterAnchor(null);
@@ -196,6 +203,9 @@ export default function OllasBeneficiariosPage() {
         params.set("phone", "true");
       } else if (filtroTelefono === "sin") {
         params.set("phone", "false");
+      }
+      if (filtroSexo) {
+        params.set("sex", filtroSexo);
       }
       const response = await getData<BackendResponse>(`pca/recipient?${params.toString()}`);
       if (!response?.data) return;
@@ -286,6 +296,17 @@ export default function OllasBeneficiariosPage() {
                   </IconButton>
                 </Box>
               )}
+              {filtroSexo && (
+                <Box sx={{ backgroundColor: filtroSexo === "MALE" ? "#e3f2fd" : "#fce4ec", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                  <Wc sx={{ fontSize: 14, color: filtroSexo === "MALE" ? "#1565c0" : "#c2185b" }} />
+                  <Typography variant="caption" color={filtroSexo === "MALE" ? "#1565c0" : "#c2185b"}>
+                    {filtroSexo === "MALE" ? "Masculino" : "Femenino"}
+                  </Typography>
+                  <IconButton size="small" onClick={() => { setFiltroSexo(""); setFiltroSexoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                    <Close sx={{ fontSize: 14, color: filtroSexo === "MALE" ? "#1565c0" : "#c2185b" }} />
+                  </IconButton>
+                </Box>
+              )}
               <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
                 {totalCount.toLocaleString()} beneficiario(s)
               </Typography>
@@ -298,6 +319,7 @@ export default function OllasBeneficiariosPage() {
                   <ToggleButton value="edad" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#dbeafe", color: "#1e40af", "&:hover": { backgroundColor: "#bfdbfe" } } }}>Edad</ToggleButton>
                   <ToggleButton value="cumpleanos" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#fce7f3", color: "#be185d", "&:hover": { backgroundColor: "#fbcfe8" } } }}>Cumpleaños</ToggleButton>
                   <ToggleButton value="telefono" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#dcfce7", color: "#16a34a", "&:hover": { backgroundColor: "#bbf7d0" } } }}>Teléfono</ToggleButton>
+                  <ToggleButton value="genero" sx={{ textTransform: "none", fontSize: "0.7rem", "&.Mui-selected": { backgroundColor: "#e3f2fd", color: "#1565c0", "&:hover": { backgroundColor: "#bbdefb" } } }}>Género</ToggleButton>
                 </ToggleButtonGroup>
                 <Divider sx={{ mb: 2 }} />
                 {filterType === "edad" && (
@@ -355,9 +377,19 @@ export default function OllasBeneficiariosPage() {
                     </ToggleButtonGroup>
                   </>
                 )}
+                {filterType === "genero" && (
+                  <>
+                    <Typography variant="body2" color="#475569" mb={1.5}>Filtrar por género</Typography>
+                    <ToggleButtonGroup value={filtroSexoDraft} exclusive onChange={(_e, val) => { if (val !== null) setFiltroSexoDraft(val); }} size="small" fullWidth>
+                      <ToggleButton value="" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#f1f5f9", color: "#334155", "&:hover": { backgroundColor: "#e2e8f0" } } }}>Todos</ToggleButton>
+                      <ToggleButton value="MALE" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#e3f2fd", color: "#1565c0", "&:hover": { backgroundColor: "#bbdefb" } } }}>Masculino</ToggleButton>
+                      <ToggleButton value="FEMALE" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fce4ec", color: "#c2185b", "&:hover": { backgroundColor: "#f8bbd0" } } }}>Femenino</ToggleButton>
+                    </ToggleButtonGroup>
+                  </>
+                )}
                 <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
-                  <Button size="small" onClick={() => { setEdadRange([0, 110]); setMesesCumpleanos([]); setCumpleanosModo("mes"); setDiaCumpleanos(""); setFiltroTelefono(""); setFiltroTelefonoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ color: "#64748b", textTransform: "none" }}>Limpiar todo</Button>
-                  <Button size="small" variant="contained" onClick={() => { setFiltroTelefono(filtroTelefonoDraft); setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }} sx={{ backgroundColor: "#475569", textTransform: "none", "&:hover": { backgroundColor: "#334155" } }}>Aplicar</Button>
+                  <Button size="small" onClick={() => { setEdadRange([0, 110]); setMesesCumpleanos([]); setCumpleanosModo("mes"); setDiaCumpleanos(""); setFiltroTelefono(""); setFiltroTelefonoDraft(""); setFiltroSexo(""); setFiltroSexoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ color: "#64748b", textTransform: "none" }}>Limpiar todo</Button>
+                  <Button size="small" variant="contained" onClick={() => { setFiltroTelefono(filtroTelefonoDraft); setFiltroSexo(filtroSexoDraft); setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }} sx={{ backgroundColor: "#475569", textTransform: "none", "&:hover": { backgroundColor: "#334155" } }}>Aplicar</Button>
                 </Box>
               </Box>
             </Popover>
@@ -369,6 +401,7 @@ export default function OllasBeneficiariosPage() {
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Nombre Completo</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>DNI</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Teléfono</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Sexo</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Dirección</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Edad</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
@@ -376,15 +409,27 @@ export default function OllasBeneficiariosPage() {
                 </TableHead>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={6} align="center" sx={{ py: 4 }}><CircularProgress size={32} sx={{ color: "#64748b" }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Cargando beneficiarios...</Typography></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} align="center" sx={{ py: 4 }}><CircularProgress size={32} sx={{ color: "#64748b" }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Cargando beneficiarios...</Typography></TableCell></TableRow>
                   ) : dataFormateados.length === 0 ? (
-                    <TableRow><TableCell colSpan={6} align="center" sx={{ py: 4 }}><Typography variant="body2" color="text.secondary">No se encontraron beneficiarios</Typography></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} align="center" sx={{ py: 4 }}><Typography variant="body2" color="text.secondary">No se encontraron beneficiarios</Typography></TableCell></TableRow>
                   ) : (
                     dataFormateados.map((row: BeneficiarioFrontend, index: number) => (
                       <TableRow key={row.id} onClick={() => handleRowClick(row)} sx={{ backgroundColor: index % 2 === 0 ? "white" : "#f8fafc", "&:hover": { backgroundColor: "#f1f5f9", cursor: "pointer" }, transition: "background-color 0.2s" }}>
                         <TableCell sx={{ fontWeight: 500 }}>{row.nombreCompleto}</TableCell>
                         <TableCell>{row.dni}</TableCell>
                         <TableCell>{row.telefono}</TableCell>
+                        <TableCell>
+                          {row.sexo === "Masculino" ? (
+                            <Chip icon={<Male sx={{ fontSize: "0.9rem !important", color: "white !important" }} />} label="Hombre" size="small"
+                              sx={{ backgroundColor: "#1e40af", color: "white", fontWeight: 700, fontSize: "0.75rem", borderRadius: "20px", "& .MuiChip-icon": { color: "white" } }} />
+                          ) : row.sexo === "Femenino" ? (
+                            <Chip icon={<Female sx={{ fontSize: "0.9rem !important", color: "white !important" }} />} label="Mujer" size="small"
+                              sx={{ backgroundColor: "#be185d", color: "white", fontWeight: 700, fontSize: "0.75rem", borderRadius: "20px", "& .MuiChip-icon": { color: "white" } }} />
+                          ) : (
+                            <Chip label="Sin dato" size="small"
+                              sx={{ backgroundColor: "#f1f5f9", color: "#94a3b8", fontWeight: 600, fontSize: "0.75rem", borderRadius: "20px" }} />
+                          )}
+                        </TableCell>
                         <TableCell sx={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.direccion}</TableCell>
                         <TableCell align="center">
                           {row.fechaNacimiento ? (
