@@ -58,27 +58,10 @@ import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import * as XLSX from "xlsx";
+import { formatearFecha, MESES } from "@/lib/utils/formatters";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.SERVICIOS_SOCIALES];
 const MODULE_COLOR = subgerencia.color; // #00a3a8
-
-// ============================================
-// MESES / TIPO FILTRO
-// ============================================
-const MESES = [
-  { value: 1,  label: "Enero" },
-  { value: 2,  label: "Febrero" },
-  { value: 3,  label: "Marzo" },
-  { value: 4,  label: "Abril" },
-  { value: 5,  label: "Mayo" },
-  { value: 6,  label: "Junio" },
-  { value: 7,  label: "Julio" },
-  { value: 8,  label: "Agosto" },
-  { value: 9,  label: "Septiembre" },
-  { value: 10, label: "Octubre" },
-  { value: 11, label: "Noviembre" },
-  { value: 12, label: "Diciembre" },
-];
 
 type FilterType = "edad" | "cumpleanos" | "telefono" | "sexo";
 
@@ -134,15 +117,6 @@ const toTitleCase = (str: string): string => {
     .split(" ")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
-};
-
-const formatearFecha = (fecha: string | null | undefined): string => {
-  if (!fecha) return "-";
-  const d = new Date(fecha);
-  const dia = d.getUTCDate().toString().padStart(2, "0");
-  const mes = (d.getUTCMonth() + 1).toString().padStart(2, "0");
-  const anio = d.getUTCFullYear();
-  return `${dia}/${mes}/${anio}`;
 };
 
 const formatearTelefono = (tel: string | null | undefined): string => {

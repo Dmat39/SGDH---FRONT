@@ -18,8 +18,6 @@ import {
   Paper,
   IconButton,
   Tooltip,
-  Popover,
-  Slider,
   Button,
   Dialog,
   DialogTitle,
@@ -27,8 +25,6 @@ import {
   DialogActions,
   Grid,
   Divider,
-  ToggleButton,
-  ToggleButtonGroup,
   CircularProgress,
   Chip,
 } from "@mui/material";
@@ -48,32 +44,12 @@ import {
 import * as XLSX from "xlsx";
 import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
+import { useFilters } from "@/lib/hooks/useFilters";
+import { useBeneficiarioDialog } from "@/lib/hooks/useBeneficiarioDialog";
+import { FilterPanel } from "@/components/filters/FilterPanel";
+import { calcularEdad, formatearFecha } from "@/lib/utils/formatters";
 
 const PANTBC_COLOR = "#d81b7e";
-
-// ============================================
-// UTILIDADES
-// ============================================
-const calcularEdad = (fechaNacimiento: string | null | undefined): number => {
-  if (!fechaNacimiento) return 0;
-  const hoy = new Date();
-  const nacimiento = new Date(fechaNacimiento);
-  let edad = hoy.getFullYear() - nacimiento.getUTCFullYear();
-  const mes = hoy.getMonth() - nacimiento.getUTCMonth();
-  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getUTCDate())) {
-    edad--;
-  }
-  return edad;
-};
-
-const formatearFecha = (fecha: string | null | undefined): string => {
-  if (!fecha) return "-";
-  const date = new Date(fecha);
-  const dia = date.getUTCDate().toString().padStart(2, "0");
-  const mes = (date.getUTCMonth() + 1).toString().padStart(2, "0");
-  const anio = date.getUTCFullYear();
-  return `${dia}/${mes}/${anio}`;
-};
 
 const TRADUCCIONES: Record<string, Record<string, string>> = {
   sex: {
@@ -170,9 +146,6 @@ const mapListaToTabla = (item: PacienteListaBackend): PacienteTabla => ({
 // ============================================
 // CONSTANTES
 // ============================================
-type FilterType = "edad" | "cumpleanos" | "telefono" | "genero";
-type CumpleanosModo = "mes" | "dia";
-
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
@@ -356,35 +329,22 @@ export default function PANTBCBeneficiariosPage() {
   const [data, setData] = useState<PacienteTabla[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Paginación server-side
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [fetchKey, setFetchKey] = useState(0);
 
-  // Búsqueda y filtros
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [filterType, setFilterType] = useState<FilterType>("edad");
-  const [edadRange, setEdadRange] = useState<number[]>([0, 120]);
-  const [mesSeleccionado, setMesSeleccionado] = useState<number | null>(null);
-  const [cumpleanosModo, setCumpleanosModo] = useState<CumpleanosModo>("mes");
-  const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
-  const [filtroTelefono, setFiltroTelefono] = useState<"" | "con" | "sin">("");
-  const [filtroTelefonoDraft, setFiltroTelefonoDraft] = useState<"" | "con" | "sin">("");
-  const [filtroSexo, setFiltroSexo] = useState<"" | "MALE" | "FEMALE">("");
-  const [filtroSexoDraft, setFiltroSexoDraft] = useState<"" | "MALE" | "FEMALE">("");
-  const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
   const [observaciones, setObservaciones] = useState<Record<string, string>>({});
+  const [isExporting, setIsExporting] = useState(false);
 
-  // Detalle
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
+  // Mapa de datos originales para detalle rápido (sin llamada API adicional)
+  const [rawDataMap, setRawDataMap] = useState<Record<string, PacienteListaBackend>>({});
   const [detalleData, setDetalleData] = useState<PacienteListaBackend | null>(null);
   const [detalleLoading, setDetalleLoading] = useState(false);
 
-  // Mapa de datos originales para detalle rápido
-  const [rawDataMap, setRawDataMap] = useState<Record<string, PacienteListaBackend>>({});
+  const filters = useFilters({ edadMax: 120 });
+  const dialog = useBeneficiarioDialog<string>();
 
   // Debounce de búsqueda (500ms)
   useEffect(() => {
@@ -395,6 +355,8 @@ export default function PANTBCBeneficiariosPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
+  const triggerFetch = () => { setPage(0); setFetchKey((k) => k + 1); };
+
   // Cargar lista de pacientes
   useEffect(() => {
     const fetchData = async () => {
@@ -404,43 +366,31 @@ export default function PANTBCBeneficiariosPage() {
         params.set("page", String(page + 1));
         params.set("limit", String(rowsPerPage));
 
-        if (debouncedSearch.trim()) {
-          params.set("search", debouncedSearch.trim());
+        if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+
+        if (filters.edadRange[0] > 0 || filters.edadRange[1] < 120) {
+          params.set("age_min", String(filters.edadRange[0]));
+          params.set("age_max", String(filters.edadRange[1]));
         }
 
-        // Filtro de edad (server-side)
-        if (edadRange[0] > 0 || edadRange[1] < 120) {
-          params.set("age_min", String(edadRange[0]));
-          params.set("age_max", String(edadRange[1]));
-        }
-
-        // Filtro de cumpleaños/mes (server-side)
-        if (cumpleanosModo === "mes" && mesSeleccionado !== null) {
-          params.set("month", String(mesSeleccionado + 1));
-        } else if (cumpleanosModo === "dia" && diaCumpleanos) {
-          const parts = diaCumpleanos.split("-");
+        if (filters.cumpleanosModo === "mes" && filters.mesSeleccionado !== null) {
+          params.set("month", String(filters.mesSeleccionado + 1));
+        } else if (filters.cumpleanosModo === "dia" && filters.diaCumpleanos) {
+          const parts = filters.diaCumpleanos.split("-");
           params.set("birthday", `${parts[1]}-${parts[2]}`);
         }
 
-        if (filtroTelefono === "con") {
-          params.set("phone", "true");
-        } else if (filtroTelefono === "sin") {
-          params.set("phone", "false");
-        }
+        if (filters.filtroTelefono === "con") params.set("phone", "true");
+        else if (filters.filtroTelefono === "sin") params.set("phone", "false");
 
-        if (filtroSexo) {
-          params.set("sex", filtroSexo);
-        }
+        if (filters.filtroSexo) params.set("sex", filters.filtroSexo);
 
-        const response = await getData<BackendListaResponse>(
-          `pantbc/patient?${params.toString()}`
-        );
+        const response = await getData<BackendListaResponse>(`pantbc/patient?${params.toString()}`);
 
         if (response?.data) {
           const rawList = response.data.data;
           setData(rawList.map(mapListaToTabla));
           setTotalCount(response.data.totalCount);
-          // Guardar datos originales para detalle rápido
           const map: Record<string, PacienteListaBackend> = {};
           rawList.forEach((p) => { map[p.id] = p; });
           setRawDataMap((prev) => ({ ...prev, ...map }));
@@ -459,81 +409,78 @@ export default function PANTBCBeneficiariosPage() {
   }, [page, rowsPerPage, fetchKey, debouncedSearch, getData]);
 
   // Cargar detalle de un paciente
-  const fetchDetalle = useCallback(
-    async (id: string) => {
-      // Usar datos ya cargados si están disponibles
-      if (rawDataMap[id]) {
-        setDetalleData(rawDataMap[id]);
-        setDetalleLoading(false);
-        return;
-      }
-      setDetalleLoading(true);
-      try {
-        const response = await getData<BackendDetalleResponse>(`pantbc/patient/${id}`);
-        if (response?.data) {
-          setDetalleData(response.data);
-        }
-      } catch (error) {
-        console.error("Error al cargar detalle:", error);
-        setDetalleData(null);
-      } finally {
-        setDetalleLoading(false);
-      }
-    },
-    [getData, rawDataMap]
-  );
+  const fetchDetalle = useCallback(async (id: string) => {
+    if (rawDataMap[id]) {
+      setDetalleData(rawDataMap[id]);
+      setDetalleLoading(false);
+      return;
+    }
+    setDetalleLoading(true);
+    try {
+      const response = await getData<BackendDetalleResponse>(`pantbc/patient/${id}`);
+      if (response?.data) setDetalleData(response.data);
+    } catch (error) {
+      console.error("Error al cargar detalle:", error);
+      setDetalleData(null);
+    } finally {
+      setDetalleLoading(false);
+    }
+  }, [getData, rawDataMap]);
 
   useEffect(() => {
-    if (selectedId && detailOpen) {
-      fetchDetalle(selectedId);
-    }
-  }, [selectedId, detailOpen, fetchDetalle]);
+    if (dialog.selectedItem && dialog.detailOpen) fetchDetalle(dialog.selectedItem);
+  }, [dialog.selectedItem, dialog.detailOpen, fetchDetalle]);
 
-  // Handlers de filtros
+  // Handlers
   const handleFilterClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    setFiltroTelefonoDraft(filtroTelefono);
-    setFiltroSexoDraft(filtroSexo);
-    setFilterAnchor(e.currentTarget);
+    filters.setFiltroTelefonoDraft(filters.filtroTelefono);
+    filters.setFiltroSexoDraft(filters.filtroSexo);
+    filters.handleFilterClick(e);
   };
-  const handleFilterClose = () => setFilterAnchor(null);
-  const handleFilterTypeChange = (
-    _: React.MouseEvent<HTMLElement>,
-    v: FilterType | null
-  ) => {
-    if (v !== null) setFilterType(v);
+
+  const handleMesToggle = (index: number) => {
+    filters.setMesSeleccionado(filters.mesSeleccionado === index ? null : index);
   };
-  const handleEdadChange = (_: Event, v: number | number[]) =>
-    setEdadRange(v as number[]);
-  const handleMesToggle = (mes: number) => {
-    setMesSeleccionado((prev) => (prev === mes ? null : mes));
+
+  const handleApplyFilters = () => {
+    filters.handleApplyFilters();
+    triggerFetch();
   };
-  const filterOpen = Boolean(filterAnchor);
-  const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 120;
-  const isCumpleanosFiltered =
-    cumpleanosModo === "mes" ? mesSeleccionado !== null : diaCumpleanos !== "";
+
+  const clearPanelFilters = () => {
+    filters.limpiarFiltros();
+    triggerFetch();
+  };
+
+  const limpiarTodo = () => {
+    setSearchTerm("");
+    setDebouncedSearch("");
+    clearPanelFilters();
+  };
+
+  const handleRowClick = (id: string) => {
+    setDetalleData(null);
+    dialog.handleOpenDetail(id);
+  };
+
+  const handleDetailClose = () => {
+    dialog.handleCloseDetail();
+    setDetalleData(null);
+  };
 
   const handleChangePage = (_: unknown, newPage: number) => setPage(newPage);
   const handleChangeRowsPerPage = (e: React.ChangeEvent<HTMLInputElement>) => {
     setRowsPerPage(parseInt(e.target.value, 10));
     setPage(0);
   };
-  const handleRowClick = (id: string) => {
-    setSelectedId(id);
-    setDetalleData(null);
-    setDetailOpen(true);
-  };
-  const handleDetailClose = () => {
-    setDetailOpen(false);
-    setSelectedId(null);
-    setDetalleData(null);
-  };
+
+  // Valores derivados
+  const isEdadFiltered = filters.edadRange[0] > 0 || filters.edadRange[1] < 120;
+  const isCumpleanosFiltered = filters.cumpleanosModo === "mes"
+    ? filters.mesSeleccionado !== null
+    : filters.diaCumpleanos !== "";
 
   const dataFormateados = useFormatTableData(data);
-
-  // La búsqueda es server-side; se usa dataFormateados directamente
-  const filteredData = dataFormateados;
-
-  const [isExporting, setIsExporting] = useState(false);
 
   // Exportar a Excel
   const handleExport = async () => {
@@ -543,31 +490,24 @@ export default function PANTBCBeneficiariosPage() {
       params.set("page", "1");
       params.set("limit", "99999");
 
-      if (debouncedSearch.trim()) {
-        params.set("search", debouncedSearch.trim());
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+
+      if (filters.edadRange[0] > 0 || filters.edadRange[1] < 120) {
+        params.set("age_min", String(filters.edadRange[0]));
+        params.set("age_max", String(filters.edadRange[1]));
       }
 
-      if (edadRange[0] > 0 || edadRange[1] < 120) {
-        params.set("age_min", String(edadRange[0]));
-        params.set("age_max", String(edadRange[1]));
-      }
-
-      if (cumpleanosModo === "mes" && mesSeleccionado !== null) {
-        params.set("month", String(mesSeleccionado + 1));
-      } else if (cumpleanosModo === "dia" && diaCumpleanos) {
-        const parts = diaCumpleanos.split("-");
+      if (filters.cumpleanosModo === "mes" && filters.mesSeleccionado !== null) {
+        params.set("month", String(filters.mesSeleccionado + 1));
+      } else if (filters.cumpleanosModo === "dia" && filters.diaCumpleanos) {
+        const parts = filters.diaCumpleanos.split("-");
         params.set("birthday", `${parts[1]}-${parts[2]}`);
       }
 
-      if (filtroTelefono === "con") {
-        params.set("phone", "true");
-      } else if (filtroTelefono === "sin") {
-        params.set("phone", "false");
-      }
+      if (filters.filtroTelefono === "con") params.set("phone", "true");
+      else if (filters.filtroTelefono === "sin") params.set("phone", "false");
 
-      if (filtroSexo) {
-        params.set("sex", filtroSexo);
-      }
+      if (filters.filtroSexo) params.set("sex", filters.filtroSexo);
 
       const response = await getData<BackendListaResponse>(`pantbc/patient?${params.toString()}`);
 
@@ -592,30 +532,12 @@ export default function PANTBCBeneficiariosPage() {
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Pacientes PANTBC");
       worksheet["!cols"] = Object.keys(exportData[0] || {}).map(() => ({ wch: 20 }));
-      XLSX.writeFile(
-        workbook,
-        `pacientes_pantbc_${new Date().toISOString().split("T")[0]}.xlsx`
-      );
+      XLSX.writeFile(workbook, `pacientes_pantbc_${new Date().toISOString().split("T")[0]}.xlsx`);
     } catch (error) {
       console.error("Error exportando:", error);
     } finally {
       setIsExporting(false);
     }
-  };
-
-  const limpiarFiltros = () => {
-    setSearchTerm("");
-    setDebouncedSearch("");
-    setEdadRange([0, 120]);
-    setMesSeleccionado(null);
-    setCumpleanosModo("mes");
-    setDiaCumpleanos("");
-    setFiltroTelefono("");
-    setFiltroTelefonoDraft("");
-    setFiltroSexo("");
-    setFiltroSexoDraft("");
-    setPage(0);
-    setFetchKey((k) => k + 1);
   };
 
   return (
@@ -689,7 +611,7 @@ export default function PANTBCBeneficiariosPage() {
                 <IconButton
                   onClick={handleFilterClick}
                   sx={{
-                    backgroundColor: filterOpen ? "#e2e8f0" : "#f8fafc",
+                    backgroundColor: filters.filterOpen ? "#e2e8f0" : "#f8fafc",
                     border: "1px solid #e2e8f0",
                     borderRadius: "8px",
                     "&:hover": { backgroundColor: "#e2e8f0" },
@@ -715,422 +637,103 @@ export default function PANTBCBeneficiariosPage() {
 
               {/* Chips de filtros activos */}
               {isEdadFiltered && (
-                <Box
-                  sx={{
-                    backgroundColor: "#fce4ec",
-                    borderRadius: "16px",
-                    px: 1.5,
-                    py: 0.5,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                  }}
-                >
+                <Box sx={{ backgroundColor: "#fce4ec", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
                   <Typography variant="caption" color="#880e4f">
-                    Edad: {edadRange[0]} - {edadRange[1]} años
+                    Edad: {filters.edadRange[0]} - {filters.edadRange[1]} años
                   </Typography>
-                  <IconButton
-                    size="small"
-                    onClick={() => {
-                      setEdadRange([0, 120]);
-                      setPage(0);
-                      setFetchKey((k) => k + 1);
-                    }}
-                    sx={{ p: 0.25 }}
-                  >
+                  <IconButton size="small" onClick={() => { filters.setEdadRange([0, 120]); triggerFetch(); }} sx={{ p: 0.25 }}>
                     <Close sx={{ fontSize: 14, color: "#880e4f" }} />
                   </IconButton>
                 </Box>
               )}
               {isCumpleanosFiltered && (
-                <Box
-                  sx={{
-                    backgroundColor: "#fce4ec",
-                    borderRadius: "16px",
-                    px: 1.5,
-                    py: 0.5,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                  }}
-                >
+                <Box sx={{ backgroundColor: "#fce4ec", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
                   <Cake sx={{ fontSize: 14, color: "#880e4f" }} />
                   <Typography variant="caption" color="#880e4f">
-                    {cumpleanosModo === "mes" && mesSeleccionado !== null
-                      ? MESES[mesSeleccionado].slice(0, 3)
-                      : diaCumpleanos.split("-").slice(1).reverse().join("/")}
+                    {filters.cumpleanosModo === "mes" && filters.mesSeleccionado !== null
+                      ? MESES[filters.mesSeleccionado].slice(0, 3)
+                      : filters.diaCumpleanos.split("-").slice(1).reverse().join("/")}
                   </Typography>
-                  <IconButton
-                    size="small"
-                    onClick={() => {
-                      setMesSeleccionado(null);
-                      setDiaCumpleanos("");
-                      setPage(0);
-                      setFetchKey((k) => k + 1);
-                    }}
-                    sx={{ p: 0.25 }}
-                  >
+                  <IconButton size="small" onClick={() => { filters.setMesSeleccionado(null); filters.setDiaCumpleanos(""); triggerFetch(); }} sx={{ p: 0.25 }}>
                     <Close sx={{ fontSize: 14, color: "#880e4f" }} />
                   </IconButton>
                 </Box>
               )}
-              {filtroTelefono && (
-                <Box sx={{ backgroundColor: filtroTelefono === "con" ? "#dcfce7" : "#fee2e2", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
-                  {filtroTelefono === "con"
+              {filters.filtroTelefono && (
+                <Box sx={{ backgroundColor: filters.filtroTelefono === "con" ? "#dcfce7" : "#fee2e2", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                  {filters.filtroTelefono === "con"
                     ? <PhoneEnabled sx={{ fontSize: 14, color: "#16a34a" }} />
                     : <PhoneDisabled sx={{ fontSize: 14, color: "#dc2626" }} />
                   }
-                  <Typography variant="caption" color={filtroTelefono === "con" ? "#16a34a" : "#dc2626"}>
-                    {filtroTelefono === "con" ? "Con celular" : "Sin celular"}
+                  <Typography variant="caption" color={filters.filtroTelefono === "con" ? "#16a34a" : "#dc2626"}>
+                    {filters.filtroTelefono === "con" ? "Con celular" : "Sin celular"}
                   </Typography>
-                  <IconButton size="small" onClick={() => { setFiltroTelefono(""); setFiltroTelefonoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
-                    <Close sx={{ fontSize: 14, color: filtroTelefono === "con" ? "#16a34a" : "#dc2626" }} />
+                  <IconButton size="small" onClick={() => { filters.setFiltroTelefono(""); filters.setFiltroTelefonoDraft(""); triggerFetch(); }} sx={{ p: 0.25 }}>
+                    <Close sx={{ fontSize: 14, color: filters.filtroTelefono === "con" ? "#16a34a" : "#dc2626" }} />
                   </IconButton>
                 </Box>
               )}
-              {filtroSexo && (
-                <Box sx={{ backgroundColor: filtroSexo === "MALE" ? "#e3f2fd" : "#fce4ec", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
-                  <Wc sx={{ fontSize: 14, color: filtroSexo === "MALE" ? "#1565c0" : "#c2185b" }} />
-                  <Typography variant="caption" color={filtroSexo === "MALE" ? "#1565c0" : "#c2185b"}>
-                    {filtroSexo === "MALE" ? "Masculino" : "Femenino"}
+              {filters.filtroSexo && (
+                <Box sx={{ backgroundColor: filters.filtroSexo === "MALE" ? "#e3f2fd" : "#fce4ec", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                  <Wc sx={{ fontSize: 14, color: filters.filtroSexo === "MALE" ? "#1565c0" : "#c2185b" }} />
+                  <Typography variant="caption" color={filters.filtroSexo === "MALE" ? "#1565c0" : "#c2185b"}>
+                    {filters.filtroSexo === "MALE" ? "Masculino" : "Femenino"}
                   </Typography>
-                  <IconButton size="small" onClick={() => { setFiltroSexo(""); setFiltroSexoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
-                    <Close sx={{ fontSize: 14, color: filtroSexo === "MALE" ? "#1565c0" : "#c2185b" }} />
+                  <IconButton size="small" onClick={() => { filters.setFiltroSexo(""); filters.setFiltroSexoDraft(""); triggerFetch(); }} sx={{ p: 0.25 }}>
+                    <Close sx={{ fontSize: 14, color: filters.filtroSexo === "MALE" ? "#1565c0" : "#c2185b" }} />
                   </IconButton>
                 </Box>
               )}
+
               <Typography variant="body2" color="text.secondary" sx={{ ml: "auto" }}>
                 {totalCount.toLocaleString()} paciente(s)
               </Typography>
             </Box>
 
-            {/* Popover de filtros */}
-            <Popover
-              open={filterOpen}
-              anchorEl={filterAnchor}
-              onClose={handleFilterClose}
-              anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-              transformOrigin={{ vertical: "top", horizontal: "left" }}
-              sx={{ mt: 1 }}
-            >
-              <Box sx={{ p: 2.5, width: 320 }}>
-                <Typography variant="subtitle2" fontWeight={600} color="#334155" mb={1.5}>
-                  Tipo de filtro
-                </Typography>
-                <ToggleButtonGroup
-                  value={filterType}
-                  exclusive
-                  onChange={handleFilterTypeChange}
-                  size="small"
-                  fullWidth
-                  sx={{ mb: 2.5 }}
-                >
-                  <ToggleButton
-                    value="edad"
-                    sx={{
-                      textTransform: "none",
-                      fontSize: "0.7rem",
-                      "&.Mui-selected": {
-                        backgroundColor: "#fce4ec",
-                        color: "#880e4f",
-                        "&:hover": { backgroundColor: "#f8bbd0" },
-                      },
-                    }}
-                  >
-                    Edad
-                  </ToggleButton>
-                  <ToggleButton
-                    value="cumpleanos"
-                    sx={{
-                      textTransform: "none",
-                      fontSize: "0.7rem",
-                      "&.Mui-selected": {
-                        backgroundColor: "#fce4ec",
-                        color: "#880e4f",
-                        "&:hover": { backgroundColor: "#f8bbd0" },
-                      },
-                    }}
-                  >
-                    Cumple
-                  </ToggleButton>
-                  <ToggleButton
-                    value="telefono"
-                    sx={{
-                      textTransform: "none",
-                      fontSize: "0.7rem",
-                      "&.Mui-selected": {
-                        backgroundColor: "#dcfce7",
-                        color: "#16a34a",
-                        "&:hover": { backgroundColor: "#bbf7d0" },
-                      },
-                    }}
-                  >
-                    Teléfono
-                  </ToggleButton>
-                  <ToggleButton
-                    value="genero"
-                    sx={{
-                      textTransform: "none",
-                      fontSize: "0.7rem",
-                      "&.Mui-selected": {
-                        backgroundColor: "#e3f2fd",
-                        color: "#1565c0",
-                        "&:hover": { backgroundColor: "#bbdefb" },
-                      },
-                    }}
-                  >
-                    Género
-                  </ToggleButton>
-                </ToggleButtonGroup>
-
-                <Divider sx={{ mb: 2 }} />
-
-                {/* Filtro por edad */}
-                {filterType === "edad" && (
-                  <>
-                    <Typography variant="body2" color="#475569" mb={1.5}>
-                      Rango de edad
-                    </Typography>
-                    <Slider
-                      value={edadRange}
-                      onChange={handleEdadChange}
-                      valueLabelDisplay="auto"
-                      min={0}
-                      max={120}
-                      sx={{
-                        color: PANTBC_COLOR,
-                        "& .MuiSlider-thumb": { backgroundColor: "#880e4f" },
-                        "& .MuiSlider-track": { backgroundColor: PANTBC_COLOR },
-                      }}
-                    />
-                    <Box display="flex" justifyContent="space-between" mt={1}>
-                      <Typography variant="caption" color="text.secondary">
-                        {edadRange[0]} años
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {edadRange[1]} años
-                      </Typography>
-                    </Box>
-                  </>
-                )}
-
-                {/* Filtro por cumpleaños */}
-                {filterType === "cumpleanos" && (
-                  <>
-                    <Typography variant="body2" color="#475569" mb={1.5}>
-                      Cumpleaños del paciente
-                    </Typography>
-                    <ToggleButtonGroup
-                      value={cumpleanosModo}
-                      exclusive
-                      onChange={(_, v) => v && setCumpleanosModo(v)}
-                      size="small"
-                      fullWidth
-                      sx={{ mb: 2 }}
-                    >
-                      <ToggleButton
-                        value="mes"
-                        sx={{
-                          textTransform: "none",
-                          fontSize: "0.75rem",
-                          "&.Mui-selected": {
-                            backgroundColor: "#fce4ec",
-                            color: "#880e4f",
-                            "&:hover": { backgroundColor: "#f8bbd0" },
-                          },
-                        }}
-                      >
-                        Por mes
-                      </ToggleButton>
-                      <ToggleButton
-                        value="dia"
-                        sx={{
-                          textTransform: "none",
-                          fontSize: "0.75rem",
-                          "&.Mui-selected": {
-                            backgroundColor: "#fce4ec",
-                            color: "#880e4f",
-                            "&:hover": { backgroundColor: "#f8bbd0" },
-                          },
-                        }}
-                      >
-                        Día específico
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-
-                    {cumpleanosModo === "mes" ? (
-                      <>
-                        <Box
-                          sx={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(3, 1fr)",
-                            gap: 0.75,
-                          }}
-                        >
-                          {MESES.map((mes, index) => (
-                            <Button
-                              key={mes}
-                              size="small"
-                              variant={mesSeleccionado === index ? "contained" : "outlined"}
-                              onClick={() => handleMesToggle(index)}
-                              sx={{
-                                textTransform: "none",
-                                fontSize: "0.7rem",
-                                py: 0.5,
-                                px: 1,
-                                minWidth: 0,
-                                borderColor:
-                                  mesSeleccionado === index ? "#880e4f" : "#e2e8f0",
-                                backgroundColor:
-                                  mesSeleccionado === index ? "#880e4f" : "transparent",
-                                color:
-                                  mesSeleccionado === index ? "white" : "#64748b",
-                                "&:hover": {
-                                  backgroundColor:
-                                    mesSeleccionado === index ? "#6a0036" : "#fce4ec",
-                                  borderColor: "#880e4f",
-                                },
-                              }}
-                            >
-                              {mes.slice(0, 3)}
-                            </Button>
-                          ))}
-                        </Box>
-                        {mesSeleccionado !== null && (
-                          <Typography
-                            variant="caption"
-                            color="#880e4f"
-                            sx={{ mt: 1, display: "block" }}
-                          >
-                            Mes seleccionado: {MESES[mesSeleccionado]}
-                          </Typography>
-                        )}
-                      </>
-                    ) : (
-                      <TextField
-                        type="date"
-                        value={diaCumpleanos}
-                        onChange={(e) => setDiaCumpleanos(e.target.value)}
-                        fullWidth
-                        size="small"
-                        helperText="Filtra por día y mes de nacimiento"
-                        sx={{
-                          "& .MuiOutlinedInput-root": {
-                            borderRadius: "8px",
-                            "&.Mui-focused fieldset": { borderColor: "#880e4f" },
-                          },
-                        }}
-                      />
-                    )}
-                  </>
-                )}
-                {filterType === "telefono" && (
-                  <>
-                    <Typography variant="body2" color="#475569" mb={1.5}>Filtrar por número de celular</Typography>
-                    <ToggleButtonGroup
-                      value={filtroTelefonoDraft}
-                      exclusive
-                      onChange={(_e, val) => { if (val !== null) setFiltroTelefonoDraft(val); }}
-                      size="small"
-                      fullWidth
-                    >
-                      <ToggleButton value="" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#f1f5f9", color: "#334155", "&:hover": { backgroundColor: "#e2e8f0" } } }}>Todos</ToggleButton>
-                      <ToggleButton value="con" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#dcfce7", color: "#16a34a", "&:hover": { backgroundColor: "#bbf7d0" } } }}>
-                        <PhoneEnabled sx={{ fontSize: 15, mr: 0.5 }} />Con celular
-                      </ToggleButton>
-                      <ToggleButton value="sin" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fee2e2", color: "#dc2626", "&:hover": { backgroundColor: "#fecaca" } } }}>
-                        <PhoneDisabled sx={{ fontSize: 15, mr: 0.5 }} />Sin celular
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-                  </>
-                )}
-                {filterType === "genero" && (
-                  <>
-                    <Typography variant="body2" color="#475569" mb={1.5}>Filtrar por género</Typography>
-                    <ToggleButtonGroup
-                      value={filtroSexoDraft}
-                      exclusive
-                      onChange={(_e, val) => { if (val !== null) setFiltroSexoDraft(val); }}
-                      size="small"
-                      fullWidth
-                    >
-                      <ToggleButton value="" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#f1f5f9", color: "#334155", "&:hover": { backgroundColor: "#e2e8f0" } } }}>Todos</ToggleButton>
-                      <ToggleButton value="MALE" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#e3f2fd", color: "#1565c0", "&:hover": { backgroundColor: "#bbdefb" } } }}>
-                        Masculino
-                      </ToggleButton>
-                      <ToggleButton value="FEMALE" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fce4ec", color: "#c2185b", "&:hover": { backgroundColor: "#f8bbd0" } } }}>
-                        Femenino
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-                  </>
-                )}
-                <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
-                  <Button
-                    size="small"
-                    onClick={limpiarFiltros}
-                    sx={{ color: "#64748b", textTransform: "none" }}
-                  >
-                    Limpiar todo
-                  </Button>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    onClick={() => {
-                      setFiltroTelefono(filtroTelefonoDraft);
-                      setFiltroSexo(filtroSexoDraft);
-                      setPage(0);
-                      setFetchKey((k) => k + 1);
-                      handleFilterClose();
-                    }}
-                    sx={{
-                      backgroundColor: "#475569",
-                      textTransform: "none",
-                      "&:hover": { backgroundColor: "#334155" },
-                    }}
-                  >
-                    Aplicar
-                  </Button>
-                </Box>
-              </Box>
-            </Popover>
+            {/* Panel de filtros */}
+            <FilterPanel
+              anchor={filters.filterAnchor}
+              onClose={filters.handleFilterClose}
+              onApply={handleApplyFilters}
+              onClear={limpiarTodo}
+              filterType={filters.filterType}
+              onFilterTypeChange={filters.setFilterType}
+              edadRange={filters.edadRange}
+              edadMax={120}
+              onEdadChange={filters.setEdadRange}
+              cumpleanosModo={filters.cumpleanosModo}
+              onCumpleanosModoChange={filters.setCumpleanosModo}
+              mesSeleccionado={filters.mesSeleccionado}
+              onMesToggle={handleMesToggle}
+              diaCumpleanos={filters.diaCumpleanos}
+              onDiaCumpleanosChange={filters.setDiaCumpleanos}
+              filtroTelefonoDraft={filters.filtroTelefonoDraft}
+              onTelefonoDraftChange={filters.setFiltroTelefonoDraft}
+              filtroSexoDraft={filters.filtroSexoDraft}
+              onSexoDraftChange={filters.setFiltroSexoDraft}
+              showGenero={true}
+              accentColor={PANTBC_COLOR}
+              accentBg="#fce4ec"
+            />
 
             {/* Tabla */}
             <TableContainer
               component={Paper}
-              sx={{
-                borderRadius: "12px",
-                boxShadow: "none",
-                border: "1px solid #e2e8f0",
-                overflow: "hidden",
-              }}
+              sx={{ borderRadius: "12px", boxShadow: "none", border: "1px solid #e2e8f0", overflow: "hidden" }}
             >
               <Table>
                 <TableHead>
                   <TableRow sx={{ backgroundColor: "#f8fafc" }}>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>
-                      Nombre Completo
-                    </TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Nombre Completo</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Doc.</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>
-                      Sexo
-                    </TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>
-                      Edad
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>
-                      Tipo Paciente
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>
-                      Establecimiento
-                    </TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Sexo</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Edad</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Tipo Paciente</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Establecimiento</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Celular</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>
-                      Fecha Inicio
-                    </TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Fecha Inicio</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>
-                      Acciones
-                    </TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1138,16 +741,12 @@ export default function PANTBCBeneficiariosPage() {
                     <TableRow>
                       <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                         <CircularProgress size={32} sx={{ color: PANTBC_COLOR }} />
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{ mt: 1 }}
-                        >
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                           Cargando pacientes...
                         </Typography>
                       </TableCell>
                     </TableRow>
-                  ) : filteredData.length === 0 ? (
+                  ) : dataFormateados.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">
@@ -1156,30 +755,20 @@ export default function PANTBCBeneficiariosPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredData.map((row: PacienteTabla, index: number) => {
-                      const sexoColors =
-                        SEXO_CHIP_COLORS[row.sexo] || { bg: "#f5f5f5", color: "#757575" };
-                      const tipoColors =
-                        TIPO_CHIP_COLORS[row.tipoPaciente] || {
-                          bg: "#f5f5f5",
-                          color: "#757575",
-                        };
+                    dataFormateados.map((row: PacienteTabla, index: number) => {
+                      const sexoColors = SEXO_CHIP_COLORS[row.sexo] || { bg: "#f5f5f5", color: "#757575" };
+                      const tipoColors = TIPO_CHIP_COLORS[row.tipoPaciente] || { bg: "#f5f5f5", color: "#757575" };
                       return (
                         <TableRow
                           key={row.id}
                           onClick={() => handleRowClick(row.id)}
                           sx={{
                             backgroundColor: index % 2 === 0 ? "white" : "#f8fafc",
-                            "&:hover": {
-                              backgroundColor: "#f1f5f9",
-                              cursor: "pointer",
-                            },
+                            "&:hover": { backgroundColor: "#f1f5f9", cursor: "pointer" },
                             transition: "background-color 0.2s",
                           }}
                         >
-                          <TableCell sx={{ fontWeight: 500 }}>
-                            {row.nombreCompleto}
-                          </TableCell>
+                          <TableCell sx={{ fontWeight: 500 }}>{row.nombreCompleto}</TableCell>
                           <TableCell>
                             <Typography variant="body2" color="text.secondary" fontSize="0.75rem">
                               {row.tipoDoc}
@@ -1192,36 +781,17 @@ export default function PANTBCBeneficiariosPage() {
                             <Chip
                               label={row.sexo}
                               size="small"
-                              sx={{
-                                backgroundColor: sexoColors.bg,
-                                color: sexoColors.color,
-                                fontWeight: 600,
-                                fontSize: "0.7rem",
-                              }}
+                              sx={{ backgroundColor: sexoColors.bg, color: sexoColors.color, fontWeight: 600, fontSize: "0.7rem" }}
                             />
                           </TableCell>
                           <TableCell align="center">
-                            <Box
-                              display="flex"
-                              flexDirection="column"
-                              alignItems="center"
-                              gap={0.3}
-                            >
+                            <Box display="flex" flexDirection="column" alignItems="center" gap={0.3}>
                               <Chip
                                 label={`${row.edad} años`}
                                 size="small"
-                                sx={{
-                                  backgroundColor: "#fce4ec",
-                                  color: "#880e4f",
-                                  fontWeight: 600,
-                                  fontSize: "0.75rem",
-                                }}
+                                sx={{ backgroundColor: "#fce4ec", color: "#880e4f", fontWeight: 600, fontSize: "0.75rem" }}
                               />
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                                sx={{ fontSize: "0.65rem" }}
-                              >
+                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem" }}>
                                 {formatearFecha(row.fechaNacimiento)}
                               </Typography>
                             </Box>
@@ -1230,12 +800,7 @@ export default function PANTBCBeneficiariosPage() {
                             <Chip
                               label={row.tipoPaciente}
                               size="small"
-                              sx={{
-                                backgroundColor: tipoColors.bg,
-                                color: tipoColors.color,
-                                fontWeight: 600,
-                                fontSize: "0.7rem",
-                              }}
+                              sx={{ backgroundColor: tipoColors.bg, color: tipoColors.color, fontWeight: 600, fontSize: "0.7rem" }}
                             />
                           </TableCell>
                           <TableCell>
@@ -1265,14 +830,8 @@ export default function PANTBCBeneficiariosPage() {
                             <Tooltip title="Ver detalles">
                               <IconButton
                                 size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRowClick(row.id);
-                                }}
-                                sx={{
-                                  color: "#64748b",
-                                  "&:hover": { backgroundColor: "#f1f5f9" },
-                                }}
+                                onClick={(e) => { e.stopPropagation(); handleRowClick(row.id); }}
+                                sx={{ color: "#64748b", "&:hover": { backgroundColor: "#f1f5f9" } }}
                               >
                                 <Visibility fontSize="small" />
                               </IconButton>
@@ -1309,7 +868,7 @@ export default function PANTBCBeneficiariosPage() {
 
       {/* Dialog de detalles */}
       <Dialog
-        open={detailOpen}
+        open={dialog.detailOpen}
         onClose={handleDetailClose}
         maxWidth="md"
         fullWidth
@@ -1339,10 +898,7 @@ export default function PANTBCBeneficiariosPage() {
           <DetalleContent paciente={detalleData} loading={detalleLoading} />
         </DialogContent>
         <DialogActions sx={{ p: 2, borderTop: "1px solid #e2e8f0" }}>
-          <Button
-            onClick={handleDetailClose}
-            sx={{ textTransform: "none", color: "#64748b" }}
-          >
+          <Button onClick={handleDetailClose} sx={{ textTransform: "none", color: "#64748b" }}>
             Cerrar
           </Button>
         </DialogActions>

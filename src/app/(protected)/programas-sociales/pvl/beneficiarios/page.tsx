@@ -18,8 +18,6 @@ import {
   Paper,
   IconButton,
   Tooltip,
-  Popover,
-  Slider,
   Button,
   Dialog,
   DialogTitle,
@@ -27,8 +25,6 @@ import {
   DialogActions,
   Grid,
   Divider,
-  ToggleButton,
-  ToggleButtonGroup,
   CircularProgress,
   Chip,
 } from "@mui/material";
@@ -49,32 +45,12 @@ import {
 import * as XLSX from "xlsx";
 import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
+import { calcularEdad, formatearFecha, MESES_LABELS } from "@/lib/utils/formatters";
+import { useFilters } from "@/lib/hooks/useFilters";
+import { useBeneficiarioDialog } from "@/lib/hooks/useBeneficiarioDialog";
+import { FilterPanel } from "@/components/filters/FilterPanel";
 
 const PVL_COLOR = "#d81b7e";
-
-// ============================================
-// UTILIDADES
-// ============================================
-const calcularEdad = (fechaNacimiento: string | null | undefined): number => {
-  if (!fechaNacimiento) return 0;
-  const hoy = new Date();
-  const nacimiento = new Date(fechaNacimiento);
-  let edad = hoy.getFullYear() - nacimiento.getUTCFullYear();
-  const mes = hoy.getMonth() - nacimiento.getUTCMonth();
-  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getUTCDate())) {
-    edad--;
-  }
-  return edad;
-};
-
-const formatearFecha = (fecha: string | null | undefined): string => {
-  if (!fecha) return "-";
-  const date = new Date(fecha);
-  const dia = date.getUTCDate().toString().padStart(2, "0");
-  const mes = (date.getUTCMonth() + 1).toString().padStart(2, "0");
-  const anio = date.getUTCFullYear();
-  return `${dia}/${mes}/${anio}`;
-};
 
 // ============================================
 // INTERFACES BACKEND
@@ -136,14 +112,6 @@ const mapListaToTabla = (item: BeneficiarioListaBackend): BeneficiarioTabla => (
 // ============================================
 // CONSTANTES
 // ============================================
-type FilterType = "edad" | "cumpleanos" | "telefono" | "sexo";
-type CumpleanosModo = "mes" | "dia";
-
-const MESES = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
-];
-
 const PRIORIDAD_CONFIG: Record<number, { label: string; bg: string; color: string }> = {
   1: { label: "1° Prioridad", bg: "#ffebee", color: "#c62828" },
   2: { label: "2° Prioridad", bg: "#fff3e0", color: "#e65100" },
@@ -327,29 +295,26 @@ export default function PVLBeneficiariosPage() {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [fetchKey, setFetchKey] = useState(0);
 
-  // Búsqueda y filtros
+  // Búsqueda con debounce
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [filterType, setFilterType] = useState<FilterType>("edad");
-  const [edadRange, setEdadRange] = useState<number[]>([0, 120]);
-  const [mesSeleccionado, setMesSeleccionado] = useState<number | null>(null);
-  const [cumpleanosModo, setCumpleanosModo] = useState<CumpleanosModo>("mes");
-  const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
-  const [filtroTelefono, setFiltroTelefono] = useState<"" | "con" | "sin">("");
-  const [filtroTelefonoDraft, setFiltroTelefonoDraft] = useState<"" | "con" | "sin">("");
-  const [filtroSexo, setFiltroSexo] = useState<"" | "FEMALE" | "MALE">("");
-  const [filtroSexoDraft, setFiltroSexoDraft] = useState<"" | "FEMALE" | "MALE">("");
-  const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
   const [observaciones, setObservaciones] = useState<Record<string, string>>({});
+  const [isExporting, setIsExporting] = useState(false);
 
-  // Detalle
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
+  // Datos del detalle (se carga por API)
   const [detalleData, setDetalleData] = useState<BeneficiarioListaBackend | null>(null);
   const [detalleLoading, setDetalleLoading] = useState(false);
-
-  // Mapa de datos originales para detalle rápido
   const [rawDataMap, setRawDataMap] = useState<Record<string, BeneficiarioListaBackend>>({});
+
+  // Hooks de filtros y dialog
+  const filters = useFilters({ edadMax: 120 });
+  const dialog = useBeneficiarioDialog<string>(); // almacena el ID del beneficiario
+
+  // Disparar re-fetch
+  const triggerFetch = () => {
+    setPage(0);
+    setFetchKey((k) => k + 1);
+  };
 
   // Debounce de búsqueda (500ms)
   useEffect(() => {
@@ -369,35 +334,26 @@ export default function PVLBeneficiariosPage() {
         params.set("page", String(page + 1));
         params.set("limit", String(rowsPerPage));
 
-        if (debouncedSearch.trim()) {
-          params.set("search", debouncedSearch.trim());
+        if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+
+        if (filters.edadRange[0] > 0 || filters.edadRange[1] < 120) {
+          params.set("age_min", String(filters.edadRange[0]));
+          params.set("age_max", String(filters.edadRange[1]));
         }
 
-        if (edadRange[0] > 0 || edadRange[1] < 120) {
-          params.set("age_min", String(edadRange[0]));
-          params.set("age_max", String(edadRange[1]));
-        }
-
-        if (cumpleanosModo === "mes" && mesSeleccionado !== null) {
-          params.set("month", String(mesSeleccionado + 1));
-        } else if (cumpleanosModo === "dia" && diaCumpleanos) {
-          const parts = diaCumpleanos.split("-");
+        if (filters.cumpleanosModo === "mes" && filters.mesSeleccionado !== null) {
+          params.set("month", String(filters.mesSeleccionado + 1));
+        } else if (filters.cumpleanosModo === "dia" && filters.diaCumpleanos) {
+          const parts = filters.diaCumpleanos.split("-");
           params.set("birthday", `${parts[1]}-${parts[2]}`);
         }
 
-        if (filtroTelefono === "con") {
-          params.set("phone", "true");
-        } else if (filtroTelefono === "sin") {
-          params.set("phone", "false");
-        }
+        if (filters.filtroTelefono === "con") params.set("phone", "true");
+        else if (filters.filtroTelefono === "sin") params.set("phone", "false");
 
-        if (filtroSexo) {
-          params.set("sex", filtroSexo);
-        }
+        if (filters.filtroSexo) params.set("sex", filters.filtroSexo);
 
-        const response = await getData<BackendListaResponse>(
-          `pvl/dependent?${params.toString()}`
-        );
+        const response = await getData<BackendListaResponse>(`pvl/dependent?${params.toString()}`);
 
         if (response?.data) {
           const rawList = response.data.data;
@@ -420,7 +376,7 @@ export default function PVLBeneficiariosPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, rowsPerPage, fetchKey, debouncedSearch, getData]);
 
-  // Cargar detalle
+  // Cargar detalle del beneficiario
   const fetchDetalle = useCallback(
     async (id: string) => {
       if (rawDataMap[id]) {
@@ -445,50 +401,52 @@ export default function PVLBeneficiariosPage() {
   );
 
   useEffect(() => {
-    if (selectedId && detailOpen) fetchDetalle(selectedId);
-  }, [selectedId, detailOpen, fetchDetalle]);
+    if (dialog.selectedItem && dialog.detailOpen) fetchDetalle(dialog.selectedItem);
+  }, [dialog.selectedItem, dialog.detailOpen, fetchDetalle]);
 
   // Handlers
   const handleFilterClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    setFiltroTelefonoDraft(filtroTelefono);
-    setFiltroSexoDraft(filtroSexo);
-    setFilterAnchor(e.currentTarget);
+    filters.setFiltroTelefonoDraft(filters.filtroTelefono);
+    filters.setFiltroSexoDraft(filters.filtroSexo);
+    filters.handleFilterClick(e);
   };
-  const handleFilterClose = () => setFilterAnchor(null);
-  const handleFilterTypeChange = (_: React.MouseEvent<HTMLElement>, v: FilterType | null) => {
-    if (v !== null) setFilterType(v);
-  };
-  const handleEdadChange = (_: Event, v: number | number[]) => setEdadRange(v as number[]);
-  const handleMesToggle = (mes: number) =>
-    setMesSeleccionado((prev) => (prev === mes ? null : mes));
 
-  const filterOpen = Boolean(filterAnchor);
-  const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 120;
-  const isCumpleanosFiltered =
-    cumpleanosModo === "mes" ? mesSeleccionado !== null : diaCumpleanos !== "";
-
-  const handleChangePage = (_: unknown, newPage: number) => setPage(newPage);
-  const handleChangeRowsPerPage = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setRowsPerPage(parseInt(e.target.value, 10));
-    setPage(0);
+  const handleApplyFilters = () => {
+    filters.handleApplyFilters();
+    triggerFetch();
   };
+
+  const handleMesToggle = (index: number) => {
+    filters.setMesSeleccionado(filters.mesSeleccionado === index ? null : index);
+  };
+
+  const clearPanelFilters = () => {
+    filters.limpiarFiltros();
+    triggerFetch();
+  };
+
+  const limpiarTodo = () => {
+    setSearchTerm("");
+    setDebouncedSearch("");
+    clearPanelFilters();
+  };
+
   const handleRowClick = (id: string) => {
-    setSelectedId(id);
     setDetalleData(null);
-    setDetailOpen(true);
+    dialog.handleOpenDetail(id);
   };
+
   const handleDetailClose = () => {
-    setDetailOpen(false);
-    setSelectedId(null);
+    dialog.handleCloseDetail();
     setDetalleData(null);
   };
 
   const dataFormateados = useFormatTableData(data);
-
-  // La búsqueda es server-side; se usa dataFormateados directamente
   const filteredData = dataFormateados;
 
-  const [isExporting, setIsExporting] = useState(false);
+  const isEdadFiltered = filters.edadRange[0] > 0 || filters.edadRange[1] < 120;
+  const isCumpleanosFiltered =
+    filters.cumpleanosModo === "mes" ? filters.mesSeleccionado !== null : filters.diaCumpleanos !== "";
 
   // Exportar a Excel
   const handleExport = async () => {
@@ -498,34 +456,26 @@ export default function PVLBeneficiariosPage() {
       params.set("page", "1");
       params.set("limit", "99999");
 
-      if (debouncedSearch.trim()) {
-        params.set("search", debouncedSearch.trim());
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+
+      if (isEdadFiltered) {
+        params.set("age_min", String(filters.edadRange[0]));
+        params.set("age_max", String(filters.edadRange[1]));
       }
 
-      if (edadRange[0] > 0 || edadRange[1] < 120) {
-        params.set("age_min", String(edadRange[0]));
-        params.set("age_max", String(edadRange[1]));
-      }
-
-      if (cumpleanosModo === "mes" && mesSeleccionado !== null) {
-        params.set("month", String(mesSeleccionado + 1));
-      } else if (cumpleanosModo === "dia" && diaCumpleanos) {
-        const parts = diaCumpleanos.split("-");
+      if (filters.cumpleanosModo === "mes" && filters.mesSeleccionado !== null) {
+        params.set("month", String(filters.mesSeleccionado + 1));
+      } else if (filters.cumpleanosModo === "dia" && filters.diaCumpleanos) {
+        const parts = filters.diaCumpleanos.split("-");
         params.set("birthday", `${parts[1]}-${parts[2]}`);
       }
 
-      if (filtroTelefono === "con") {
-        params.set("phone", "true");
-      } else if (filtroTelefono === "sin") {
-        params.set("phone", "false");
-      }
+      if (filters.filtroTelefono === "con") params.set("phone", "true");
+      else if (filters.filtroTelefono === "sin") params.set("phone", "false");
 
-      if (filtroSexo) {
-        params.set("sex", filtroSexo);
-      }
+      if (filters.filtroSexo) params.set("sex", filters.filtroSexo);
 
       const response = await getData<BackendListaResponse>(`pvl/dependent?${params.toString()}`);
-
       if (!response?.data) return;
 
       const exportData = response.data.data.map((b) => ({
@@ -550,21 +500,6 @@ export default function PVLBeneficiariosPage() {
     } finally {
       setIsExporting(false);
     }
-  };
-
-  const limpiarFiltros = () => {
-    setSearchTerm("");
-    setDebouncedSearch("");
-    setEdadRange([0, 120]);
-    setMesSeleccionado(null);
-    setCumpleanosModo("mes");
-    setDiaCumpleanos("");
-    setFiltroTelefono("");
-    setFiltroTelefonoDraft("");
-    setFiltroSexo("");
-    setFiltroSexoDraft("");
-    setPage(0);
-    setFetchKey((k) => k + 1);
   };
 
   return (
@@ -638,7 +573,7 @@ export default function PVLBeneficiariosPage() {
                 <IconButton
                   onClick={handleFilterClick}
                   sx={{
-                    backgroundColor: filterOpen ? "#e2e8f0" : "#f8fafc",
+                    backgroundColor: filters.filterOpen ? "#e2e8f0" : "#f8fafc",
                     border: "1px solid #e2e8f0",
                     borderRadius: "8px",
                     "&:hover": { backgroundColor: "#e2e8f0" },
@@ -664,81 +599,51 @@ export default function PVLBeneficiariosPage() {
 
               {/* Chips de filtros activos */}
               {isEdadFiltered && (
-                <Box
-                  sx={{
-                    backgroundColor: "#fce4ec",
-                    borderRadius: "16px",
-                    px: 1.5,
-                    py: 0.5,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                  }}
-                >
+                <Box sx={{ backgroundColor: "#fce4ec", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
                   <Typography variant="caption" color="#880e4f">
-                    Edad: {edadRange[0]} - {edadRange[1]} años
+                    Edad: {filters.edadRange[0]} - {filters.edadRange[1]} años
                   </Typography>
-                  <IconButton
-                    size="small"
-                    onClick={() => { setEdadRange([0, 120]); setPage(0); setFetchKey((k) => k + 1); }}
-                    sx={{ p: 0.25 }}
-                  >
+                  <IconButton size="small" onClick={() => { filters.setEdadRange([0, 120]); triggerFetch(); }} sx={{ p: 0.25 }}>
                     <Close sx={{ fontSize: 14, color: "#880e4f" }} />
                   </IconButton>
                 </Box>
               )}
               {isCumpleanosFiltered && (
-                <Box
-                  sx={{
-                    backgroundColor: "#fce4ec",
-                    borderRadius: "16px",
-                    px: 1.5,
-                    py: 0.5,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                  }}
-                >
+                <Box sx={{ backgroundColor: "#fce4ec", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
                   <Cake sx={{ fontSize: 14, color: "#880e4f" }} />
                   <Typography variant="caption" color="#880e4f">
-                    {cumpleanosModo === "mes" && mesSeleccionado !== null
-                      ? MESES[mesSeleccionado].slice(0, 3)
-                      : diaCumpleanos.split("-").slice(1).reverse().join("/")}
+                    {filters.cumpleanosModo === "mes" && filters.mesSeleccionado !== null
+                      ? MESES_LABELS[filters.mesSeleccionado].slice(0, 3)
+                      : filters.diaCumpleanos.split("-").slice(1).reverse().join("/")}
                   </Typography>
-                  <IconButton
-                    size="small"
-                    onClick={() => { setMesSeleccionado(null); setDiaCumpleanos(""); setPage(0); setFetchKey((k) => k + 1); }}
-                    sx={{ p: 0.25 }}
-                  >
+                  <IconButton size="small" onClick={() => { filters.setMesSeleccionado(null); filters.setDiaCumpleanos(""); triggerFetch(); }} sx={{ p: 0.25 }}>
                     <Close sx={{ fontSize: 14, color: "#880e4f" }} />
                   </IconButton>
                 </Box>
               )}
-              {filtroTelefono && (
-                <Box sx={{ backgroundColor: filtroTelefono === "con" ? "#dcfce7" : "#fee2e2", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
-                  {filtroTelefono === "con"
+              {filters.filtroTelefono && (
+                <Box sx={{ backgroundColor: filters.filtroTelefono === "con" ? "#dcfce7" : "#fee2e2", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                  {filters.filtroTelefono === "con"
                     ? <PhoneEnabled sx={{ fontSize: 14, color: "#16a34a" }} />
-                    : <PhoneDisabled sx={{ fontSize: 14, color: "#dc2626" }} />
-                  }
-                  <Typography variant="caption" color={filtroTelefono === "con" ? "#16a34a" : "#dc2626"}>
-                    {filtroTelefono === "con" ? "Con celular" : "Sin celular"}
+                    : <PhoneDisabled sx={{ fontSize: 14, color: "#dc2626" }} />}
+                  <Typography variant="caption" color={filters.filtroTelefono === "con" ? "#16a34a" : "#dc2626"}>
+                    {filters.filtroTelefono === "con" ? "Con celular" : "Sin celular"}
                   </Typography>
-                  <IconButton size="small" onClick={() => { setFiltroTelefono(""); setFiltroTelefonoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
-                    <Close sx={{ fontSize: 14, color: filtroTelefono === "con" ? "#16a34a" : "#dc2626" }} />
+                  <IconButton size="small" onClick={() => { filters.setFiltroTelefono(""); filters.setFiltroTelefonoDraft(""); triggerFetch(); }} sx={{ p: 0.25 }}>
+                    <Close sx={{ fontSize: 14, color: filters.filtroTelefono === "con" ? "#16a34a" : "#dc2626" }} />
                   </IconButton>
                 </Box>
               )}
-              {filtroSexo && (
-                <Box sx={{ backgroundColor: filtroSexo === "FEMALE" ? "#fce7f3" : "#dbeafe", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
-                  {filtroSexo === "FEMALE"
+              {filters.filtroSexo && (
+                <Box sx={{ backgroundColor: filters.filtroSexo === "FEMALE" ? "#fce7f3" : "#dbeafe", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                  {filters.filtroSexo === "FEMALE"
                     ? <Female sx={{ fontSize: 14, color: "#be185d" }} />
-                    : <Male sx={{ fontSize: 14, color: "#1d4ed8" }} />
-                  }
-                  <Typography variant="caption" color={filtroSexo === "FEMALE" ? "#be185d" : "#1d4ed8"}>
-                    {filtroSexo === "FEMALE" ? "Mujeres" : "Hombres"}
+                    : <Male sx={{ fontSize: 14, color: "#1d4ed8" }} />}
+                  <Typography variant="caption" color={filters.filtroSexo === "FEMALE" ? "#be185d" : "#1d4ed8"}>
+                    {filters.filtroSexo === "FEMALE" ? "Mujeres" : "Hombres"}
                   </Typography>
-                  <IconButton size="small" onClick={() => { setFiltroSexo(""); setFiltroSexoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
-                    <Close sx={{ fontSize: 14, color: filtroSexo === "FEMALE" ? "#be185d" : "#1d4ed8" }} />
+                  <IconButton size="small" onClick={() => { filters.setFiltroSexo(""); filters.setFiltroSexoDraft(""); triggerFetch(); }} sx={{ p: 0.25 }}>
+                    <Close sx={{ fontSize: 14, color: filters.filtroSexo === "FEMALE" ? "#be185d" : "#1d4ed8" }} />
                   </IconButton>
                 </Box>
               )}
@@ -748,278 +653,30 @@ export default function PVLBeneficiariosPage() {
               </Typography>
             </Box>
 
-            {/* Popover de filtros */}
-            <Popover
-              open={filterOpen}
-              anchorEl={filterAnchor}
-              onClose={handleFilterClose}
-              anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-              transformOrigin={{ vertical: "top", horizontal: "left" }}
-              sx={{ mt: 1 }}
-            >
-              <Box sx={{ p: 2.5, width: 320 }}>
-                <Typography variant="subtitle2" fontWeight={600} color="#334155" mb={1.5}>
-                  Tipo de filtro
-                </Typography>
-                <ToggleButtonGroup
-                  value={filterType}
-                  exclusive
-                  onChange={handleFilterTypeChange}
-                  size="small"
-                  fullWidth
-                  sx={{ mb: 2.5 }}
-                >
-                  <ToggleButton
-                    value="edad"
-                    sx={{
-                      textTransform: "none",
-                      fontSize: "0.7rem",
-                      "&.Mui-selected": {
-                        backgroundColor: "#fce4ec",
-                        color: "#880e4f",
-                        "&:hover": { backgroundColor: "#f8bbd0" },
-                      },
-                    }}
-                  >
-                    Edad
-                  </ToggleButton>
-                  <ToggleButton
-                    value="cumpleanos"
-                    sx={{
-                      textTransform: "none",
-                      fontSize: "0.7rem",
-                      "&.Mui-selected": {
-                        backgroundColor: "#fce4ec",
-                        color: "#880e4f",
-                        "&:hover": { backgroundColor: "#f8bbd0" },
-                      },
-                    }}
-                  >
-                    Cumpleaños
-                  </ToggleButton>
-                  <ToggleButton
-                    value="telefono"
-                    sx={{
-                      textTransform: "none",
-                      fontSize: "0.7rem",
-                      "&.Mui-selected": {
-                        backgroundColor: "#dcfce7",
-                        color: "#16a34a",
-                        "&:hover": { backgroundColor: "#bbf7d0" },
-                      },
-                    }}
-                  >
-                    Teléfono
-                  </ToggleButton>
-                  <ToggleButton
-                    value="sexo"
-                    sx={{
-                      textTransform: "none",
-                      fontSize: "0.7rem",
-                      "&.Mui-selected": {
-                        backgroundColor: "#ede9fe",
-                        color: "#7c3aed",
-                        "&:hover": { backgroundColor: "#ddd6fe" },
-                      },
-                    }}
-                  >
-                    Sexo
-                  </ToggleButton>
-                </ToggleButtonGroup>
-
-                <Divider sx={{ mb: 2 }} />
-
-                {/* Filtro por edad */}
-                {filterType === "edad" && (
-                  <>
-                    <Typography variant="body2" color="#475569" mb={1.5}>
-                      Rango de edad
-                    </Typography>
-                    <Slider
-                      value={edadRange}
-                      onChange={handleEdadChange}
-                      valueLabelDisplay="auto"
-                      min={0}
-                      max={120}
-                      sx={{
-                        color: PVL_COLOR,
-                        "& .MuiSlider-thumb": { backgroundColor: "#880e4f" },
-                        "& .MuiSlider-track": { backgroundColor: PVL_COLOR },
-                      }}
-                    />
-                    <Box display="flex" justifyContent="space-between" mt={1}>
-                      <Typography variant="caption" color="text.secondary">
-                        {edadRange[0]} años
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {edadRange[1]} años
-                      </Typography>
-                    </Box>
-                  </>
-                )}
-
-                {/* Filtro por cumpleaños */}
-                {filterType === "cumpleanos" && (
-                  <>
-                    <Typography variant="body2" color="#475569" mb={1.5}>
-                      Cumpleaños del beneficiario
-                    </Typography>
-                    <ToggleButtonGroup
-                      value={cumpleanosModo}
-                      exclusive
-                      onChange={(_, v) => v && setCumpleanosModo(v)}
-                      size="small"
-                      fullWidth
-                      sx={{ mb: 2 }}
-                    >
-                      <ToggleButton
-                        value="mes"
-                        sx={{
-                          textTransform: "none",
-                          fontSize: "0.75rem",
-                          "&.Mui-selected": {
-                            backgroundColor: "#fce4ec",
-                            color: "#880e4f",
-                            "&:hover": { backgroundColor: "#f8bbd0" },
-                          },
-                        }}
-                      >
-                        Por mes
-                      </ToggleButton>
-                      <ToggleButton
-                        value="dia"
-                        sx={{
-                          textTransform: "none",
-                          fontSize: "0.75rem",
-                          "&.Mui-selected": {
-                            backgroundColor: "#fce4ec",
-                            color: "#880e4f",
-                            "&:hover": { backgroundColor: "#f8bbd0" },
-                          },
-                        }}
-                      >
-                        Día específico
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-
-                    {cumpleanosModo === "mes" ? (
-                      <>
-                        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0.75 }}>
-                          {MESES.map((mes, index) => (
-                            <Button
-                              key={mes}
-                              size="small"
-                              variant={mesSeleccionado === index ? "contained" : "outlined"}
-                              onClick={() => handleMesToggle(index)}
-                              sx={{
-                                textTransform: "none",
-                                fontSize: "0.7rem",
-                                py: 0.5,
-                                px: 1,
-                                minWidth: 0,
-                                borderColor: mesSeleccionado === index ? "#880e4f" : "#e2e8f0",
-                                backgroundColor: mesSeleccionado === index ? "#880e4f" : "transparent",
-                                color: mesSeleccionado === index ? "white" : "#64748b",
-                                "&:hover": {
-                                  backgroundColor: mesSeleccionado === index ? "#6a0036" : "#fce4ec",
-                                  borderColor: "#880e4f",
-                                },
-                              }}
-                            >
-                              {mes.slice(0, 3)}
-                            </Button>
-                          ))}
-                        </Box>
-                        {mesSeleccionado !== null && (
-                          <Typography variant="caption" color="#880e4f" sx={{ mt: 1, display: "block" }}>
-                            Mes seleccionado: {MESES[mesSeleccionado]}
-                          </Typography>
-                        )}
-                      </>
-                    ) : (
-                      <TextField
-                        type="date"
-                        value={diaCumpleanos}
-                        onChange={(e) => setDiaCumpleanos(e.target.value)}
-                        fullWidth
-                        size="small"
-                        helperText="Filtra por día y mes de nacimiento"
-                        sx={{
-                          "& .MuiOutlinedInput-root": {
-                            borderRadius: "8px",
-                            "&.Mui-focused fieldset": { borderColor: "#880e4f" },
-                          },
-                        }}
-                      />
-                    )}
-                  </>
-                )}
-
-                {filterType === "telefono" && (
-                  <>
-                    <Typography variant="body2" color="#475569" mb={1.5}>Filtrar por número de celular</Typography>
-                    <ToggleButtonGroup
-                      value={filtroTelefonoDraft}
-                      exclusive
-                      onChange={(_e, val) => { if (val !== null) setFiltroTelefonoDraft(val); }}
-                      size="small"
-                      fullWidth
-                    >
-                      <ToggleButton value="" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#f1f5f9", color: "#334155", "&:hover": { backgroundColor: "#e2e8f0" } } }}>Todos</ToggleButton>
-                      <ToggleButton value="con" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#dcfce7", color: "#16a34a", "&:hover": { backgroundColor: "#bbf7d0" } } }}>
-                        <PhoneEnabled sx={{ fontSize: 15, mr: 0.5 }} />Con celular
-                      </ToggleButton>
-                      <ToggleButton value="sin" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fee2e2", color: "#dc2626", "&:hover": { backgroundColor: "#fecaca" } } }}>
-                        <PhoneDisabled sx={{ fontSize: 15, mr: 0.5 }} />Sin celular
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-                  </>
-                )}
-
-                {filterType === "sexo" && (
-                  <>
-                    <Typography variant="body2" color="#475569" mb={1.5}>Filtrar por sexo</Typography>
-                    <ToggleButtonGroup
-                      value={filtroSexoDraft}
-                      exclusive
-                      onChange={(_e, val) => { if (val !== null) setFiltroSexoDraft(val); }}
-                      size="small"
-                      fullWidth
-                    >
-                      <ToggleButton value="" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#f1f5f9", color: "#334155", "&:hover": { backgroundColor: "#e2e8f0" } } }}>Todos</ToggleButton>
-                      <ToggleButton value="FEMALE" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#fce7f3", color: "#be185d", "&:hover": { backgroundColor: "#fbcfe8" } } }}>
-                        <Female sx={{ fontSize: 15, mr: 0.5 }} />Mujeres
-                      </ToggleButton>
-                      <ToggleButton value="MALE" sx={{ textTransform: "none", fontSize: "0.75rem", "&.Mui-selected": { backgroundColor: "#dbeafe", color: "#1d4ed8", "&:hover": { backgroundColor: "#bfdbfe" } } }}>
-                        <Male sx={{ fontSize: 15, mr: 0.5 }} />Hombres
-                      </ToggleButton>
-                    </ToggleButtonGroup>
-                  </>
-                )}
-
-                <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
-                  <Button
-                    size="small"
-                    onClick={limpiarFiltros}
-                    sx={{ color: "#64748b", textTransform: "none" }}
-                  >
-                    Limpiar todo
-                  </Button>
-                  <Button
-                    size="small"
-                    variant="contained"
-                    onClick={() => { setFiltroTelefono(filtroTelefonoDraft); setFiltroSexo(filtroSexoDraft); setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
-                    sx={{
-                      backgroundColor: "#475569",
-                      textTransform: "none",
-                      "&:hover": { backgroundColor: "#334155" },
-                    }}
-                  >
-                    Aplicar
-                  </Button>
-                </Box>
-              </Box>
-            </Popover>
+            {/* Panel de filtros avanzados */}
+            <FilterPanel
+              anchor={filters.filterAnchor}
+              onClose={filters.handleFilterClose}
+              onApply={handleApplyFilters}
+              onClear={limpiarTodo}
+              filterType={filters.filterType}
+              onFilterTypeChange={filters.setFilterType}
+              edadRange={filters.edadRange}
+              edadMax={120}
+              onEdadChange={filters.setEdadRange}
+              cumpleanosModo={filters.cumpleanosModo}
+              onCumpleanosModoChange={filters.setCumpleanosModo}
+              mesSeleccionado={filters.mesSeleccionado}
+              onMesToggle={handleMesToggle}
+              diaCumpleanos={filters.diaCumpleanos}
+              onDiaCumpleanosChange={filters.setDiaCumpleanos}
+              filtroTelefonoDraft={filters.filtroTelefonoDraft}
+              onTelefonoDraftChange={filters.setFiltroTelefonoDraft}
+              filtroSexoDraft={filters.filtroSexoDraft}
+              onSexoDraftChange={filters.setFiltroSexoDraft}
+              accentColor={PVL_COLOR}
+              accentBg="#fce4ec"
+            />
 
             {/* Tabla */}
             <TableContainer
@@ -1166,9 +823,9 @@ export default function PVLBeneficiariosPage() {
               component="div"
               count={totalCount}
               page={page}
-              onPageChange={handleChangePage}
+              onPageChange={(_, newPage) => setPage(newPage)}
               rowsPerPage={rowsPerPage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
+              onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
               rowsPerPageOptions={[10, 25, 50, 100]}
               labelRowsPerPage="Filas por página:"
               labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
@@ -1184,7 +841,7 @@ export default function PVLBeneficiariosPage() {
 
       {/* Dialog de detalles */}
       <Dialog
-        open={detailOpen}
+        open={dialog.detailOpen}
         onClose={handleDetailClose}
         maxWidth="md"
         fullWidth

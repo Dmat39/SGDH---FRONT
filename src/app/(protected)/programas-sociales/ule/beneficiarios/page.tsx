@@ -23,11 +23,6 @@ import {
   CircularProgress,
   Button,
   Alert,
-  Popover,
-  ToggleButton,
-  ToggleButtonGroup,
-  Divider,
-  Slider,
 } from "@mui/material";
 import {
   Search,
@@ -41,18 +36,12 @@ import {
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
+import { useFilters } from "@/lib/hooks/useFilters";
 import * as XLSX from "xlsx";
+import { calcularEdad, formatearFecha, formatearTelefono, MESES_LABELS as MESES } from "@/lib/utils/formatters";
+import { FilterPanel } from "@/components/filters/FilterPanel";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
-
-// Nombres de los meses en español
-const MESES = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-];
-
-type CumpleanosModo = "mes" | "dia";
-type FilterType = "edad" | "cumpleanos";
 
 // Interfaces para el backend
 interface RegisteredPerson {
@@ -111,18 +100,19 @@ export default function ULEBeneficiariosPage() {
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [fetchKey, setFetchKey] = useState(0);
 
-  // Estados de filtros
+  // Estados de filtros locales
   const [searchTerm, setSearchTerm] = useState("");
   const [filtroFormato, setFiltroFormato] = useState<string>("");
-
-  // Estados para filtros de edad y cumpleaños
-  const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
   const [observaciones, setObservaciones] = useState<Record<string, string>>({});
-  const [filterType, setFilterType] = useState<FilterType>("edad");
-  const [edadRange, setEdadRange] = useState<number[]>([0, 100]);
-  const [cumpleanosModo, setCumpleanosModo] = useState<CumpleanosModo>("mes");
-  const [mesSeleccionado, setMesSeleccionado] = useState<number | null>(null);
-  const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Hook de filtros reutilizable
+  const filters = useFilters({ edadMax: 100 });
+
+  const triggerFetch = () => {
+    setPage(0);
+    setFetchKey((k) => k + 1);
+  };
 
   // Cargar datos con paginación y filtros server-side
   useEffect(() => {
@@ -135,27 +125,23 @@ export default function ULEBeneficiariosPage() {
         params.set("page", String(page + 1));
         params.set("limit", String(rowsPerPage));
 
-        // Filtro por búsqueda (server-side)
         if (searchTerm.trim()) {
           params.set("search", searchTerm.trim());
         }
 
-        // Filtro por formato (server-side)
         if (filtroFormato) {
           params.set("format", filtroFormato);
         }
 
-        // Filtro de edad (server-side)
-        if (edadRange[0] > 0 || edadRange[1] < 100) {
-          params.set("age_min", String(edadRange[0]));
-          params.set("age_max", String(edadRange[1]));
+        if (filters.edadRange[0] > 0 || filters.edadRange[1] < 100) {
+          params.set("age_min", String(filters.edadRange[0]));
+          params.set("age_max", String(filters.edadRange[1]));
         }
 
-        // Filtro de cumpleaños (server-side)
-        if (cumpleanosModo === "mes" && mesSeleccionado !== null) {
-          params.set("birthday_month", String(mesSeleccionado + 1));
-        } else if (cumpleanosModo === "dia" && diaCumpleanos) {
-          const parts = diaCumpleanos.split("-"); // YYYY-MM-DD
+        if (filters.cumpleanosModo === "mes" && filters.mesSeleccionado !== null) {
+          params.set("birthday_month", String(filters.mesSeleccionado + 1));
+        } else if (filters.cumpleanosModo === "dia" && filters.diaCumpleanos) {
+          const parts = filters.diaCumpleanos.split("-");
           params.set("birthday_day", `${parts[1]}-${parts[2]}`);
         }
 
@@ -167,8 +153,8 @@ export default function ULEBeneficiariosPage() {
           setData(response.data.data);
           setTotalCount(response.data.totalCount);
         }
-      } catch (error) {
-        console.error("Error fetching data:", error);
+      } catch (err) {
+        console.error("Error fetching data:", err);
         setError("Error al cargar los datos. Por favor, intenta de nuevo.");
         setData([]);
         setTotalCount(0);
@@ -181,94 +167,41 @@ export default function ULEBeneficiariosPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, rowsPerPage, filtroFormato, searchTerm, fetchKey, getData]);
 
-  // Formatear strings del backend (Title Case, preservar siglas en direcciones)
+  // Formatear strings del backend (Title Case)
   const dataFormateados = useFormatTableData(data);
-
-  // Los datos ya vienen filtrados del backend
   const empadronadosFiltrados = dataFormateados;
 
-  // Calcular edad
-  const calcularEdad = (fechaNacimiento: string): number => {
-    const hoy = new Date();
-    const nacimiento = new Date(fechaNacimiento);
-    let edad = hoy.getFullYear() - nacimiento.getUTCFullYear();
-    const mesActual = hoy.getMonth();
-    const mesNacimiento = nacimiento.getUTCMonth();
-
-    if (mesActual < mesNacimiento ||
-        (mesActual === mesNacimiento && hoy.getDate() < nacimiento.getUTCDate())) {
-      edad--;
-    }
-
-    return edad;
+  const handleMesToggle = (mes: number) => {
+    filters.setMesSeleccionado(mes === filters.mesSeleccionado ? null : mes);
   };
 
-  // Formatear teléfono con prefijo +51
-  const formatearTelefono = (telefono: string | null | undefined): string => {
-    if (!telefono || telefono.trim() === "") return "";
-    const telefonoLimpio = telefono.trim();
-    if (telefonoLimpio.startsWith("+51")) {
-      return telefonoLimpio;
-    }
-    if (telefonoLimpio.startsWith("51") && telefonoLimpio.length >= 11) {
-      return `+${telefonoLimpio}`;
-    }
-    return `+51${telefonoLimpio}`;
+  const handleApplyFilters = () => {
+    filters.handleApplyFilters();
+    triggerFetch();
   };
 
-  // Formatear fecha
-  const formatearFecha = (fecha: string | null) => {
-    if (!fecha) return "-";
-    const d = new Date(fecha);
-    const dia = d.getUTCDate().toString().padStart(2, "0");
-    const mes = (d.getUTCMonth() + 1).toString().padStart(2, "0");
-    const anio = d.getUTCFullYear();
-    return `${dia}/${mes}/${anio}`;
+  // Limpiar solo los filtros del panel (sin tocar búsqueda ni formato)
+  const limpiarFiltrosPanel = () => {
+    filters.limpiarFiltros();
+    triggerFetch();
   };
 
-  // Limpiar filtros
+  // Limpiar todos los filtros
   const limpiarFiltros = () => {
     setSearchTerm("");
     setFiltroFormato("");
-    setEdadRange([0, 100]);
-    setMesSeleccionado(null);
-    setDiaCumpleanos("");
-    setCumpleanosModo("mes");
+    filters.limpiarFiltros();
     setPage(0);
     setFetchKey((k) => k + 1);
   };
 
-  // Handlers para filtros
-  const handleFilterClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    setFilterAnchor(event.currentTarget);
-  };
+  const isEdadFiltered = filters.edadRange[0] > 0 || filters.edadRange[1] < 100;
+  const isCumpleanosFiltered =
+    filters.cumpleanosModo === "mes"
+      ? filters.mesSeleccionado !== null
+      : filters.diaCumpleanos !== "";
 
-  const handleFilterClose = () => {
-    setFilterAnchor(null);
-  };
-
-  const handleFilterTypeChange = (
-    _event: React.MouseEvent<HTMLElement>,
-    newFilterType: FilterType | null
-  ) => {
-    if (newFilterType !== null) {
-      setFilterType(newFilterType);
-    }
-  };
-
-  const handleEdadChange = (_event: unknown, newValue: number | number[]) => {
-    setEdadRange(newValue as number[]);
-  };
-
-  const handleMesToggle = (mes: number) => {
-    setMesSeleccionado((prev) => (prev === mes ? null : mes));
-  };
-
-  const filterOpen = Boolean(filterAnchor);
-  const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 100;
-  const isCumpleanosFiltered = cumpleanosModo === "mes" ? mesSeleccionado !== null : diaCumpleanos !== "";
-
-  const [isExporting, setIsExporting] = useState(false);
+  const hayFiltrosActivos = searchTerm || filtroFormato || isEdadFiltered || isCumpleanosFiltered;
 
   // Descargar Excel
   const descargarExcel = async () => {
@@ -286,15 +219,15 @@ export default function ULEBeneficiariosPage() {
         params.set("format", filtroFormato);
       }
 
-      if (edadRange[0] > 0 || edadRange[1] < 100) {
-        params.set("age_min", String(edadRange[0]));
-        params.set("age_max", String(edadRange[1]));
+      if (filters.edadRange[0] > 0 || filters.edadRange[1] < 100) {
+        params.set("age_min", String(filters.edadRange[0]));
+        params.set("age_max", String(filters.edadRange[1]));
       }
 
-      if (cumpleanosModo === "mes" && mesSeleccionado !== null) {
-        params.set("birthday_month", String(mesSeleccionado + 1));
-      } else if (cumpleanosModo === "dia" && diaCumpleanos) {
-        const parts = diaCumpleanos.split("-");
+      if (filters.cumpleanosModo === "mes" && filters.mesSeleccionado !== null) {
+        params.set("birthday_month", String(filters.mesSeleccionado + 1));
+      } else if (filters.cumpleanosModo === "dia" && filters.diaCumpleanos) {
+        const parts = filters.diaCumpleanos.split("-");
         params.set("birthday_day", `${parts[1]}-${parts[2]}`);
       }
 
@@ -322,23 +255,12 @@ export default function ULEBeneficiariosPage() {
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(datosExcel);
 
-      const colWidths = [
-        { wch: 12 }, // DNI
-        { wch: 20 }, // Nombres
-        { wch: 20 }, // Apellidos
-        { wch: 14 }, // Teléfono
-        { wch: 10 }, // Formato
-        { wch: 12 }, // FSU
-        { wch: 12 }, // S100
-        { wch: 8 },  // Nivel
-        { wch: 10 }, // Miembros
-        { wch: 25 }, // Urbanización
-        { wch: 30 }, // Empadronador
-        { wch: 14 }, // Fecha Registro
-        { wch: 14 }, // Fecha Nacimiento
-        { wch: 6 },  // Edad
+      ws["!cols"] = [
+        { wch: 12 }, { wch: 20 }, { wch: 20 }, { wch: 14 },
+        { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 8 },
+        { wch: 10 }, { wch: 25 }, { wch: 30 }, { wch: 14 },
+        { wch: 14 }, { wch: 6 },
       ];
-      ws["!cols"] = colWidths;
 
       XLSX.utils.book_append_sheet(wb, ws, "Empadronados ULE");
 
@@ -347,36 +269,26 @@ export default function ULEBeneficiariosPage() {
       fileName += ".xlsx";
 
       XLSX.writeFile(wb, fileName);
-    } catch (error) {
-      console.error("Error exportando:", error);
+    } catch (err) {
+      console.error("Error exportando:", err);
     } finally {
       setIsExporting(false);
     }
   };
 
-  const hayFiltrosActivos = searchTerm || filtroFormato || isEdadFiltered || isCumpleanosFiltered;
-
-  // Color por formato
   const getFormatoColor = (formato: string) => {
     switch (formato) {
-      case "FSU":
-        return "#d81b7e";
-      case "S100":
-        return "#00a3a8";
-      default:
-        return "#64748b";
+      case "FSU": return "#d81b7e";
+      case "S100": return "#00a3a8";
+      default: return "#64748b";
     }
   };
 
-  // Color por nivel
   const getNivelColor = (nivel: string) => {
     switch (nivel) {
-      case "P":
-        return "success";
-      case "NP":
-        return "warning";
-      default:
-        return "default";
+      case "P": return "success";
+      case "NP": return "warning";
+      default: return "default";
     }
   };
 
@@ -430,9 +342,7 @@ export default function ULEBeneficiariosPage() {
             <TextField
               placeholder="Buscar por nombre, DNI, FSU, S100..."
               value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-              }}
+              onChange={(e) => setSearchTerm(e.target.value)}
               slotProps={{
                 input: {
                   startAdornment: (
@@ -470,10 +380,10 @@ export default function ULEBeneficiariosPage() {
 
             <Tooltip title="Filtros de edad y cumpleaños">
               <IconButton
-                onClick={handleFilterClick}
+                onClick={filters.handleFilterClick}
                 sx={{
-                  backgroundColor: filterOpen || isEdadFiltered || isCumpleanosFiltered ? "#fce7f3" : "#f8fafc",
-                  border: `1px solid ${filterOpen || isEdadFiltered || isCumpleanosFiltered ? subgerencia.color : "#e2e8f0"}`,
+                  backgroundColor: filters.filterOpen || isEdadFiltered || isCumpleanosFiltered ? "#fce7f3" : "#f8fafc",
+                  border: `1px solid ${filters.filterOpen || isEdadFiltered || isCumpleanosFiltered ? subgerencia.color : "#e2e8f0"}`,
                   borderRadius: "8px",
                   "&:hover": {
                     backgroundColor: "#fce7f3",
@@ -481,31 +391,17 @@ export default function ULEBeneficiariosPage() {
                   },
                 }}
               >
-                <FilterList sx={{ color: filterOpen || isEdadFiltered || isCumpleanosFiltered ? subgerencia.color : "#64748b", fontSize: 20 }} />
+                <FilterList sx={{ color: filters.filterOpen || isEdadFiltered || isCumpleanosFiltered ? subgerencia.color : "#64748b", fontSize: 20 }} />
               </IconButton>
             </Tooltip>
 
             {/* Chip de filtro de edad activo */}
             {isEdadFiltered && (
-              <Box
-                sx={{
-                  backgroundColor: "#dbeafe",
-                  borderRadius: "16px",
-                  px: 1.5,
-                  py: 0.5,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 0.5,
-                }}
-              >
+              <Box sx={{ backgroundColor: "#dbeafe", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
                 <Typography variant="caption" color="#1e40af">
-                  Edad: {edadRange[0]} - {edadRange[1]} años
+                  Edad: {filters.edadRange[0]} - {filters.edadRange[1]} años
                 </Typography>
-                <IconButton
-                  size="small"
-                  onClick={() => { setEdadRange([0, 100]); setPage(0); setFetchKey((k) => k + 1); }}
-                  sx={{ p: 0.25 }}
-                >
+                <IconButton size="small" onClick={() => { filters.setEdadRange([0, 100]); triggerFetch(); }} sx={{ p: 0.25 }}>
                   <Close sx={{ fontSize: 14, color: "#1e40af" }} />
                 </IconButton>
               </Box>
@@ -513,28 +409,14 @@ export default function ULEBeneficiariosPage() {
 
             {/* Chip de filtro de cumpleaños activo */}
             {isCumpleanosFiltered && (
-              <Box
-                sx={{
-                  backgroundColor: "#fce7f3",
-                  borderRadius: "16px",
-                  px: 1.5,
-                  py: 0.5,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 0.5,
-                }}
-              >
+              <Box sx={{ backgroundColor: "#fce7f3", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
                 <Cake sx={{ fontSize: 14, color: "#be185d" }} />
                 <Typography variant="caption" color="#be185d">
-                  {cumpleanosModo === "mes" && mesSeleccionado !== null
-                    ? MESES[mesSeleccionado].slice(0, 3)
-                    : diaCumpleanos.split("-").slice(1).reverse().join("/")}
+                  {filters.cumpleanosModo === "mes" && filters.mesSeleccionado !== null
+                    ? MESES[filters.mesSeleccionado].slice(0, 3)
+                    : filters.diaCumpleanos.split("-").slice(1).reverse().join("/")}
                 </Typography>
-                <IconButton
-                  size="small"
-                  onClick={() => { setMesSeleccionado(null); setDiaCumpleanos(""); setPage(0); setFetchKey((k) => k + 1); }}
-                  sx={{ p: 0.25 }}
-                >
+                <IconButton size="small" onClick={() => { filters.setMesSeleccionado(null); filters.setDiaCumpleanos(""); triggerFetch(); }} sx={{ p: 0.25 }}>
                   <Close sx={{ fontSize: 14, color: "#be185d" }} />
                 </IconButton>
               </Box>
@@ -564,237 +446,32 @@ export default function ULEBeneficiariosPage() {
             </Button>
           </Box>
 
-          {/* Popover de filtro de edad y cumpleaños */}
-          <Popover
-            open={filterOpen}
-            anchorEl={filterAnchor}
-            onClose={handleFilterClose}
-            anchorOrigin={{
-              vertical: "bottom",
-              horizontal: "left",
-            }}
-            transformOrigin={{
-              vertical: "top",
-              horizontal: "left",
-            }}
-            sx={{ mt: 1 }}
-          >
-            <Box sx={{ p: 2.5, width: 320 }}>
-              <Typography variant="subtitle2" fontWeight={600} color="#334155" mb={1.5}>
-                Tipo de filtro
-              </Typography>
-              <ToggleButtonGroup
-                value={filterType}
-                exclusive
-                onChange={handleFilterTypeChange}
-                size="small"
-                fullWidth
-                sx={{ mb: 2.5 }}
-              >
-                <ToggleButton
-                  value="edad"
-                  sx={{
-                    textTransform: "none",
-                    fontSize: "0.75rem",
-                    "&.Mui-selected": {
-                      backgroundColor: "#dbeafe",
-                      color: "#1e40af",
-                      "&:hover": { backgroundColor: "#bfdbfe" },
-                    },
-                  }}
-                >
-                  Edad
-                </ToggleButton>
-                <ToggleButton
-                  value="cumpleanos"
-                  sx={{
-                    textTransform: "none",
-                    fontSize: "0.75rem",
-                    "&.Mui-selected": {
-                      backgroundColor: "#fce7f3",
-                      color: "#be185d",
-                      "&:hover": { backgroundColor: "#fbcfe8" },
-                    },
-                  }}
-                >
-                  Cumpleaños
-                </ToggleButton>
-              </ToggleButtonGroup>
-
-              <Divider sx={{ mb: 2 }} />
-
-              {/* Filtro por edad */}
-              {filterType === "edad" && (
-                <>
-                  <Typography variant="body2" color="#475569" mb={1.5}>
-                    Rango de edad
-                  </Typography>
-                  <Slider
-                    value={edadRange}
-                    onChange={handleEdadChange}
-                    valueLabelDisplay="auto"
-                    min={0}
-                    max={100}
-                    sx={{
-                      color: "#3b82f6",
-                      "& .MuiSlider-thumb": {
-                        backgroundColor: "#1e40af",
-                      },
-                      "& .MuiSlider-track": {
-                        backgroundColor: "#3b82f6",
-                      },
-                    }}
-                  />
-                  <Box display="flex" justifyContent="space-between" mt={1}>
-                    <Typography variant="caption" color="text.secondary">
-                      {edadRange[0]} años
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {edadRange[1]} años
-                    </Typography>
-                  </Box>
-                </>
-              )}
-
-              {/* Filtro por cumpleaños */}
-              {filterType === "cumpleanos" && (
-                <>
-                  <Typography variant="body2" color="#475569" mb={1.5}>
-                    Cumpleaños
-                  </Typography>
-
-                  <ToggleButtonGroup
-                    value={cumpleanosModo}
-                    exclusive
-                    onChange={(_, value) => value && setCumpleanosModo(value)}
-                    size="small"
-                    fullWidth
-                    sx={{ mb: 2 }}
-                  >
-                    <ToggleButton
-                      value="mes"
-                      sx={{
-                        textTransform: "none",
-                        fontSize: "0.75rem",
-                        "&.Mui-selected": {
-                          backgroundColor: "#fce7f3",
-                          color: "#be185d",
-                          "&:hover": { backgroundColor: "#fbcfe8" },
-                        },
-                      }}
-                    >
-                      Por mes
-                    </ToggleButton>
-                    <ToggleButton
-                      value="dia"
-                      sx={{
-                        textTransform: "none",
-                        fontSize: "0.75rem",
-                        "&.Mui-selected": {
-                          backgroundColor: "#fce7f3",
-                          color: "#be185d",
-                          "&:hover": { backgroundColor: "#fbcfe8" },
-                        },
-                      }}
-                    >
-                      Día específico
-                    </ToggleButton>
-                  </ToggleButtonGroup>
-
-                  {cumpleanosModo === "mes" ? (
-                    <>
-                      <Box
-                        sx={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(3, 1fr)",
-                          gap: 0.75,
-                        }}
-                      >
-                        {MESES.map((mes, index) => (
-                          <Button
-                            key={mes}
-                            size="small"
-                            variant={mesSeleccionado === index ? "contained" : "outlined"}
-                            onClick={() => handleMesToggle(index)}
-                            sx={{
-                              textTransform: "none",
-                              fontSize: "0.7rem",
-                              py: 0.5,
-                              px: 1,
-                              minWidth: 0,
-                              borderColor: mesSeleccionado === index ? "#be185d" : "#e2e8f0",
-                              backgroundColor: mesSeleccionado === index ? "#be185d" : "transparent",
-                              color: mesSeleccionado === index ? "white" : "#64748b",
-                              "&:hover": {
-                                backgroundColor: mesSeleccionado === index ? "#9d174d" : "#fce7f3",
-                                borderColor: "#be185d",
-                              },
-                            }}
-                          >
-                            {mes.slice(0, 3)}
-                          </Button>
-                        ))}
-                      </Box>
-                      {mesSeleccionado !== null && (
-                        <Typography variant="caption" color="#be185d" sx={{ mt: 1, display: "block" }}>
-                          Mes seleccionado: {MESES[mesSeleccionado]}
-                        </Typography>
-                      )}
-                    </>
-                  ) : (
-                    <TextField
-                      type="date"
-                      value={diaCumpleanos}
-                      onChange={(e) => setDiaCumpleanos(e.target.value)}
-                      fullWidth
-                      size="small"
-                      helperText="Selecciona una fecha para filtrar por día y mes"
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          borderRadius: "8px",
-                          "&.Mui-focused fieldset": {
-                            borderColor: "#be185d",
-                          },
-                        },
-                      }}
-                    />
-                  )}
-                </>
-              )}
-
-              <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
-                <Button
-                  size="small"
-                  onClick={() => {
-                    setEdadRange([0, 100]);
-                    setMesSeleccionado(null);
-                    setDiaCumpleanos("");
-                    setCumpleanosModo("mes");
-                    setPage(0);
-                    setFetchKey((k) => k + 1);
-                  }}
-                  sx={{
-                    color: "#64748b",
-                    textTransform: "none",
-                  }}
-                >
-                  Limpiar todo
-                </Button>
-                <Button
-                  size="small"
-                  variant="contained"
-                  onClick={() => { setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
-                  sx={{
-                    backgroundColor: subgerencia.color,
-                    textTransform: "none",
-                    "&:hover": { backgroundColor: "#be185d" },
-                  }}
-                >
-                  Aplicar
-                </Button>
-              </Box>
-            </Box>
-          </Popover>
+          {/* Panel de filtros */}
+          <FilterPanel
+            anchor={filters.filterAnchor}
+            onClose={filters.handleFilterClose}
+            onApply={handleApplyFilters}
+            onClear={limpiarFiltrosPanel}
+            filterType={filters.filterType}
+            onFilterTypeChange={filters.setFilterType}
+            edadRange={filters.edadRange}
+            edadMax={100}
+            onEdadChange={filters.setEdadRange}
+            cumpleanosModo={filters.cumpleanosModo}
+            onCumpleanosModoChange={filters.setCumpleanosModo}
+            mesSeleccionado={filters.mesSeleccionado}
+            onMesToggle={handleMesToggle}
+            diaCumpleanos={filters.diaCumpleanos}
+            onDiaCumpleanosChange={filters.setDiaCumpleanos}
+            filtroTelefonoDraft={filters.filtroTelefonoDraft}
+            onTelefonoDraftChange={filters.setFiltroTelefonoDraft}
+            filtroSexoDraft={filters.filtroSexoDraft}
+            onSexoDraftChange={filters.setFiltroSexoDraft}
+            showTelefono={false}
+            showGenero={false}
+            accentColor={subgerencia.color}
+            accentBg="#fce7f3"
+          />
 
           {/* Resumen */}
           <Box mb={2} display="flex" gap={2} flexWrap="wrap">
@@ -910,12 +587,7 @@ export default function ULEBeneficiariosPage() {
                           <TableCell>
                             <Typography
                               variant="body2"
-                              sx={{
-                                maxWidth: 150,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
+                              sx={{ maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                               title={empadronado.urban?.name}
                             >
                               {empadronado.urban?.name || "-"}
@@ -924,12 +596,7 @@ export default function ULEBeneficiariosPage() {
                           <TableCell>
                             <Typography
                               variant="body2"
-                              sx={{
-                                maxWidth: 150,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
+                              sx={{ maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                               title={empadronado.enumerator ? `${empadronado.enumerator.name} ${empadronado.enumerator.lastname}` : ""}
                             >
                               {empadronado.enumerator
