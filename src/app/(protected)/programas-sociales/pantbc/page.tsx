@@ -13,6 +13,7 @@ import {
 import { People, Male, Female, LocalHospital } from "@mui/icons-material";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
+import { calcularEdad } from "@/lib/utils/formatters";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 const PANTBC_COLOR = subgerencia.color;
@@ -88,18 +89,6 @@ const AGE_RANGES = [
   { label: "60+", min: 60, max: 200, color: "#f87171" },
 ];
 
-// ============================================
-// UTILIDADES
-// ============================================
-const calcularEdad = (fecha: string | null | undefined): number => {
-  if (!fecha) return 0;
-  const hoy = new Date();
-  const nac = new Date(fecha);
-  let edad = hoy.getFullYear() - nac.getUTCFullYear();
-  const mes = hoy.getMonth() - nac.getUTCMonth();
-  if (mes < 0 || (mes === 0 && hoy.getDate() < nac.getUTCDate())) edad--;
-  return edad;
-};
 
 const generateDonutSegment = (
   startAngle: number,

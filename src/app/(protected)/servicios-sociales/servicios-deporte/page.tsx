@@ -13,6 +13,7 @@ import {
 import { People, SportsScore, ChildCare, Person } from "@mui/icons-material";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
+import { calcularEdad } from "@/lib/utils/formatters";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.SERVICIOS_SOCIALES];
 const MODULE_COLOR = subgerencia.color; // #00a3a8
@@ -70,18 +71,6 @@ interface BackendResponse {
   };
 }
 
-// ============================================
-// UTILIDADES
-// ============================================
-const calcularEdad = (fecha: string | null | undefined): number => {
-  if (!fecha) return 0;
-  const hoy = new Date();
-  const nac = new Date(fecha);
-  let edad = hoy.getFullYear() - nac.getUTCFullYear();
-  const mes = hoy.getMonth() - nac.getUTCMonth();
-  if (mes < 0 || (mes === 0 && hoy.getDate() < nac.getUTCDate())) edad--;
-  return edad;
-};
 
 const generateDonutSegment = (
   startAngle: number,

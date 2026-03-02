@@ -12,29 +12,9 @@ import * as XLSX from "xlsx";
 import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
+import { calcularEdad, formatearFecha, MESES_LABELS as MESES } from "@/lib/utils/formatters";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
-
-const calcularEdad = (fechaNacimiento: string | null | undefined): number => {
-  if (!fechaNacimiento) return 0;
-  const hoy = new Date();
-  const nacimiento = new Date(fechaNacimiento);
-  let edad = hoy.getFullYear() - nacimiento.getUTCFullYear();
-  const mes = hoy.getMonth() - nacimiento.getUTCMonth();
-  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getUTCDate())) { edad--; }
-  return edad;
-};
-
-const formatearFecha = (fecha: string | null | undefined): string => {
-  if (!fecha) return "-";
-  const date = new Date(fecha);
-  const dia = date.getUTCDate().toString().padStart(2, "0");
-  const mes = (date.getUTCMonth() + 1).toString().padStart(2, "0");
-  const anio = date.getUTCFullYear();
-  return `${dia}/${mes}/${anio}`;
-};
-
-const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 const TRADUCCIONES_SEXO: Record<string, string> = { MALE: "Masculino", FEMALE: "Femenino" };
 const TRADUCCIONES_SOCIAL: Record<string, string> = { PARTNER: "Socio", BENEFICIARY: "Beneficiario" };
 

@@ -57,61 +57,13 @@ import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import * as XLSX from "xlsx";
+import { calcularEdad, formatearFecha, formatearTelefono, MESES } from "@/lib/utils/formatters";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.SERVICIOS_SOCIALES];
 const MODULE_COLOR = subgerencia.color; // #00a3a8
 
-// ============================================
-// MESES
-// ============================================
-const MESES = [
-  { value: 1,  label: "Enero" },
-  { value: 2,  label: "Febrero" },
-  { value: 3,  label: "Marzo" },
-  { value: 4,  label: "Abril" },
-  { value: 5,  label: "Mayo" },
-  { value: 6,  label: "Junio" },
-  { value: 7,  label: "Julio" },
-  { value: 8,  label: "Agosto" },
-  { value: 9,  label: "Septiembre" },
-  { value: 10, label: "Octubre" },
-  { value: 11, label: "Noviembre" },
-  { value: 12, label: "Diciembre" },
-];
-
 type FilterType = "edad" | "cumpleanos" | "telefono" | "sexo";
 
-// ============================================
-// UTILIDADES
-// ============================================
-const calcularEdad = (fechaNacimiento: string | null | undefined): number => {
-  if (!fechaNacimiento) return 0;
-  const hoy = new Date();
-  const nacimiento = new Date(fechaNacimiento);
-  let edad = hoy.getUTCFullYear() - nacimiento.getUTCFullYear();
-  const mes = hoy.getUTCMonth() - nacimiento.getUTCMonth();
-  if (mes < 0 || (mes === 0 && hoy.getUTCDate() < nacimiento.getUTCDate())) {
-    edad--;
-  }
-  return edad;
-};
-
-const formatearFecha = (fecha: string | null | undefined): string => {
-  if (!fecha) return "-";
-  const d = new Date(fecha);
-  const dia = d.getUTCDate().toString().padStart(2, "0");
-  const mes = (d.getUTCMonth() + 1).toString().padStart(2, "0");
-  const anio = d.getUTCFullYear();
-  return `${dia}/${mes}/${anio}`;
-};
-
-const formatearTelefono = (telefono: string | null | undefined): string => {
-  if (!telefono || !telefono.trim()) return "-";
-  const t = telefono.trim();
-  if (t.startsWith("+51")) return t;
-  if (t.startsWith("51") && t.length >= 11) return `+${t}`;
-  return `+51${t}`;
-};
 
 // ============================================
 // INTERFACES BACKEND
