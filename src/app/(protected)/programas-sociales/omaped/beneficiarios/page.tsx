@@ -318,6 +318,7 @@ export default function OMAPEDBeneficiariosPage() {
   const [filtroSexo, setFiltroSexo] = useState<"" | "MALE" | "FEMALE">("");
   const [filtroSexoDraft, setFiltroSexoDraft] = useState<"" | "MALE" | "FEMALE">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
+  const [observaciones, setObservaciones] = useState<Record<string, string>>({});
 
   // Estados para detalle
   const [detailData, setDetailData] = useState<BeneficiarioDetalleView | null>(null);
@@ -888,13 +889,14 @@ export default function OMAPEDBeneficiariosPage() {
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Grado</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Diagnóstico</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>CONADIS</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                         <CircularProgress size={32} sx={{ color: OMAPED_COLOR }} />
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                           Cargando beneficiarios...
@@ -903,7 +905,7 @@ export default function OMAPEDBeneficiariosPage() {
                     </TableRow>
                   ) : filteredData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">
                           No se encontraron beneficiarios
                         </Typography>
@@ -956,6 +958,18 @@ export default function OMAPEDBeneficiariosPage() {
                             {row.diagnostico}
                           </TableCell>
                           <TableCell>{row.conadis}</TableCell>
+                          <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
+                            <TextField
+                              size="small"
+                              placeholder="Escribir..."
+                              value={observaciones[row.id] || ""}
+                              onChange={(e) => setObservaciones((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                              multiline
+                              maxRows={2}
+                              fullWidth
+                              sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
+                            />
+                          </TableCell>
                           <TableCell align="center">
                             <Tooltip title="Ver detalles">
                               <IconButton

@@ -114,6 +114,7 @@ export default function ComedoresListaPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [miembrosRange, setMiembrosRange] = useState<number[]>([0, 500]);
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
+  const [observaciones, setObservaciones] = useState<Record<string, string>>({});
 
   // Estados para detalle
   const [selectedComedor, setSelectedComedor] = useState<ComedorAPI | null>(null);
@@ -538,6 +539,9 @@ export default function ComedoresListaPage() {
                     <TableCell sx={{ fontWeight: 600, color: "#334155", fontFamily: "'Inter', 'Roboto', sans-serif", whiteSpace: "nowrap" }}>
                       Presidente
                     </TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155", fontFamily: "'Inter', 'Roboto', sans-serif", whiteSpace: "nowrap" }}>
+                      Observación
+                    </TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155", fontFamily: "'Inter', 'Roboto', sans-serif", whiteSpace: "nowrap" }}>
                       Acciones
                     </TableCell>
@@ -546,7 +550,7 @@ export default function ComedoresListaPage() {
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={10} align="center" sx={{ py: 6 }}>
+                      <TableCell colSpan={11} align="center" sx={{ py: 6 }}>
                         <CircularProgress size={40} sx={{ color: subgerencia.color }} />
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
                           Cargando comedores populares...
@@ -555,7 +559,7 @@ export default function ComedoresListaPage() {
                     </TableRow>
                   ) : dataFormateados.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">
                           No se encontraron comedores populares
                         </Typography>
@@ -629,6 +633,18 @@ export default function ComedoresListaPage() {
                         </TableCell>
                         <TableCell sx={{ fontFamily: "'Inter', 'Roboto', sans-serif", maxWidth: 180, fontSize: "0.85rem" }}>
                           {row.president ? `${row.president.name} ${row.president.lastname}` : "-"}
+                        </TableCell>
+                        <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
+                          <TextField
+                            size="small"
+                            placeholder="Escribir..."
+                            value={observaciones[row.id] || ""}
+                            onChange={(e) => setObservaciones((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                            multiline
+                            maxRows={2}
+                            fullWidth
+                            sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
+                          />
                         </TableCell>
                         <TableCell align="center">
                           <Box display="flex" alignItems="center" justifyContent="center" gap={0.5} flexWrap="nowrap">

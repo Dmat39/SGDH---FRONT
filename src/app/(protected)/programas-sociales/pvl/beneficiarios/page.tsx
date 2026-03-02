@@ -340,6 +340,7 @@ export default function PVLBeneficiariosPage() {
   const [filtroSexo, setFiltroSexo] = useState<"" | "FEMALE" | "MALE">("");
   const [filtroSexoDraft, setFiltroSexoDraft] = useState<"" | "FEMALE" | "MALE">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
+  const [observaciones, setObservaciones] = useState<Record<string, string>>({});
 
   // Detalle
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -1035,13 +1036,14 @@ export default function PVLBeneficiariosPage() {
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Prioridad</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Comité</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Celular</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
                         <CircularProgress size={32} sx={{ color: PVL_COLOR }} />
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                           Cargando beneficiarios...
@@ -1050,7 +1052,7 @@ export default function PVLBeneficiariosPage() {
                     </TableRow>
                   ) : filteredData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">
                           No se encontraron beneficiarios
                         </Typography>
@@ -1128,6 +1130,18 @@ export default function PVLBeneficiariosPage() {
                             </Typography>
                           </TableCell>
                           <TableCell>{row.celular}</TableCell>
+                          <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
+                            <TextField
+                              size="small"
+                              placeholder="Escribir..."
+                              value={observaciones[row.id] || ""}
+                              onChange={(e) => setObservaciones((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                              multiline
+                              maxRows={2}
+                              fullWidth
+                              sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
+                            />
+                          </TableCell>
                           <TableCell align="center">
                             <Tooltip title="Ver detalles">
                               <IconButton

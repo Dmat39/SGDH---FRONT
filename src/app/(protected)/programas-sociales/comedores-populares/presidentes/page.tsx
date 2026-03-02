@@ -164,6 +164,7 @@ export default function ComedoresPresidentesPage() {
   const [filtroSexo, setFiltroSexo] = useState<"" | "MALE" | "FEMALE">("");
   const [filtroSexoDraft, setFiltroSexoDraft] = useState<"" | "MALE" | "FEMALE">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
+  const [observaciones, setObservaciones] = useState<Record<string, string>>({});
 
   // Detalle
   const [selectedPresidente, setSelectedPresidente] = useState<PresidenteFrontend | null>(null);
@@ -510,20 +511,21 @@ export default function ComedoresPresidentesPage() {
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Teléfono</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Sexo</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Edad</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                         <CircularProgress size={32} sx={{ color: "#64748b" }} />
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Cargando presidentes...</Typography>
                       </TableCell>
                     </TableRow>
                   ) : dataFormateados.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">No se encontraron presidentes</Typography>
                       </TableCell>
                     </TableRow>
@@ -561,6 +563,18 @@ export default function ComedoresPresidentesPage() {
                               </Typography>
                             </Box>
                           ) : "-"}
+                        </TableCell>
+                        <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
+                          <TextField
+                            size="small"
+                            placeholder="Escribir..."
+                            value={observaciones[row.id] || ""}
+                            onChange={(e) => setObservaciones((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                            multiline
+                            maxRows={2}
+                            fullWidth
+                            sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
+                          />
                         </TableCell>
                         <TableCell align="center">
                           <Tooltip title="Ver detalles">

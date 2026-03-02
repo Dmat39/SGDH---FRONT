@@ -194,6 +194,7 @@ export default function ListaGeneralServiciosSocialesPage() {
   const [filtroSexo, setFiltroSexo] = useState<"" | "FEMALE" | "MALE">("");
   const [filtroSexoDraft, setFiltroSexoDraft] = useState<"" | "FEMALE" | "MALE">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
+  const [observaciones, setObservaciones] = useState<Record<string, string>>({});
 
   // Debounce de búsqueda (400ms)
   useEffect(() => {
@@ -897,18 +898,19 @@ export default function ListaGeneralServiciosSocialesPage() {
               <Table stickyHeader size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>Nombre Completo</TableCell>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>DNI</TableCell>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc", whiteSpace: "nowrap" }}>Sexo</TableCell>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>Teléfono</TableCell>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>Cumpleaños / Edad</TableCell>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>Módulo</TableCell>
+                    <TableCell sx={{ fontWeight: 700, backgroundColor: subgerencia.color, color: "white", fontSize: "0.78rem", whiteSpace: "nowrap", py: 1.5 }}>Nombre Completo</TableCell>
+                    <TableCell sx={{ fontWeight: 700, backgroundColor: subgerencia.color, color: "white", fontSize: "0.78rem", whiteSpace: "nowrap", py: 1.5 }}>DNI</TableCell>
+                    <TableCell sx={{ fontWeight: 700, backgroundColor: subgerencia.color, color: "white", fontSize: "0.78rem", whiteSpace: "nowrap", py: 1.5 }}>Sexo</TableCell>
+                    <TableCell sx={{ fontWeight: 700, backgroundColor: subgerencia.color, color: "white", fontSize: "0.78rem", whiteSpace: "nowrap", py: 1.5 }}>Teléfono</TableCell>
+                    <TableCell sx={{ fontWeight: 700, backgroundColor: subgerencia.color, color: "white", fontSize: "0.78rem", whiteSpace: "nowrap", py: 1.5 }}>Cumpleaños / Edad</TableCell>
+                    <TableCell sx={{ fontWeight: 700, backgroundColor: subgerencia.color, color: "white", fontSize: "0.78rem", whiteSpace: "nowrap", py: 1.5 }}>Módulo</TableCell>
+                    <TableCell sx={{ fontWeight: 700, backgroundColor: subgerencia.color, color: "white", fontSize: "0.78rem", whiteSpace: "nowrap", py: 1.5, minWidth: 160 }}>Observación</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {filteredData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">
                           No se encontraron registros con los filtros aplicados
                         </Typography>
@@ -992,6 +994,24 @@ export default function ListaGeneralServiciosSocialesPage() {
                             ) : (
                               <Typography variant="body2" color="text.secondary">-</Typography>
                             )}
+                          </TableCell>
+                          <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
+                            <TextField
+                              size="small"
+                              placeholder="Escribir..."
+                              value={observaciones[row.id] || ""}
+                              onChange={(e) => setObservaciones((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                              multiline
+                              maxRows={2}
+                              fullWidth
+                              sx={{
+                                "& .MuiOutlinedInput-root": {
+                                  fontSize: "0.78rem",
+                                  borderRadius: "6px",
+                                  backgroundColor: "white",
+                                },
+                              }}
+                            />
                           </TableCell>
                         </TableRow>
                       );
