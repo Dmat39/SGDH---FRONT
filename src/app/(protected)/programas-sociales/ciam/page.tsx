@@ -23,6 +23,7 @@ import {
   School,
 } from "@mui/icons-material";
 import { useFetch } from "@/lib/hooks/useFetch";
+import { calcularEdad } from "@/lib/utils/formatters";
 
 const BATCH_SIZE = 500;
 
@@ -146,19 +147,6 @@ const AGE_RANGE_COLORS = [
   "#8e24aa",
 ];
 
-// ============================================
-// UTILIDADES
-// ============================================
-const calcularEdad = (birthday: string): number => {
-  const hoy = new Date();
-  const nacimiento = new Date(birthday);
-  let edad = hoy.getFullYear() - nacimiento.getUTCFullYear();
-  const m = hoy.getMonth() - nacimiento.getUTCMonth();
-  if (m < 0 || (m === 0 && hoy.getDate() < nacimiento.getUTCDate())) {
-    edad--;
-  }
-  return edad;
-};
 
 const getRangoEdad = (edad: number): string => {
   if (edad < 65) return "60-64";

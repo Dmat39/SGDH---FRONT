@@ -60,32 +60,11 @@ import {
 import * as XLSX from "xlsx";
 import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
+import { useFilters } from "@/lib/hooks/useFilters";
+import { useBeneficiarioDialog } from "@/lib/hooks/useBeneficiarioDialog";
+import { calcularEdad, formatearFecha } from "@/lib/utils/formatters";
 
 const CIAM_COLOR = "#9c27b0";
-
-// ============================================
-// UTILIDADES
-// ============================================
-const calcularEdad = (fechaNacimiento: string | null | undefined): number => {
-  if (!fechaNacimiento) return 0;
-  const hoy = new Date();
-  const nacimiento = new Date(fechaNacimiento);
-  let edad = hoy.getFullYear() - nacimiento.getUTCFullYear();
-  const mes = hoy.getMonth() - nacimiento.getUTCMonth();
-  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getUTCDate())) {
-    edad--;
-  }
-  return edad;
-};
-
-const formatearFecha = (fecha: string | null | undefined): string => {
-  if (!fecha) return "-";
-  const date = new Date(fecha);
-  const dia = date.getUTCDate().toString().padStart(2, "0");
-  const mes = (date.getUTCMonth() + 1).toString().padStart(2, "0");
-  const anio = date.getUTCFullYear();
-  return `${dia}/${mes}/${anio}`;
-};
 
 // Traducciones de valores del backend
 const TRADUCCIONES: Record<string, Record<string, string>> = {
@@ -290,8 +269,7 @@ const mapListaToTabla = (item: BeneficiarioListaBackend): BeneficiarioTabla => (
 // ============================================
 // CONSTANTES
 // ============================================
-type FilterType = "edad" | "cumpleanos" | "sexo" | "seguro" | "telefono";
-type CumpleanosModo = "mes" | "dia";
+type LocalFilterType = "edad" | "cumpleanos" | "sexo" | "seguro" | "telefono";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -818,34 +796,31 @@ function DetalleContent({ beneficiario, loading }: DetalleProps) {
 export default function CIAMBeneficiariosPage() {
   const { getData } = useFetch();
 
+  // Datos de tabla
   const [data, setData] = useState<BeneficiarioTabla[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Paginación server-side
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [fetchKey, setFetchKey] = useState(0);
 
-  // Búsqueda y filtros
+  // Búsqueda
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [filterType, setFilterType] = useState<FilterType>("edad");
-  const [edadRange, setEdadRange] = useState<number[]>([60, 110]);
-  const [mesSeleccionado, setMesSeleccionado] = useState<number | null>(null);
-  const [cumpleanosModo, setCumpleanosModo] = useState<CumpleanosModo>("mes");
-  const [diaCumpleanos, setDiaCumpleanos] = useState<string>("");
-  const [filtroSexo, setFiltroSexo] = useState<"" | "MALE" | "FEMALE">("");
-  const [filtroSexoDraft, setFiltroSexoDraft] = useState<"" | "MALE" | "FEMALE">("");
-  const [segurosSeleccionados, setSegurosSeleccionados] = useState<string[]>([]);
-  const [filtroTelefono, setFiltroTelefono] = useState<"" | "con" | "sin">("");
-  const [filtroTelefonoDraft, setFiltroTelefonoDraft] = useState<"" | "con" | "sin">("");
-  const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
-  const [observaciones, setObservaciones] = useState<Record<string, string>>({});
 
-  // Detalle
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
+  // Otros estados locales
+  const [observaciones, setObservaciones] = useState<Record<string, string>>({});
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Filtros específicos de CIAM (no en useFilters)
+  const [filterType, setFilterType] = useState<LocalFilterType>("edad");
+  const [segurosSeleccionados, setSegurosSeleccionados] = useState<string[]>([]);
+
+  // Hooks
+  const filters = useFilters({ edadMin: 60, edadMax: 110 });
+  const dialog = useBeneficiarioDialog<string>();
+
+  // Estado del detalle
   const [detalleData, setDetalleData] = useState<BeneficiarioDetalleBackend | null>(null);
   const [detalleLoading, setDetalleLoading] = useState(false);
 
@@ -858,7 +833,9 @@ export default function CIAMBeneficiariosPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Cargar lista de beneficiarios con paginación y filtros server-side
+  const triggerFetch = () => { setPage(0); setFetchKey((k) => k + 1); };
+
+  // Cargar lista de beneficiarios
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
@@ -867,37 +844,26 @@ export default function CIAMBeneficiariosPage() {
         params.set("page", String(page + 1));
         params.set("limit", String(rowsPerPage));
 
-        if (debouncedSearch.trim()) {
-          params.set("search", debouncedSearch.trim());
+        if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+
+        if (filters.edadRange[0] > 60 || filters.edadRange[1] < 110) {
+          params.set("age_min", String(filters.edadRange[0]));
+          params.set("age_max", String(filters.edadRange[1]));
         }
 
-        // Filtro de edad (server-side)
-        if (edadRange[0] > 60 || edadRange[1] < 110) {
-          params.set("age_min", String(edadRange[0]));
-          params.set("age_max", String(edadRange[1]));
-        }
-
-        // Filtro de cumpleaños/mes (server-side)
-        if (cumpleanosModo === "mes" && mesSeleccionado !== null) {
-          params.set("month", String(mesSeleccionado + 1));
-        } else if (cumpleanosModo === "dia" && diaCumpleanos) {
-          const parts = diaCumpleanos.split("-"); // YYYY-MM-DD
+        if (filters.cumpleanosModo === "mes" && filters.mesSeleccionado !== null) {
+          params.set("month", String(filters.mesSeleccionado + 1));
+        } else if (filters.cumpleanosModo === "dia" && filters.diaCumpleanos) {
+          const parts = filters.diaCumpleanos.split("-");
           params.set("birthday", `${parts[1]}-${parts[2]}`);
         }
 
-        if (filtroTelefono === "con") {
-          params.set("phone", "true");
-        } else if (filtroTelefono === "sin") {
-          params.set("phone", "false");
-        }
+        if (filters.filtroTelefono === "con") params.set("phone", "true");
+        else if (filters.filtroTelefono === "sin") params.set("phone", "false");
 
-        if (filtroSexo) {
-          params.set("sex", filtroSexo);
-        }
+        if (filters.filtroSexo) params.set("sex", filters.filtroSexo);
 
-        const response = await getData<BackendListaResponse>(
-          `pam/benefited?${params.toString()}`
-        );
+        const response = await getData<BackendListaResponse>(`pam/benefited?${params.toString()}`);
 
         if (response?.data) {
           setData(response.data.data.map(mapListaToTabla));
@@ -921,9 +887,7 @@ export default function CIAMBeneficiariosPage() {
     setDetalleLoading(true);
     try {
       const response = await getData<BackendDetalleResponse>(`pam/benefited/${id}`);
-      if (response?.data) {
-        setDetalleData(response.data);
-      }
+      if (response?.data) setDetalleData(response.data);
     } catch (error) {
       console.error("Error al cargar detalle:", error);
       setDetalleData(null);
@@ -933,63 +897,74 @@ export default function CIAMBeneficiariosPage() {
   }, [getData]);
 
   useEffect(() => {
-    if (selectedId && detailOpen) {
-      fetchDetalle(selectedId);
-    }
-  }, [selectedId, detailOpen, fetchDetalle]);
+    if (dialog.selectedItem && dialog.detailOpen) fetchDetalle(dialog.selectedItem);
+  }, [dialog.selectedItem, dialog.detailOpen, fetchDetalle]);
 
-  // Handlers de filtros
+  // Handlers
   const handleFilterClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    setFiltroTelefonoDraft(filtroTelefono);
-    setFiltroSexoDraft(filtroSexo);
-    setFilterAnchor(e.currentTarget);
-  };
-  const handleFilterClose = () => setFilterAnchor(null);
-  const handleFilterTypeChange = (_: React.MouseEvent<HTMLElement>, v: FilterType | null) => {
-    if (v !== null) setFilterType(v);
-  };
-  const handleEdadChange = (_: Event, v: number | number[]) => setEdadRange(v as number[]);
-  const handleMesToggle = (mes: number) => {
-    setMesSeleccionado((prev) => prev === mes ? null : mes);
-  };
-  const handleSeguroToggle = (seguro: string) => {
-    setSegurosSeleccionados((prev) => prev.includes(seguro) ? prev.filter((s) => s !== seguro) : [...prev, seguro]);
+    filters.setFiltroTelefonoDraft(filters.filtroTelefono);
+    filters.setFiltroSexoDraft(filters.filtroSexo);
+    filters.handleFilterClick(e);
   };
 
-  const filterOpen = Boolean(filterAnchor);
-  const isEdadFiltered = edadRange[0] > 60 || edadRange[1] < 110;
-  const isCumpleanosFiltered = cumpleanosModo === "mes" ? mesSeleccionado !== null : diaCumpleanos !== "";
-  const isSexoFiltered = filtroSexo !== "";
-  const isSeguroFiltered = segurosSeleccionados.length > 0;
+  const handleMesToggle = (index: number) => {
+    filters.setMesSeleccionado(filters.mesSeleccionado === index ? null : index);
+  };
+
+  const handleSeguroToggle = (seguro: string) => {
+    setSegurosSeleccionados((prev) =>
+      prev.includes(seguro) ? prev.filter((s) => s !== seguro) : [...prev, seguro]
+    );
+  };
+
+  const handleApplyFilters = () => {
+    filters.handleApplyFilters();
+    triggerFetch();
+  };
+
+  const clearPanelFilters = () => {
+    filters.limpiarFiltros();
+    setSegurosSeleccionados([]);
+    triggerFetch();
+  };
+
+  const limpiarTodo = () => {
+    setSearchTerm("");
+    setDebouncedSearch("");
+    clearPanelFilters();
+  };
+
+  const handleRowClick = (id: string) => {
+    setDetalleData(null);
+    dialog.handleOpenDetail(id);
+  };
+
+  const handleDetailClose = () => {
+    dialog.handleCloseDetail();
+    setDetalleData(null);
+  };
 
   const handleChangePage = (_: unknown, newPage: number) => setPage(newPage);
   const handleChangeRowsPerPage = (e: React.ChangeEvent<HTMLInputElement>) => {
     setRowsPerPage(parseInt(e.target.value, 10));
     setPage(0);
   };
-  const handleRowClick = (id: string) => {
-    setSelectedId(id);
-    setDetalleData(null);
-    setDetailOpen(true);
-  };
-  const handleDetailClose = () => {
-    setDetailOpen(false);
-    setSelectedId(null);
-    setDetalleData(null);
-  };
 
-  // Formatear datos de la página actual
+  // Valores derivados
+  const isEdadFiltered = filters.edadRange[0] > 60 || filters.edadRange[1] < 110;
+  const isCumpleanosFiltered = filters.cumpleanosModo === "mes"
+    ? filters.mesSeleccionado !== null
+    : filters.diaCumpleanos !== "";
+  const isSexoFiltered = filters.filtroSexo !== "";
+  const isSeguroFiltered = segurosSeleccionados.length > 0;
+
+  // Formatear y filtrar datos (seguro es client-side)
   const dataFormateados = useFormatTableData(data);
+  const filteredData = dataFormateados.filter((b: BeneficiarioTabla) =>
+    segurosSeleccionados.length === 0 || segurosSeleccionados.includes(b.seguroSalud)
+  );
 
-  // Filtrado client-side (solo seguro - sexo se filtra en el servidor)
-  const filteredData = dataFormateados.filter((b: BeneficiarioTabla) => {
-    const matchesSeguro = segurosSeleccionados.length === 0 || segurosSeleccionados.includes(b.seguroSalud);
-    return matchesSeguro;
-  });
-
-  const [isExporting, setIsExporting] = useState(false);
-
-  // Exportar a Excel (todos los datos filtrados)
+  // Exportar a Excel
   const handleExport = async () => {
     setIsExporting(true);
     try {
@@ -997,31 +972,24 @@ export default function CIAMBeneficiariosPage() {
       params.set("page", "1");
       params.set("limit", "99999");
 
-      if (debouncedSearch.trim()) {
-        params.set("search", debouncedSearch.trim());
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+
+      if (filters.edadRange[0] > 60 || filters.edadRange[1] < 110) {
+        params.set("age_min", String(filters.edadRange[0]));
+        params.set("age_max", String(filters.edadRange[1]));
       }
 
-      if (edadRange[0] > 60 || edadRange[1] < 110) {
-        params.set("age_min", String(edadRange[0]));
-        params.set("age_max", String(edadRange[1]));
-      }
-
-      if (cumpleanosModo === "mes" && mesSeleccionado !== null) {
-        params.set("month", String(mesSeleccionado + 1));
-      } else if (cumpleanosModo === "dia" && diaCumpleanos) {
-        const parts = diaCumpleanos.split("-");
+      if (filters.cumpleanosModo === "mes" && filters.mesSeleccionado !== null) {
+        params.set("month", String(filters.mesSeleccionado + 1));
+      } else if (filters.cumpleanosModo === "dia" && filters.diaCumpleanos) {
+        const parts = filters.diaCumpleanos.split("-");
         params.set("birthday", `${parts[1]}-${parts[2]}`);
       }
 
-      if (filtroTelefono === "con") {
-        params.set("phone", "true");
-      } else if (filtroTelefono === "sin") {
-        params.set("phone", "false");
-      }
+      if (filters.filtroTelefono === "con") params.set("phone", "true");
+      else if (filters.filtroTelefono === "sin") params.set("phone", "false");
 
-      if (filtroSexo) {
-        params.set("sex", filtroSexo);
-      }
+      if (filters.filtroSexo) params.set("sex", filters.filtroSexo);
 
       const response = await getData<BackendListaResponse>(`pam/benefited?${params.toString()}`);
 
@@ -1050,22 +1018,6 @@ export default function CIAMBeneficiariosPage() {
     } finally {
       setIsExporting(false);
     }
-  };
-
-  const limpiarFiltros = () => {
-    setSearchTerm("");
-    setDebouncedSearch("");
-    setEdadRange([60, 110]);
-    setMesSeleccionado(null);
-    setCumpleanosModo("mes");
-    setDiaCumpleanos("");
-    setFiltroSexo("");
-    setFiltroSexoDraft("");
-    setSegurosSeleccionados([]);
-    setFiltroTelefono("");
-    setFiltroTelefonoDraft("");
-    setPage(0);
-    setFetchKey((k) => k + 1);
   };
 
   return (
@@ -1139,7 +1091,7 @@ export default function CIAMBeneficiariosPage() {
                 <IconButton
                   onClick={handleFilterClick}
                   sx={{
-                    backgroundColor: filterOpen ? "#e2e8f0" : "#f8fafc",
+                    backgroundColor: filters.filterOpen ? "#e2e8f0" : "#f8fafc",
                     border: "1px solid #e2e8f0",
                     borderRadius: "8px",
                     "&:hover": { backgroundColor: "#e2e8f0" },
@@ -1167,9 +1119,9 @@ export default function CIAMBeneficiariosPage() {
               {isEdadFiltered && (
                 <Box sx={{ backgroundColor: "#f3e5f5", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
                   <Typography variant="caption" color="#7b1fa2">
-                    Edad: {edadRange[0]} - {edadRange[1]} años
+                    Edad: {filters.edadRange[0]} - {filters.edadRange[1]} años
                   </Typography>
-                  <IconButton size="small" onClick={() => { setEdadRange([60, 110]); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                  <IconButton size="small" onClick={() => { filters.setEdadRange([60, 110]); triggerFetch(); }} sx={{ p: 0.25 }}>
                     <Close sx={{ fontSize: 14, color: "#7b1fa2" }} />
                   </IconButton>
                 </Box>
@@ -1178,23 +1130,23 @@ export default function CIAMBeneficiariosPage() {
                 <Box sx={{ backgroundColor: "#fce7f3", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
                   <Cake sx={{ fontSize: 14, color: "#be185d" }} />
                   <Typography variant="caption" color="#be185d">
-                    {cumpleanosModo === "mes" && mesSeleccionado !== null
-                      ? MESES[mesSeleccionado].slice(0, 3)
-                      : diaCumpleanos.split("-").slice(1).reverse().join("/")}
+                    {filters.cumpleanosModo === "mes" && filters.mesSeleccionado !== null
+                      ? MESES[filters.mesSeleccionado].slice(0, 3)
+                      : filters.diaCumpleanos.split("-").slice(1).reverse().join("/")}
                   </Typography>
-                  <IconButton size="small" onClick={() => { setMesSeleccionado(null); setDiaCumpleanos(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
+                  <IconButton size="small" onClick={() => { filters.setMesSeleccionado(null); filters.setDiaCumpleanos(""); triggerFetch(); }} sx={{ p: 0.25 }}>
                     <Close sx={{ fontSize: 14, color: "#be185d" }} />
                   </IconButton>
                 </Box>
               )}
-              {filtroSexo && (
-                <Box sx={{ backgroundColor: filtroSexo === "MALE" ? "#e3f2fd" : "#fce4ec", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
-                  <Wc sx={{ fontSize: 14, color: filtroSexo === "MALE" ? "#1565c0" : "#c2185b" }} />
-                  <Typography variant="caption" color={filtroSexo === "MALE" ? "#1565c0" : "#c2185b"}>
-                    {filtroSexo === "MALE" ? "Masculino" : "Femenino"}
+              {isSexoFiltered && (
+                <Box sx={{ backgroundColor: filters.filtroSexo === "MALE" ? "#e3f2fd" : "#fce4ec", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                  <Wc sx={{ fontSize: 14, color: filters.filtroSexo === "MALE" ? "#1565c0" : "#c2185b" }} />
+                  <Typography variant="caption" color={filters.filtroSexo === "MALE" ? "#1565c0" : "#c2185b"}>
+                    {filters.filtroSexo === "MALE" ? "Masculino" : "Femenino"}
                   </Typography>
-                  <IconButton size="small" onClick={() => { setFiltroSexo(""); setFiltroSexoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
-                    <Close sx={{ fontSize: 14, color: filtroSexo === "MALE" ? "#1565c0" : "#c2185b" }} />
+                  <IconButton size="small" onClick={() => { filters.setFiltroSexo(""); filters.setFiltroSexoDraft(""); triggerFetch(); }} sx={{ p: 0.25 }}>
+                    <Close sx={{ fontSize: 14, color: filters.filtroSexo === "MALE" ? "#1565c0" : "#c2185b" }} />
                   </IconButton>
                 </Box>
               )}
@@ -1208,17 +1160,17 @@ export default function CIAMBeneficiariosPage() {
                   </IconButton>
                 </Box>
               )}
-              {filtroTelefono && (
-                <Box sx={{ backgroundColor: filtroTelefono === "con" ? "#dcfce7" : "#fee2e2", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
-                  {filtroTelefono === "con"
+              {filters.filtroTelefono && (
+                <Box sx={{ backgroundColor: filters.filtroTelefono === "con" ? "#dcfce7" : "#fee2e2", borderRadius: "16px", px: 1.5, py: 0.5, display: "flex", alignItems: "center", gap: 0.5 }}>
+                  {filters.filtroTelefono === "con"
                     ? <PhoneEnabled sx={{ fontSize: 14, color: "#16a34a" }} />
                     : <PhoneDisabled sx={{ fontSize: 14, color: "#dc2626" }} />
                   }
-                  <Typography variant="caption" color={filtroTelefono === "con" ? "#16a34a" : "#dc2626"}>
-                    {filtroTelefono === "con" ? "Con celular" : "Sin celular"}
+                  <Typography variant="caption" color={filters.filtroTelefono === "con" ? "#16a34a" : "#dc2626"}>
+                    {filters.filtroTelefono === "con" ? "Con celular" : "Sin celular"}
                   </Typography>
-                  <IconButton size="small" onClick={() => { setFiltroTelefono(""); setFiltroTelefonoDraft(""); setPage(0); setFetchKey((k) => k + 1); }} sx={{ p: 0.25 }}>
-                    <Close sx={{ fontSize: 14, color: filtroTelefono === "con" ? "#16a34a" : "#dc2626" }} />
+                  <IconButton size="small" onClick={() => { filters.setFiltroTelefono(""); filters.setFiltroTelefonoDraft(""); triggerFetch(); }} sx={{ p: 0.25 }}>
+                    <Close sx={{ fontSize: 14, color: filters.filtroTelefono === "con" ? "#16a34a" : "#dc2626" }} />
                   </IconButton>
                 </Box>
               )}
@@ -1230,9 +1182,9 @@ export default function CIAMBeneficiariosPage() {
 
             {/* Popover de filtros */}
             <Popover
-              open={filterOpen}
-              anchorEl={filterAnchor}
-              onClose={handleFilterClose}
+              open={filters.filterOpen}
+              anchorEl={filters.filterAnchor}
+              onClose={filters.handleFilterClose}
               anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
               transformOrigin={{ vertical: "top", horizontal: "left" }}
               sx={{ mt: 1 }}
@@ -1244,7 +1196,7 @@ export default function CIAMBeneficiariosPage() {
                 <ToggleButtonGroup
                   value={filterType}
                   exclusive
-                  onChange={handleFilterTypeChange}
+                  onChange={(_, v) => { if (v !== null) setFilterType(v); }}
                   size="small"
                   fullWidth
                   sx={{ mb: 2.5 }}
@@ -1275,8 +1227,8 @@ export default function CIAMBeneficiariosPage() {
                       Rango de edad
                     </Typography>
                     <Slider
-                      value={edadRange}
-                      onChange={handleEdadChange}
+                      value={filters.edadRange}
+                      onChange={(_, v) => filters.setEdadRange(v as number[])}
                       valueLabelDisplay="auto"
                       min={60}
                       max={110}
@@ -1287,8 +1239,8 @@ export default function CIAMBeneficiariosPage() {
                       }}
                     />
                     <Box display="flex" justifyContent="space-between" mt={1}>
-                      <Typography variant="caption" color="text.secondary">{edadRange[0]} años</Typography>
-                      <Typography variant="caption" color="text.secondary">{edadRange[1]} años</Typography>
+                      <Typography variant="caption" color="text.secondary">{filters.edadRange[0]} años</Typography>
+                      <Typography variant="caption" color="text.secondary">{filters.edadRange[1]} años</Typography>
                     </Box>
                   </>
                 )}
@@ -1300,9 +1252,9 @@ export default function CIAMBeneficiariosPage() {
                       Cumpleaños del adulto mayor
                     </Typography>
                     <ToggleButtonGroup
-                      value={cumpleanosModo}
+                      value={filters.cumpleanosModo}
                       exclusive
-                      onChange={(_, v) => v && setCumpleanosModo(v)}
+                      onChange={(_, v) => v && filters.setCumpleanosModo(v)}
                       size="small"
                       fullWidth
                       sx={{ mb: 2 }}
@@ -1315,14 +1267,14 @@ export default function CIAMBeneficiariosPage() {
                       </ToggleButton>
                     </ToggleButtonGroup>
 
-                    {cumpleanosModo === "mes" ? (
+                    {filters.cumpleanosModo === "mes" ? (
                       <>
                         <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0.75 }}>
                           {MESES.map((mes, index) => (
                             <Button
                               key={mes}
                               size="small"
-                              variant={mesSeleccionado === index ? "contained" : "outlined"}
+                              variant={filters.mesSeleccionado === index ? "contained" : "outlined"}
                               onClick={() => handleMesToggle(index)}
                               sx={{
                                 textTransform: "none",
@@ -1330,11 +1282,11 @@ export default function CIAMBeneficiariosPage() {
                                 py: 0.5,
                                 px: 1,
                                 minWidth: 0,
-                                borderColor: mesSeleccionado === index ? "#be185d" : "#e2e8f0",
-                                backgroundColor: mesSeleccionado === index ? "#be185d" : "transparent",
-                                color: mesSeleccionado === index ? "white" : "#64748b",
+                                borderColor: filters.mesSeleccionado === index ? "#be185d" : "#e2e8f0",
+                                backgroundColor: filters.mesSeleccionado === index ? "#be185d" : "transparent",
+                                color: filters.mesSeleccionado === index ? "white" : "#64748b",
                                 "&:hover": {
-                                  backgroundColor: mesSeleccionado === index ? "#9d174d" : "#fce7f3",
+                                  backgroundColor: filters.mesSeleccionado === index ? "#9d174d" : "#fce7f3",
                                   borderColor: "#be185d",
                                 },
                               }}
@@ -1343,17 +1295,17 @@ export default function CIAMBeneficiariosPage() {
                             </Button>
                           ))}
                         </Box>
-                        {mesSeleccionado !== null && (
+                        {filters.mesSeleccionado !== null && (
                           <Typography variant="caption" color="#be185d" sx={{ mt: 1, display: "block" }}>
-                            Mes seleccionado: {MESES[mesSeleccionado]}
+                            Mes seleccionado: {MESES[filters.mesSeleccionado]}
                           </Typography>
                         )}
                       </>
                     ) : (
                       <TextField
                         type="date"
-                        value={diaCumpleanos}
-                        onChange={(e) => setDiaCumpleanos(e.target.value)}
+                        value={filters.diaCumpleanos}
+                        onChange={(e) => filters.setDiaCumpleanos(e.target.value)}
                         fullWidth
                         size="small"
                         helperText="Filtra por día y mes de nacimiento"
@@ -1370,9 +1322,9 @@ export default function CIAMBeneficiariosPage() {
                   <>
                     <Typography variant="body2" color="#475569" mb={1.5}>Filtrar por género</Typography>
                     <ToggleButtonGroup
-                      value={filtroSexoDraft}
+                      value={filters.filtroSexoDraft}
                       exclusive
-                      onChange={(_e, val) => { if (val !== null) setFiltroSexoDraft(val); }}
+                      onChange={(_, val) => { if (val !== null) filters.setFiltroSexoDraft(val); }}
                       size="small"
                       fullWidth
                     >
@@ -1424,9 +1376,9 @@ export default function CIAMBeneficiariosPage() {
                   <>
                     <Typography variant="body2" color="#475569" mb={1.5}>Filtrar por número de celular</Typography>
                     <ToggleButtonGroup
-                      value={filtroTelefonoDraft}
+                      value={filters.filtroTelefonoDraft}
                       exclusive
-                      onChange={(_e, val) => { if (val !== null) setFiltroTelefonoDraft(val); }}
+                      onChange={(_, val) => { if (val !== null) filters.setFiltroTelefonoDraft(val); }}
                       size="small"
                       fullWidth
                     >
@@ -1440,14 +1392,15 @@ export default function CIAMBeneficiariosPage() {
                     </ToggleButtonGroup>
                   </>
                 )}
+
                 <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
-                  <Button size="small" onClick={limpiarFiltros} sx={{ color: "#64748b", textTransform: "none" }}>
+                  <Button size="small" onClick={limpiarTodo} sx={{ color: "#64748b", textTransform: "none" }}>
                     Limpiar todo
                   </Button>
                   <Button
                     size="small"
                     variant="contained"
-                    onClick={() => { setFiltroTelefono(filtroTelefonoDraft); setFiltroSexo(filtroSexoDraft); setPage(0); setFetchKey((k) => k + 1); handleFilterClose(); }}
+                    onClick={handleApplyFilters}
                     sx={{ backgroundColor: "#475569", textTransform: "none", "&:hover": { backgroundColor: "#334155" } }}
                   >
                     Aplicar
@@ -1593,7 +1546,7 @@ export default function CIAMBeneficiariosPage() {
 
       {/* Dialog de detalles */}
       <Dialog
-        open={detailOpen}
+        open={dialog.detailOpen}
         onClose={handleDetailClose}
         maxWidth="lg"
         fullWidth

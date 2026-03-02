@@ -6,16 +6,9 @@ import type { FeatureCollection, Feature } from "geojson";
 import type { PathOptions, Layer, Path } from "leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { setupLeafletIcons } from "@/lib/utils/mapSetup";
 
-// Fix para los iconos de Leaflet en Next.js
-if (typeof window !== "undefined") {
-  delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: () => string })._getIconUrl;
-  L.Icon.Default.mergeOptions({
-    iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-    iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-    shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-  });
-}
+if (typeof window !== "undefined") setupLeafletIcons(L);
 
 // Tipo para los comedores populares (datos del backend)
 export interface Comedor {

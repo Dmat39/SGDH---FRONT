@@ -18,6 +18,7 @@ import {
 } from "@mui/icons-material";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
+import { calcularEdad } from "@/lib/utils/formatters";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 const OMAPED_COLOR = subgerencia.color;
@@ -75,18 +76,6 @@ const AGE_RANGES = [
   { label: "60+", min: 60, max: 200, color: "#f87171" },
 ];
 
-// Calcular edad
-const calcularEdad = (fechaNacimiento: string | null | undefined): number => {
-  if (!fechaNacimiento) return 0;
-  const hoy = new Date();
-  const nacimiento = new Date(fechaNacimiento);
-  let edad = hoy.getFullYear() - nacimiento.getUTCFullYear();
-  const mes = hoy.getMonth() - nacimiento.getUTCMonth();
-  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getUTCDate())) {
-    edad--;
-  }
-  return edad;
-};
 
 // Función para generar el path de un segmento del donut
 const generateDonutSegment = (

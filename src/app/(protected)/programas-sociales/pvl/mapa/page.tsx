@@ -53,27 +53,7 @@ import { Cake } from "@mui/icons-material";
 import booleanPointInPolygon from "@turf/boolean-point-in-polygon";
 import { point as turfPoint } from "@turf/helpers";
 import type { Feature, Polygon, MultiPolygon, FeatureCollection } from "geojson";
-
-// Función para calcular edad desde fecha de nacimiento
-const calcularEdad = (fechaNacimiento: string): number => {
-  const hoy = new Date();
-  const nacimiento = new Date(fechaNacimiento);
-  let edad = hoy.getFullYear() - nacimiento.getUTCFullYear();
-  const mes = hoy.getMonth() - nacimiento.getUTCMonth();
-  if (mes < 0 || (mes === 0 && hoy.getDate() < nacimiento.getUTCDate())) {
-    edad--;
-  }
-  return edad;
-};
-
-// Función para formatear fecha a DD/MM/YYYY
-const formatearFecha = (fecha: string): string => {
-  const date = new Date(fecha);
-  const dia = date.getUTCDate().toString().padStart(2, "0");
-  const mes = (date.getUTCMonth() + 1).toString().padStart(2, "0");
-  const anio = date.getUTCFullYear();
-  return `${dia}/${mes}/${anio}`;
-};
+import { calcularEdad, formatearFecha } from "@/lib/utils/formatters";
 
 // Importar el mapa dinámicamente para evitar SSR
 const MapaPVL = dynamic(() => import("./MapaPVL"), {
