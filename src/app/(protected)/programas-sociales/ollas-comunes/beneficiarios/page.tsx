@@ -102,6 +102,7 @@ export default function OllasBeneficiariosPage() {
   const [filtroSexo, setFiltroSexo] = useState<"" | "MALE" | "FEMALE">("");
   const [filtroSexoDraft, setFiltroSexoDraft] = useState<"" | "MALE" | "FEMALE">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
+  const [observaciones, setObservaciones] = useState<Record<string, string>>({});
   const [selectedBeneficiario, setSelectedBeneficiario] = useState<BeneficiarioFrontend | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
@@ -404,14 +405,15 @@ export default function OllasBeneficiariosPage() {
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Sexo</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Dirección</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Edad</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={7} align="center" sx={{ py: 4 }}><CircularProgress size={32} sx={{ color: "#64748b" }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Cargando beneficiarios...</Typography></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} align="center" sx={{ py: 4 }}><CircularProgress size={32} sx={{ color: "#64748b" }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Cargando beneficiarios...</Typography></TableCell></TableRow>
                   ) : dataFormateados.length === 0 ? (
-                    <TableRow><TableCell colSpan={7} align="center" sx={{ py: 4 }}><Typography variant="body2" color="text.secondary">No se encontraron beneficiarios</Typography></TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} align="center" sx={{ py: 4 }}><Typography variant="body2" color="text.secondary">No se encontraron beneficiarios</Typography></TableCell></TableRow>
                   ) : (
                     dataFormateados.map((row: BeneficiarioFrontend, index: number) => (
                       <TableRow key={row.id} onClick={() => handleRowClick(row)} sx={{ backgroundColor: index % 2 === 0 ? "white" : "#f8fafc", "&:hover": { backgroundColor: "#f1f5f9", cursor: "pointer" }, transition: "background-color 0.2s" }}>
@@ -440,6 +442,18 @@ export default function OllasBeneficiariosPage() {
                               </Typography>
                             </Box>
                           ) : "-"}
+                        </TableCell>
+                        <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
+                          <TextField
+                            size="small"
+                            placeholder="Escribir..."
+                            value={observaciones[row.id] || ""}
+                            onChange={(e) => setObservaciones((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                            multiline
+                            maxRows={2}
+                            fullWidth
+                            sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
+                          />
                         </TableCell>
                         <TableCell align="center">
                           <Tooltip title="Ver detalles"><IconButton size="small" onClick={(e) => { e.stopPropagation(); handleRowClick(row); }} sx={{ color: "#64748b", "&:hover": { backgroundColor: "#f1f5f9" } }}><Visibility fontSize="small" /></IconButton></Tooltip>

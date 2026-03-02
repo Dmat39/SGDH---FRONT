@@ -157,6 +157,7 @@ export default function ULEEmpadronadosPage() {
   const [filtroSexo, setFiltroSexo] = useState<"" | "MALE" | "FEMALE">("");
   const [filtroSexoDraft, setFiltroSexoDraft] = useState<"" | "MALE" | "FEMALE">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
+  const [observaciones, setObservaciones] = useState<Record<string, string>>({});
   const [filterType, setFilterType] = useState<FilterType>("edad");
   const [edadRange, setEdadRange] = useState<number[]>([0, 100]);
   const [cumpleanosModo, setCumpleanosModo] = useState<CumpleanosModo>("mes");
@@ -970,13 +971,14 @@ export default function ULEEmpadronadosPage() {
                       <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Miembros</TableCell>
                       <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Edad</TableCell>
                       <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Empadronador</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>
                       <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {empadronadosFiltrados.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
+                        <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
                           <Typography variant="body2" color="text.secondary">
                             No se encontraron registros con los filtros aplicados
                           </Typography>
@@ -1071,6 +1073,18 @@ export default function ULEEmpadronadosPage() {
                                 ? `${empadronado.enumerator.name} ${empadronado.enumerator.lastname}`
                                 : "-"}
                             </Typography>
+                          </TableCell>
+                          <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
+                            <TextField
+                              size="small"
+                              placeholder="Escribir..."
+                              value={observaciones[empadronado.id] || ""}
+                              onChange={(e) => setObservaciones((prev) => ({ ...prev, [empadronado.id]: e.target.value }))}
+                              multiline
+                              maxRows={2}
+                              fullWidth
+                              sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
+                            />
                           </TableCell>
                           <TableCell align="center">
                             <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>

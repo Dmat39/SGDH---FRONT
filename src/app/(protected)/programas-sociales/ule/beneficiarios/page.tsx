@@ -117,6 +117,7 @@ export default function ULEBeneficiariosPage() {
 
   // Estados para filtros de edad y cumpleaños
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
+  const [observaciones, setObservaciones] = useState<Record<string, string>>({});
   const [filterType, setFilterType] = useState<FilterType>("edad");
   const [edadRange, setEdadRange] = useState<number[]>([0, 100]);
   const [cumpleanosModo, setCumpleanosModo] = useState<CumpleanosModo>("mes");
@@ -844,12 +845,13 @@ export default function ULEBeneficiariosPage() {
                       <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Urbanización</TableCell>
                       <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Empadronador</TableCell>
                       <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Fecha Registro</TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {empadronadosFiltrados.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
+                        <TableCell colSpan={11} align="center" sx={{ py: 4 }}>
                           <Typography variant="body2" color="text.secondary">
                             No se encontraron registros con los filtros aplicados
                           </Typography>
@@ -939,6 +941,18 @@ export default function ULEBeneficiariosPage() {
                             <Typography variant="body2">
                               {formatearFecha(empadronado.registered_at)}
                             </Typography>
+                          </TableCell>
+                          <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
+                            <TextField
+                              size="small"
+                              placeholder="Escribir..."
+                              value={observaciones[empadronado.id] || ""}
+                              onChange={(e) => setObservaciones((prev) => ({ ...prev, [empadronado.id]: e.target.value }))}
+                              multiline
+                              maxRows={2}
+                              fullWidth
+                              sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
+                            />
                           </TableCell>
                         </TableRow>
                       ))

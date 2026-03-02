@@ -50,6 +50,8 @@ import {
   FilterList,
   PhoneEnabled,
   PhoneDisabled,
+  Male,
+  Female,
 } from "@mui/icons-material";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
@@ -77,7 +79,7 @@ const MESES = [
   { value: 12, label: "Diciembre" },
 ];
 
-type FilterType = "edad" | "cumpleanos" | "telefono";
+type FilterType = "edad" | "cumpleanos" | "telefono" | "sexo";
 
 // ============================================
 // UTILIDADES
@@ -121,6 +123,7 @@ interface DirigenteBackend {
   dni: string;
   phone: string | null;
   birthday: string | null;
+  sex: string | null;
   pueblo: string | null;
   charges_id: string | null;
   comunne_id: string | null;
@@ -153,6 +156,7 @@ interface DirigenteTabla {
   nombreCompleto: string;
   dni: string;
   celular: string;
+  sexo: string;
   fechaNacimiento: string;
   edad: number;
   pueblo: string;
@@ -166,6 +170,7 @@ const mapToTabla = (item: DirigenteBackend): DirigenteTabla => ({
   nombreCompleto: `${item.name.trim()} ${item.lastname.trim()}`,
   dni: item.dni || "-",
   celular: item.phone || "",
+  sexo: item.sex || "",
   fechaNacimiento: item.birthday || "",
   edad: calcularEdad(item.birthday),
   pueblo: item.pueblo?.trim() || "-",
@@ -431,7 +436,10 @@ export default function DirigentesPage() {
   const [filtroDia, setFiltroDia] = useState("");
   const [filtroTelefono, setFiltroTelefono] = useState<"" | "con" | "sin">("");
   const [filtroTelefonoDraft, setFiltroTelefonoDraft] = useState<"" | "con" | "sin">("");
+  const [filtroSexo, setFiltroSexo] = useState<"" | "MALE" | "FEMALE">("");
+  const [filtroSexoDraft, setFiltroSexoDraft] = useState<"" | "MALE" | "FEMALE">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
+  const [observaciones, setObservaciones] = useState<Record<string, string>>({});
 
   // Detalle
   const [detalleOpen, setDetalleOpen] = useState(false);
@@ -474,6 +482,9 @@ export default function DirigentesPage() {
       } else if (filtroTelefono === "sin") {
         params.set("phone", "false");
       }
+      if (filtroSexo) {
+        params.set("sex", filtroSexo);
+      }
 
       const response = await getData<BackendResponse>(
         `participation/neighbors?${params.toString()}`
@@ -494,7 +505,7 @@ export default function DirigentesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [page, rowsPerPage, fetchKey, debouncedSearch, edadRange, filtroMes, filtroDia, filtroTelefono, getData]);
+  }, [page, rowsPerPage, fetchKey, debouncedSearch, edadRange, filtroMes, filtroDia, filtroTelefono, filtroSexo, getData]);
 
   useEffect(() => {
     fetchData();
@@ -524,12 +535,14 @@ export default function DirigentesPage() {
       } else if (filtroMes) {
         params.set("month", String(filtroMes));
       }
+      if (filtroSexo) params.set("sex", filtroSexo);
       const response = await getData<BackendResponse>(`participation/neighbors?${params.toString()}`);
       if (!response?.data) return;
       const exportData = response.data.data.map((item: DirigenteBackend) => ({
         "Nombre Completo": `${item.name.trim()} ${item.lastname.trim()}`,
         DNI: item.dni || "-",
         Celular: formatearTelefono(item.phone),
+        Sexo: item.sex === "MALE" ? "Masculino" : item.sex === "FEMALE" ? "Femenino" : "-",
         "F. Nacimiento": formatearFecha(item.birthday),
         Edad: calcularEdad(item.birthday),
         Pueblo: item.pueblo?.trim() || "-",
@@ -540,6 +553,7 @@ export default function DirigentesPage() {
         { wch: 30 },
         { wch: 12 },
         { wch: 15 },
+        { wch: 12 },
         { wch: 15 },
         { wch: 6 },
         { wch: 40 },
@@ -561,6 +575,8 @@ export default function DirigentesPage() {
     setFiltroDia("");
     setFiltroTelefono("");
     setFiltroTelefonoDraft("");
+    setFiltroSexo("");
+    setFiltroSexoDraft("");
     setPage(0);
     setFetchKey((k) => k + 1);
   };
@@ -593,7 +609,7 @@ export default function DirigentesPage() {
 
   const filterOpen = Boolean(filterAnchor);
   const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 110;
-  const hayFiltrosActivos = searchTerm || filtroDia || filtroMes || isEdadFiltered || filtroTelefono;
+  const hayFiltrosActivos = searchTerm || filtroDia || filtroMes || isEdadFiltered || filtroTelefono || filtroSexo;
 
   return (
     <Box>
@@ -667,11 +683,11 @@ export default function DirigentesPage() {
                 onClick={(e) => setFilterAnchor(e.currentTarget)}
                 sx={{
                   backgroundColor:
-                    filterOpen || isEdadFiltered || filtroDia || filtroMes || filtroTelefono
+                    filterOpen || isEdadFiltered || filtroDia || filtroMes || filtroTelefono || filtroSexo
                       ? "#e0f7f7"
                       : "#f8fafc",
                   border: `1px solid ${
-                    filterOpen || isEdadFiltered || filtroDia || filtroMes || filtroTelefono
+                    filterOpen || isEdadFiltered || filtroDia || filtroMes || filtroTelefono || filtroSexo
                       ? MODULE_COLOR
                       : "#e2e8f0"
                   }`,
@@ -682,7 +698,7 @@ export default function DirigentesPage() {
                 <FilterList
                   sx={{
                     color:
-                      filterOpen || isEdadFiltered || filtroDia || filtroMes || filtroTelefono
+                      filterOpen || isEdadFiltered || filtroDia || filtroMes || filtroTelefono || filtroSexo
                         ? MODULE_COLOR
                         : "#64748b",
                     fontSize: 20,
@@ -882,6 +898,20 @@ export default function DirigentesPage() {
                 >
                   Teléfono
                 </ToggleButton>
+                <ToggleButton
+                  value="sexo"
+                  sx={{
+                    textTransform: "none",
+                    fontSize: "0.75rem",
+                    "&.Mui-selected": {
+                      backgroundColor: "#fce7f3",
+                      color: "#9d174d",
+                      "&:hover": { backgroundColor: "#fbcfe8" },
+                    },
+                  }}
+                >
+                  Sexo
+                </ToggleButton>
               </ToggleButtonGroup>
 
               <Divider sx={{ mb: 2 }} />
@@ -993,6 +1023,48 @@ export default function DirigentesPage() {
                 </>
               )}
 
+              {filterType === "sexo" && (
+                <>
+                  <Typography variant="body2" color="#475569" mb={1.5}>
+                    Filtrar por sexo
+                  </Typography>
+                  <Box display="flex" gap={1}>
+                    <Button
+                      size="small"
+                      variant={filtroSexoDraft === "MALE" ? "contained" : "outlined"}
+                      startIcon={<Male fontSize="small" />}
+                      onClick={() => setFiltroSexoDraft(filtroSexoDraft === "MALE" ? "" : "MALE")}
+                      sx={{
+                        flex: 1,
+                        textTransform: "none",
+                        borderColor: "#2563eb",
+                        color: filtroSexoDraft === "MALE" ? "white" : "#2563eb",
+                        backgroundColor: filtroSexoDraft === "MALE" ? "#2563eb" : "transparent",
+                        "&:hover": { backgroundColor: filtroSexoDraft === "MALE" ? "#1d4ed8" : "#dbeafe" },
+                      }}
+                    >
+                      Masculino
+                    </Button>
+                    <Button
+                      size="small"
+                      variant={filtroSexoDraft === "FEMALE" ? "contained" : "outlined"}
+                      startIcon={<Female fontSize="small" />}
+                      onClick={() => setFiltroSexoDraft(filtroSexoDraft === "FEMALE" ? "" : "FEMALE")}
+                      sx={{
+                        flex: 1,
+                        textTransform: "none",
+                        borderColor: "#db2777",
+                        color: filtroSexoDraft === "FEMALE" ? "white" : "#db2777",
+                        backgroundColor: filtroSexoDraft === "FEMALE" ? "#db2777" : "transparent",
+                        "&:hover": { backgroundColor: filtroSexoDraft === "FEMALE" ? "#be185d" : "#fce7f3" },
+                      }}
+                    >
+                      Femenino
+                    </Button>
+                  </Box>
+                </>
+              )}
+
               <Box display="flex" justifyContent="flex-end" mt={2.5} gap={1}>
                 <Button
                   size="small"
@@ -1001,6 +1073,10 @@ export default function DirigentesPage() {
                     setEdadRangePending([0, 110]);
                     setFiltroDia("");
                     setFiltroMes("");
+                    setFiltroTelefono("");
+                    setFiltroTelefonoDraft("");
+                    setFiltroSexo("");
+                    setFiltroSexoDraft("");
                     setPage(0);
                     setFetchKey((k) => k + 1);
                   }}
@@ -1014,6 +1090,7 @@ export default function DirigentesPage() {
                   onClick={() => {
                     setEdadRange(edadRangePending);
                     setFiltroTelefono(filtroTelefonoDraft);
+                    setFiltroSexo(filtroSexoDraft);
                     setPage(0);
                     setFetchKey((k) => k + 1);
                     setFilterAnchor(null);
@@ -1083,6 +1160,15 @@ export default function DirigentesPage() {
                   sx={{ backgroundColor: filtroTelefono === "con" ? "#16a34a" : "#dc2626", color: "white" }}
                 />
               )}
+              {filtroSexo && (
+                <Chip
+                  size="small"
+                  label={filtroSexo === "MALE" ? "Masculino" : "Femenino"}
+                  icon={filtroSexo === "MALE" ? <Male sx={{ fontSize: 14, color: "white !important" }} /> : <Female sx={{ fontSize: 14, color: "white !important" }} />}
+                  onDelete={() => { setFiltroSexo(""); setFiltroSexoDraft(""); setPage(0); setFetchKey((k) => k + 1); }}
+                  sx={{ backgroundColor: filtroSexo === "MALE" ? "#2563eb" : "#db2777", color: "white" }}
+                />
+              )}
               {searchTerm && (
                 <Chip
                   size="small"
@@ -1128,13 +1214,15 @@ export default function DirigentesPage() {
                           "Nombre Completo",
                           "DNI",
                           "Celular",
+                          "Sexo",
                           "Edad / Nacimiento",
                           "Pueblo",
+                          "Observación",
                           "",
                         ].map((col, i) => (
                           <TableCell
                             key={i}
-                            align={i === 0 || i === 6 ? "center" : "left"}
+                            align={i === 0 || i === 8 ? "center" : "left"}
                             sx={{
                               backgroundColor: MODULE_COLOR,
                               color: "white",
@@ -1153,7 +1241,7 @@ export default function DirigentesPage() {
                     <TableBody>
                       {dataFormateados.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                          <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
                             <Box
                               display="flex"
                               flexDirection="column"
@@ -1213,6 +1301,40 @@ export default function DirigentesPage() {
                               </Typography>
                             </TableCell>
 
+                            {/* Sexo */}
+                            <TableCell>
+                              {row.sexo === "MALE" || row.sexo === "FEMALE" ? (
+                                <Chip
+                                  size="small"
+                                  icon={
+                                    row.sexo === "MALE"
+                                      ? <Male sx={{ fontSize: 14, color: "white !important" }} />
+                                      : <Female sx={{ fontSize: 14, color: "white !important" }} />
+                                  }
+                                  label={row.sexo === "MALE" ? "Masculino" : "Femenino"}
+                                  sx={{
+                                    backgroundColor: row.sexo === "MALE" ? "#2563eb" : "#db2777",
+                                    color: "white",
+                                    fontWeight: 600,
+                                    fontSize: "0.72rem",
+                                    height: 22,
+                                  }}
+                                />
+                              ) : (
+                                <Chip
+                                  size="small"
+                                  label="Sin dato"
+                                  sx={{
+                                    backgroundColor: "#f1f5f9",
+                                    color: "#94a3b8",
+                                    fontWeight: 500,
+                                    fontSize: "0.72rem",
+                                    height: 22,
+                                  }}
+                                />
+                              )}
+                            </TableCell>
+
                             {/* Edad / Nacimiento */}
                             <TableCell>
                               {row.fechaNacimiento ? (
@@ -1257,6 +1379,26 @@ export default function DirigentesPage() {
                               >
                                 {row.pueblo}
                               </Typography>
+                            </TableCell>
+
+                            {/* Observación */}
+                            <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
+                              <TextField
+                                size="small"
+                                placeholder="Escribir..."
+                                value={observaciones[row.id] || ""}
+                                onChange={(e) => setObservaciones((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                                multiline
+                                maxRows={2}
+                                fullWidth
+                                sx={{
+                                  "& .MuiOutlinedInput-root": {
+                                    fontSize: "0.78rem",
+                                    borderRadius: "6px",
+                                    backgroundColor: "white",
+                                  },
+                                }}
+                              />
                             </TableCell>
 
                             {/* Acciones */}
