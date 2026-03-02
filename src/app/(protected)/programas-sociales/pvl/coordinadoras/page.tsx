@@ -155,6 +155,7 @@ export default function PVLCoordinadorasPage() {
   const [filtroSexo, setFiltroSexo] = useState<"" | "FEMALE" | "MALE">("");
   const [filtroSexoDraft, setFiltroSexoDraft] = useState<"" | "FEMALE" | "MALE">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
+  const [observaciones, setObservaciones] = useState<Record<string, string>>({});
 
   // Detalle
   const [selectedCoordinadora, setSelectedCoordinadora] = useState<CoordinadoraFrontend | null>(null);
@@ -532,20 +533,21 @@ export default function PVLCoordinadorasPage() {
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Sexo</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Teléfono</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Edad</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                         <CircularProgress size={32} sx={{ color: "#64748b" }} />
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Cargando coordinadoras...</Typography>
                       </TableCell>
                     </TableRow>
                   ) : dataFormateados.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">No se encontraron coordinadoras</Typography>
                       </TableCell>
                     </TableRow>
@@ -574,6 +576,18 @@ export default function PVLCoordinadorasPage() {
                               {formatearFecha(row.fechaNacimiento)}
                             </Typography>
                           </Box>
+                        </TableCell>
+                        <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
+                          <TextField
+                            size="small"
+                            placeholder="Escribir..."
+                            value={observaciones[row.id] || ""}
+                            onChange={(e) => setObservaciones((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                            multiline
+                            maxRows={2}
+                            fullWidth
+                            sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
+                          />
                         </TableCell>
                         <TableCell align="center">
                           <Tooltip title="Ver detalles">

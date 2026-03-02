@@ -188,6 +188,7 @@ export default function PVLComitesPage() {
   const [beneficiariosRange, setBeneficiariosRange] = useState<number[]>([0, 200]);
   const [comunasSeleccionadas, setComunasSeleccionadas] = useState<number[]>([]);
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
+  const [observacionesUI, setObservacionesUI] = useState<Record<string, string>>({});
 
   // Estados para detalle
   const [selectedComite, setSelectedComite] = useState<ComiteFrontend | null>(null);
@@ -699,11 +700,11 @@ export default function PVLComitesPage() {
                 <Table stickyHeader size="small">
                   <TableHead>
                     <TableRow>
-                      {["#", "Código", "Centro Acopio", "Comité", "Beneficiarios", "Socios", "Coordinadora", "Dirección", ""].map(
+                      {["#", "Código", "Centro Acopio", "Comité", "Beneficiarios", "Socios", "Coordinadora", "Dirección", "Observación", ""].map(
                         (col, i) => (
                           <TableCell
                             key={i}
-                            align={i === 0 || i === 4 || i === 5 || i === 8 ? "center" : "left"}
+                            align={i === 0 || i === 4 || i === 5 || i === 9 ? "center" : "left"}
                             sx={{
                               backgroundColor: `${subgerencia.color}18`,
                               color: subgerencia.color,
@@ -723,7 +724,7 @@ export default function PVLComitesPage() {
                   <TableBody>
                     {isLoading ? (
                       <TableRow>
-                        <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
+                        <TableCell colSpan={10} align="center" sx={{ py: 6 }}>
                           <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
                             <CircularProgress sx={{ color: subgerencia.color }} />
                             <Typography variant="body2" color="text.secondary">
@@ -734,7 +735,7 @@ export default function PVLComitesPage() {
                       </TableRow>
                     ) : dataFormateados.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
+                        <TableCell colSpan={10} align="center" sx={{ py: 6 }}>
                           <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
                             <PersonSearch sx={{ fontSize: 40, color: "text.disabled" }} />
                             <Typography color="text.secondary">
@@ -766,6 +767,18 @@ export default function PVLComitesPage() {
                           <TableCell>{row.coordinadora}</TableCell>
                           <TableCell sx={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "text.secondary" }}>
                             {row.direccionReferencia}
+                          </TableCell>
+                          <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
+                            <TextField
+                              size="small"
+                              placeholder="Escribir..."
+                              value={observacionesUI[row.id] || ""}
+                              onChange={(e) => setObservacionesUI((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                              multiline
+                              maxRows={2}
+                              fullWidth
+                              sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
+                            />
                           </TableCell>
                           {/* Acciones */}
                           <TableCell align="center" sx={{ width: 110, whiteSpace: "nowrap" }}>

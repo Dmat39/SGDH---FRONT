@@ -841,6 +841,7 @@ export default function CIAMBeneficiariosPage() {
   const [filtroTelefono, setFiltroTelefono] = useState<"" | "con" | "sin">("");
   const [filtroTelefonoDraft, setFiltroTelefonoDraft] = useState<"" | "con" | "sin">("");
   const [filterAnchor, setFilterAnchor] = useState<HTMLButtonElement | null>(null);
+  const [observaciones, setObservaciones] = useState<Record<string, string>>({});
 
   // Detalle
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -1471,13 +1472,14 @@ export default function CIAMBeneficiariosPage() {
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Seguro</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Celular</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Vivienda</TableCell>
+                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                         <CircularProgress size={32} sx={{ color: CIAM_COLOR }} />
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                           Cargando beneficiarios...
@@ -1486,7 +1488,7 @@ export default function CIAMBeneficiariosPage() {
                     </TableRow>
                   ) : filteredData.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                      <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">
                           No se encontraron beneficiarios
                         </Typography>
@@ -1536,6 +1538,18 @@ export default function CIAMBeneficiariosPage() {
                           <TableCell>{row.celular}</TableCell>
                           <TableCell align="center">
                             <Chip label={row.housingStatus} size="small" sx={{ backgroundColor: (HOUSING_CHIP_COLORS[row.housingStatus] || { bg: "#f5f5f5", color: "#757575" }).bg, color: (HOUSING_CHIP_COLORS[row.housingStatus] || { bg: "#f5f5f5", color: "#757575" }).color, fontWeight: 600, fontSize: "0.7rem" }} />
+                          </TableCell>
+                          <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
+                            <TextField
+                              size="small"
+                              placeholder="Escribir..."
+                              value={observaciones[row.id] || ""}
+                              onChange={(e) => setObservaciones((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                              multiline
+                              maxRows={2}
+                              fullWidth
+                              sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
+                            />
                           </TableCell>
                           <TableCell align="center">
                             <Tooltip title="Ver detalles">
