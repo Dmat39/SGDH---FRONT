@@ -1,5 +1,7 @@
 "use client";
 
+import { ObservacionesPopup } from "@/components/modals/ObservacionesPopup";
+
 import { useState, useEffect } from "react";
 import {
   Card,
@@ -610,15 +612,10 @@ export default function ULEBeneficiariosPage() {
                             </Typography>
                           </TableCell>
                           <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
-                            <TextField
-                              size="small"
-                              placeholder="Escribir..."
+                            <ObservacionesPopup
+                              rowId={empadronado.id}
                               value={observaciones[empadronado.id] || ""}
-                              onChange={(e) => setObservaciones((prev) => ({ ...prev, [empadronado.id]: e.target.value }))}
-                              multiline
-                              maxRows={2}
-                              fullWidth
-                              sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
+                              onChange={(id, val) => setObservaciones((prev) => ({ ...prev, [id]: val }))}
                             />
                           </TableCell>
                         </TableRow>
