@@ -1,5 +1,7 @@
 "use client";
 
+import { ObservacionesPopup } from "@/components/modals/ObservacionesPopup";
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Box,
@@ -1335,21 +1337,10 @@ export default function DirigentesPage() {
 
                             {/* Observación */}
                             <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
-                              <TextField
-                                size="small"
-                                placeholder="Escribir..."
+                              <ObservacionesPopup
+                                rowId={row.id}
                                 value={observaciones[row.id] || ""}
-                                onChange={(e) => setObservaciones((prev) => ({ ...prev, [row.id]: e.target.value }))}
-                                multiline
-                                maxRows={2}
-                                fullWidth
-                                sx={{
-                                  "& .MuiOutlinedInput-root": {
-                                    fontSize: "0.78rem",
-                                    borderRadius: "6px",
-                                    backgroundColor: "white",
-                                  },
-                                }}
+                                onChange={(id, val) => setObservaciones((prev) => ({ ...prev, [id]: val }))}
                               />
                             </TableCell>
 

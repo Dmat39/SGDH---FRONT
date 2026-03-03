@@ -1,5 +1,7 @@
 "use client";
 
+import { ObservacionesPopup } from "@/components/modals/ObservacionesPopup";
+
 import { useState, useEffect } from "react";
 import {
   Card,
@@ -769,15 +771,10 @@ export default function PVLComitesPage() {
                             {row.direccionReferencia}
                           </TableCell>
                           <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
-                            <TextField
-                              size="small"
-                              placeholder="Escribir..."
+                            <ObservacionesPopup
+                              rowId={row.id}
                               value={observacionesUI[row.id] || ""}
-                              onChange={(e) => setObservacionesUI((prev) => ({ ...prev, [row.id]: e.target.value }))}
-                              multiline
-                              maxRows={2}
-                              fullWidth
-                              sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
+                              onChange={(id, val) => setObservacionesUI((prev) => ({ ...prev, [id]: val }))}
                             />
                           </TableCell>
                           {/* Acciones */}
