@@ -40,6 +40,7 @@ import { useFilters } from "@/lib/hooks/useFilters";
 import * as XLSX from "xlsx";
 import { calcularEdad, formatearFecha, formatearTelefono, MESES_LABELS as MESES } from "@/lib/utils/formatters";
 import { FilterPanel } from "@/components/filters/FilterPanel";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 
@@ -105,6 +106,8 @@ export default function ULEBeneficiariosPage() {
   const [filtroFormato, setFiltroFormato] = useState<string>("");
   const [observaciones, setObservaciones] = useState<Record<string, string>>({});
   const [isExporting, setIsExporting] = useState(false);
+
+  const { canShowObservacion } = usePermissions();
 
   // Hook de filtros reutilizable
   const filters = useFilters({ edadMax: 100 });
@@ -522,7 +525,7 @@ export default function ULEBeneficiariosPage() {
                       <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Urbanización</TableCell>
                       <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Empadronador</TableCell>
                       <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Fecha Registro</TableCell>
-                      <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>
+                      {canShowObservacion() && <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>}
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -609,6 +612,7 @@ export default function ULEBeneficiariosPage() {
                               {formatearFecha(empadronado.registered_at)}
                             </Typography>
                           </TableCell>
+                          {canShowObservacion() && (
                           <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
                             <TextField
                               size="small"
@@ -621,6 +625,7 @@ export default function ULEBeneficiariosPage() {
                               sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
                             />
                           </TableCell>
+                          )}
                         </TableRow>
                       ))
                     )}

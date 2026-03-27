@@ -59,6 +59,7 @@ import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import * as XLSX from "xlsx";
 import { formatearFecha, MESES } from "@/lib/utils/formatters";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.SERVICIOS_SOCIALES];
 const MODULE_COLOR = subgerencia.color; // #00a3a8
@@ -396,6 +397,7 @@ export default function Compromiso1Page() {
   const [detalleOpen, setDetalleOpen] = useState(false);
   const [detalleMadre, setDetalleMadre] = useState<MadreTabla | null>(null);
 
+  const { canEdit, canShowObservacion } = usePermissions();
   const { getData } = useFetch();
   const dataFormateados = useFormatTableData(rawData);
 
@@ -1012,7 +1014,7 @@ export default function Compromiso1Page() {
               <Table stickyHeader size="small">
                 <TableHead>
                   <TableRow>
-                    {["#", "Nombre Completo", "Tipo Doc / N° Documento", "Teléfono", "Sexo", "Edad / Nacimiento", "F. Registro", "Observación", ""].map(
+                    {["#", "Nombre Completo", "Tipo Doc / N° Documento", "Teléfono", "Sexo", "Edad / Nacimiento", "F. Registro", ...(canShowObservacion() ? ["Observación"] : []), ""].map(
                       (col, i) => (
                         <TableCell
                           key={i}
@@ -1157,6 +1159,7 @@ export default function Compromiso1Page() {
                         </TableCell>
 
                         {/* Observación */}
+                        {canShowObservacion() && (
                         <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
                           <TextField
                             size="small"
@@ -1175,6 +1178,7 @@ export default function Compromiso1Page() {
                             }}
                           />
                         </TableCell>
+                        )}
 
                         {/* Acciones */}
                         <TableCell align="center" sx={{ width: 110, whiteSpace: "nowrap" }}>
@@ -1188,6 +1192,7 @@ export default function Compromiso1Page() {
                                 <Visibility fontSize="small" />
                               </IconButton>
                             </Tooltip>
+                            {canEdit() && (
                             <Tooltip title="Editar">
                               <IconButton
                                 size="small"
@@ -1197,6 +1202,8 @@ export default function Compromiso1Page() {
                                 <Edit fontSize="small" />
                               </IconButton>
                             </Tooltip>
+                            )}
+                            {canEdit() && (
                             <Tooltip title="Eliminar">
                               <IconButton
                                 size="small"
@@ -1206,6 +1213,7 @@ export default function Compromiso1Page() {
                                 <Delete fontSize="small" />
                               </IconButton>
                             </Tooltip>
+                            )}
                           </Box>
                         </TableCell>
                       </TableRow>

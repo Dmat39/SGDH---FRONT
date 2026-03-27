@@ -44,6 +44,7 @@ import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import * as XLSX from "xlsx";
 import { calcularEdad, formatearFecha, formatearTelefono, MESES } from "@/lib/utils/formatters";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 
@@ -113,6 +114,7 @@ interface PersonaTabla {
 // COMPONENTE PRINCIPAL
 // ============================================
 export default function ListaGeneralPage() {
+  const { canShowObservacion } = usePermissions();
   const { getData } = useFetch();
 
   // Datos
@@ -991,9 +993,9 @@ export default function ListaGeneralPage() {
                     <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>
                       Módulo
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>
+                    {canShowObservacion() && <TableCell sx={{ fontWeight: 700, backgroundColor: "#f8fafc" }}>
                       Observación
-                    </TableCell>
+                    </TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1111,6 +1113,7 @@ export default function ListaGeneralPage() {
                               </Typography>
                             )}
                           </TableCell>
+                          {canShowObservacion() && (
                           <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
                             <TextField
                               size="small"
@@ -1123,6 +1126,7 @@ export default function ListaGeneralPage() {
                               sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
                             />
                           </TableCell>
+                          )}
                         </TableRow>
                       );
                     })

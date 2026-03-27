@@ -39,6 +39,24 @@ export const usePermissions = () => {
   };
 
   /**
+   * Verifica si el usuario puede editar/eliminar registros
+   * Los usuarios con permiso "readonly" no pueden editar ni eliminar
+   */
+  const canEdit = (): boolean => {
+    if (!user) return false;
+    return !user.permissions.includes("readonly");
+  };
+
+  /**
+   * Verifica si el usuario puede ver la columna de Observación
+   * Los usuarios con permiso "readonly" no ven esta columna
+   */
+  const canShowObservacion = (): boolean => {
+    if (!user) return false;
+    return !user.permissions.includes("readonly");
+  };
+
+  /**
    * Verifica si el usuario es subgerente de Programas Sociales
    */
   const isSubgerentePS = (): boolean => {
@@ -144,6 +162,8 @@ export const usePermissions = () => {
     filterMenuItems,
     hasModuleAccess,
     getVisibleMapLayers,
+    canEdit,
+    canShowObservacion,
   };
 };
 

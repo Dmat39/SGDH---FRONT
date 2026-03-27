@@ -46,6 +46,7 @@ import * as XLSX from "xlsx";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 
@@ -98,6 +99,7 @@ interface APIResponse {
 }
 
 export default function ComedoresListaPage() {
+  const { canEdit, canShowObservacion } = usePermissions();
   const { getData } = useFetch();
 
   // Estados para datos - paginación del servidor
@@ -539,9 +541,9 @@ export default function ComedoresListaPage() {
                     <TableCell sx={{ fontWeight: 600, color: "#334155", fontFamily: "'Inter', 'Roboto', sans-serif", whiteSpace: "nowrap" }}>
                       Presidente
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155", fontFamily: "'Inter', 'Roboto', sans-serif", whiteSpace: "nowrap" }}>
+                    {canShowObservacion() && <TableCell sx={{ fontWeight: 600, color: "#334155", fontFamily: "'Inter', 'Roboto', sans-serif", whiteSpace: "nowrap" }}>
                       Observación
-                    </TableCell>
+                    </TableCell>}
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155", fontFamily: "'Inter', 'Roboto', sans-serif", whiteSpace: "nowrap" }}>
                       Acciones
                     </TableCell>
@@ -634,6 +636,7 @@ export default function ComedoresListaPage() {
                         <TableCell sx={{ fontFamily: "'Inter', 'Roboto', sans-serif", maxWidth: 180, fontSize: "0.85rem" }}>
                           {row.president ? `${row.president.name} ${row.president.lastname}` : "-"}
                         </TableCell>
+                        {canShowObservacion() && (
                         <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
                           <TextField
                             size="small"
@@ -646,6 +649,7 @@ export default function ComedoresListaPage() {
                             sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
                           />
                         </TableCell>
+                        )}
                         <TableCell align="center">
                           <Box display="flex" alignItems="center" justifyContent="center" gap={0.5} flexWrap="nowrap">
                             <Tooltip title="Ver detalles">
@@ -665,6 +669,7 @@ export default function ComedoresListaPage() {
                                 <Visibility fontSize="small" />
                               </IconButton>
                             </Tooltip>
+                            {canEdit() && (
                             <Tooltip title="Editar">
                               <IconButton
                                 size="small"
@@ -681,6 +686,8 @@ export default function ComedoresListaPage() {
                                 <Edit fontSize="small" />
                               </IconButton>
                             </Tooltip>
+                            )}
+                            {canEdit() && (
                             <Tooltip title="Eliminar">
                               <IconButton
                                 size="small"
@@ -697,6 +704,7 @@ export default function ComedoresListaPage() {
                                 <Delete fontSize="small" />
                               </IconButton>
                             </Tooltip>
+                            )}
                           </Box>
                         </TableCell>
                       </TableRow>

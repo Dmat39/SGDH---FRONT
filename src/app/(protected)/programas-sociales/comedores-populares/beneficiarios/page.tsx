@@ -51,6 +51,7 @@ import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { calcularEdad, formatearFecha, MESES_LABELS as MESES } from "@/lib/utils/formatters";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 
@@ -134,6 +135,7 @@ type FilterType = "edad" | "cumpleanos" | "telefono" | "genero";
 type CumpleanosModo = "mes" | "dia";
 
 export default function ComedoresBeneficiariosPage() {
+  const { canShowObservacion } = usePermissions();
   const { getData } = useFetch();
 
   const [data, setData] = useState<BeneficiarioFrontend[]>([]);
@@ -459,7 +461,7 @@ export default function ComedoresBeneficiariosPage() {
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Sexo</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Dirección</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Edad</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>
+                    {canShowObservacion() && <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>}
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                   </TableRow>
                 </TableHead>
@@ -497,6 +499,7 @@ export default function ComedoresBeneficiariosPage() {
                             </Box>
                           ) : "-"}
                         </TableCell>
+                        {canShowObservacion() && (
                         <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
                           <TextField
                             size="small"
@@ -509,6 +512,7 @@ export default function ComedoresBeneficiariosPage() {
                             sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
                           />
                         </TableCell>
+                        )}
                         <TableCell align="center">
                           <Tooltip title="Ver detalles"><IconButton size="small" onClick={(e) => { e.stopPropagation(); handleRowClick(row); }} sx={{ color: "#64748b", "&:hover": { backgroundColor: "#f1f5f9" } }}><Visibility fontSize="small" /></IconButton></Tooltip>
                         </TableCell>

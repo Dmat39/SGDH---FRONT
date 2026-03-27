@@ -48,6 +48,7 @@ import { useFilters } from "@/lib/hooks/useFilters";
 import { useBeneficiarioDialog } from "@/lib/hooks/useBeneficiarioDialog";
 import { FilterPanel } from "@/components/filters/FilterPanel";
 import { calcularEdad, formatearFecha } from "@/lib/utils/formatters";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 const PANTBC_COLOR = "#d81b7e";
 
@@ -342,6 +343,8 @@ export default function PANTBCBeneficiariosPage() {
   const [rawDataMap, setRawDataMap] = useState<Record<string, PacienteListaBackend>>({});
   const [detalleData, setDetalleData] = useState<PacienteListaBackend | null>(null);
   const [detalleLoading, setDetalleLoading] = useState(false);
+
+  const { canShowObservacion } = usePermissions();
 
   const filters = useFilters({ edadMax: 120 });
   const dialog = useBeneficiarioDialog<string>();
@@ -732,7 +735,7 @@ export default function PANTBCBeneficiariosPage() {
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Establecimiento</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Celular</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Fecha Inicio</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>
+                    {canShowObservacion() && <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>}
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                   </TableRow>
                 </TableHead>
@@ -814,6 +817,7 @@ export default function PANTBCBeneficiariosPage() {
                               {formatearFecha(row.fechaInicio)}
                             </Typography>
                           </TableCell>
+                          {canShowObservacion() && (
                           <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
                             <TextField
                               size="small"
@@ -826,6 +830,7 @@ export default function PANTBCBeneficiariosPage() {
                               sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
                             />
                           </TableCell>
+                          )}
                           <TableCell align="center">
                             <Tooltip title="Ver detalles">
                               <IconButton

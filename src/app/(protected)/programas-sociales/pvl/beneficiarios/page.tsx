@@ -49,6 +49,7 @@ import { calcularEdad, formatearFecha, MESES_LABELS } from "@/lib/utils/formatte
 import { useFilters } from "@/lib/hooks/useFilters";
 import { useBeneficiarioDialog } from "@/lib/hooks/useBeneficiarioDialog";
 import { FilterPanel } from "@/components/filters/FilterPanel";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 const PVL_COLOR = "#d81b7e";
 
@@ -305,6 +306,8 @@ export default function PVLBeneficiariosPage() {
   const [detalleData, setDetalleData] = useState<BeneficiarioListaBackend | null>(null);
   const [detalleLoading, setDetalleLoading] = useState(false);
   const [rawDataMap, setRawDataMap] = useState<Record<string, BeneficiarioListaBackend>>({});
+
+  const { canShowObservacion } = usePermissions();
 
   // Hooks de filtros y dialog
   const filters = useFilters({ edadMax: 120 });
@@ -693,7 +696,7 @@ export default function PVLBeneficiariosPage() {
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Prioridad</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Comité</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Celular</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>
+                    {canShowObservacion() && <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>}
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                   </TableRow>
                 </TableHead>
@@ -787,6 +790,7 @@ export default function PVLBeneficiariosPage() {
                             </Typography>
                           </TableCell>
                           <TableCell>{row.celular}</TableCell>
+                          {canShowObservacion() && (
                           <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
                             <TextField
                               size="small"
@@ -799,6 +803,7 @@ export default function PVLBeneficiariosPage() {
                               sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
                             />
                           </TableCell>
+                          )}
                           <TableCell align="center">
                             <Tooltip title="Ver detalles">
                               <IconButton
