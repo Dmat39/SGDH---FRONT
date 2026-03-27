@@ -58,6 +58,7 @@ import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import * as XLSX from "xlsx";
 import { calcularEdad, formatearFecha, formatearTelefono, MESES } from "@/lib/utils/formatters";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.SERVICIOS_SOCIALES];
 const MODULE_COLOR = subgerencia.color; // #00a3a8
@@ -367,6 +368,7 @@ function DetalleParticipante({
 // COMPONENTE PRINCIPAL
 // ============================================
 export default function ParticipantesPage() {
+  const { canShowObservacion } = usePermissions();
   const { getData } = useFetch();
 
   // Datos
@@ -1057,7 +1059,7 @@ export default function ParticipantesPage() {
               <Table stickyHeader size="small">
                 <TableHead>
                   <TableRow>
-                    {["#", "Nombre Completo", "DNI", "Taller", "Celular", "Sexo", "Edad / Nacimiento", "Observación", ""].map(
+                    {["#", "Nombre Completo", "DNI", "Taller", "Celular", "Sexo", "Edad / Nacimiento", ...(canShowObservacion() ? ["Observación"] : []), ""].map(
                       (col, i) => (
                         <TableCell
                           key={i}
@@ -1221,6 +1223,7 @@ export default function ParticipantesPage() {
                           </TableCell>
 
                           {/* Observación */}
+                          {canShowObservacion() && (
                           <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
                             <TextField
                               size="small"
@@ -1239,6 +1242,7 @@ export default function ParticipantesPage() {
                               }}
                             />
                           </TableCell>
+                          )}
 
                           {/* Acciones */}
                           <TableCell align="center" sx={{ width: 56 }}>

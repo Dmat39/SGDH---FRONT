@@ -50,6 +50,7 @@ import { useBeneficiarioDialog } from "@/lib/hooks/useBeneficiarioDialog";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { calcularEdad, formatearFecha, MESES_LABELS } from "@/lib/utils/formatters";
 import { FilterPanel } from "@/components/filters/FilterPanel";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 const OMAPED_COLOR = subgerencia.color;
@@ -280,6 +281,8 @@ export default function OMAPEDBeneficiariosPage() {
   const [detailData, setDetailData] = useState<BeneficiarioDetalleView | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+
+  const { canShowObservacion } = usePermissions();
 
   // Hooks reutilizables
   const filters = useFilters({ edadMax: 110 });
@@ -681,7 +684,7 @@ export default function OMAPEDBeneficiariosPage() {
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Grado</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Diagnóstico</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>CONADIS</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>
+                    {canShowObservacion() && <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>}
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                   </TableRow>
                 </TableHead>
@@ -750,6 +753,7 @@ export default function OMAPEDBeneficiariosPage() {
                             {row.diagnostico}
                           </TableCell>
                           <TableCell>{row.conadis}</TableCell>
+                          {canShowObservacion() && (
                           <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
                             <TextField
                               size="small"
@@ -762,6 +766,7 @@ export default function OMAPEDBeneficiariosPage() {
                               sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
                             />
                           </TableCell>
+                          )}
                           <TableCell align="center">
                             <Tooltip title="Ver detalles">
                               <IconButton

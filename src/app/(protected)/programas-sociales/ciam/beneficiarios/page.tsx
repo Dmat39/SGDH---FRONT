@@ -63,6 +63,7 @@ import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import { useFilters } from "@/lib/hooks/useFilters";
 import { useBeneficiarioDialog } from "@/lib/hooks/useBeneficiarioDialog";
 import { calcularEdad, formatearFecha } from "@/lib/utils/formatters";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 const CIAM_COLOR = "#9c27b0";
 
@@ -816,6 +817,8 @@ export default function CIAMBeneficiariosPage() {
   const [filterType, setFilterType] = useState<LocalFilterType>("edad");
   const [segurosSeleccionados, setSegurosSeleccionados] = useState<string[]>([]);
 
+  const { canShowObservacion } = usePermissions();
+
   // Hooks
   const filters = useFilters({ edadMin: 60, edadMax: 110 });
   const dialog = useBeneficiarioDialog<string>();
@@ -1425,7 +1428,7 @@ export default function CIAMBeneficiariosPage() {
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Seguro</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Celular</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Vivienda</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>
+                    {canShowObservacion() && <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>}
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                   </TableRow>
                 </TableHead>
@@ -1492,6 +1495,7 @@ export default function CIAMBeneficiariosPage() {
                           <TableCell align="center">
                             <Chip label={row.housingStatus} size="small" sx={{ backgroundColor: (HOUSING_CHIP_COLORS[row.housingStatus] || { bg: "#f5f5f5", color: "#757575" }).bg, color: (HOUSING_CHIP_COLORS[row.housingStatus] || { bg: "#f5f5f5", color: "#757575" }).color, fontWeight: 600, fontSize: "0.7rem" }} />
                           </TableCell>
+                          {canShowObservacion() && (
                           <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
                             <TextField
                               size="small"
@@ -1504,6 +1508,7 @@ export default function CIAMBeneficiariosPage() {
                               sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
                             />
                           </TableCell>
+                          )}
                           <TableCell align="center">
                             <Tooltip title="Ver detalles">
                               <IconButton

@@ -49,6 +49,7 @@ import * as XLSX from "xlsx";
 import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 
@@ -170,6 +171,7 @@ const COMUNAS = [
 ];
 
 export default function PVLComitesPage() {
+  const { canEdit, canShowObservacion } = usePermissions();
   const { getData } = useFetch();
 
   // Estados para datos
@@ -700,7 +702,7 @@ export default function PVLComitesPage() {
                 <Table stickyHeader size="small">
                   <TableHead>
                     <TableRow>
-                      {["#", "Código", "Centro Acopio", "Comité", "Beneficiarios", "Socios", "Coordinadora", "Dirección", "Observación", ""].map(
+                      {["#", "Código", "Centro Acopio", "Comité", "Beneficiarios", "Socios", "Coordinadora", "Dirección", ...(canShowObservacion() ? ["Observación"] : []), ""].map(
                         (col, i) => (
                           <TableCell
                             key={i}
@@ -768,6 +770,7 @@ export default function PVLComitesPage() {
                           <TableCell sx={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "text.secondary" }}>
                             {row.direccionReferencia}
                           </TableCell>
+                          {canShowObservacion() && (
                           <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
                             <TextField
                               size="small"
@@ -780,6 +783,7 @@ export default function PVLComitesPage() {
                               sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
                             />
                           </TableCell>
+                          )}
                           {/* Acciones */}
                           <TableCell align="center" sx={{ width: 110, whiteSpace: "nowrap" }}>
                             <Box display="flex" alignItems="center" justifyContent="center">
@@ -792,6 +796,7 @@ export default function PVLComitesPage() {
                                   <Visibility fontSize="small" />
                                 </IconButton>
                               </Tooltip>
+                              {canEdit() && (
                               <Tooltip title="Editar">
                                 <IconButton
                                   size="small"
@@ -801,6 +806,8 @@ export default function PVLComitesPage() {
                                   <Edit fontSize="small" />
                                 </IconButton>
                               </Tooltip>
+                              )}
+                              {canEdit() && (
                               <Tooltip title="Eliminar">
                                 <IconButton
                                   size="small"
@@ -810,6 +817,7 @@ export default function PVLComitesPage() {
                                   <Delete fontSize="small" />
                                 </IconButton>
                               </Tooltip>
+                              )}
                             </Box>
                           </TableCell>
                         </TableRow>

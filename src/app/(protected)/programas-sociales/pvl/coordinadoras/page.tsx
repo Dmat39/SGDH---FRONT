@@ -52,6 +52,7 @@ import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import { SUBGERENCIAS, SubgerenciaType } from "@/lib/constants";
 import { calcularEdad, formatearFecha, MESES_LABELS as MESES } from "@/lib/utils/formatters";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 
@@ -107,6 +108,7 @@ type FilterType = "edad" | "cumpleanos" | "telefono" | "sexo";
 type CumpleanosModo = "mes" | "dia";
 
 export default function PVLCoordinadorasPage() {
+  const { canEdit, canShowObservacion } = usePermissions();
   const { getData } = useFetch();
 
   const [data, setData] = useState<CoordinadoraFrontend[]>([]);
@@ -508,7 +510,7 @@ export default function PVLCoordinadorasPage() {
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Sexo</TableCell>
                     <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Teléfono</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Edad</TableCell>
-                    <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>
+                    {canShowObservacion() && <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>}
                     <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                   </TableRow>
                 </TableHead>
@@ -552,6 +554,7 @@ export default function PVLCoordinadorasPage() {
                             </Typography>
                           </Box>
                         </TableCell>
+                        {canShowObservacion() && (
                         <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
                           <TextField
                             size="small"
@@ -564,22 +567,27 @@ export default function PVLCoordinadorasPage() {
                             sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
                           />
                         </TableCell>
+                        )}
                         <TableCell align="center">
                           <Tooltip title="Ver detalles">
                             <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleRowClick(row); }} sx={{ color: "#64748b", "&:hover": { backgroundColor: "#f1f5f9" } }}>
                               <Visibility fontSize="small" />
                             </IconButton>
                           </Tooltip>
+                          {canEdit() && (
                           <Tooltip title="Editar">
                             <IconButton size="small" onClick={(e) => { e.stopPropagation(); }} sx={{ color: "#0891b2", "&:hover": { backgroundColor: "rgba(8, 145, 178, 0.1)" } }}>
                               <Edit fontSize="small" />
                             </IconButton>
                           </Tooltip>
+                          )}
+                          {canEdit() && (
                           <Tooltip title="Eliminar">
                             <IconButton size="small" onClick={(e) => { e.stopPropagation(); }} sx={{ color: "#dc2626", "&:hover": { backgroundColor: "rgba(220, 38, 38, 0.1)" } }}>
                               <Delete fontSize="small" />
                             </IconButton>
                           </Tooltip>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))

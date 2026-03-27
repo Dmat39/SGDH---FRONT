@@ -44,6 +44,7 @@ import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import * as XLSX from "xlsx";
 import { calcularEdad, formatearFecha, formatearTelefono, MESES } from "@/lib/utils/formatters";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.SERVICIOS_SOCIALES];
 const PROGRAM_ID = "a343b6c5-9b32-4c2e-bb59-895bce9d55ae";
@@ -114,6 +115,7 @@ interface PersonaTabla {
 // COMPONENTE PRINCIPAL
 // ============================================
 export default function ListaGeneralServiciosSocialesPage() {
+  const { canShowObservacion } = usePermissions();
   const { getData } = useFetch();
 
   // Datos
@@ -857,7 +859,7 @@ export default function ListaGeneralServiciosSocialesPage() {
                     <TableCell sx={{ fontWeight: 700, backgroundColor: subgerencia.color, color: "white", fontSize: "0.78rem", whiteSpace: "nowrap", py: 1.5 }}>Teléfono</TableCell>
                     <TableCell sx={{ fontWeight: 700, backgroundColor: subgerencia.color, color: "white", fontSize: "0.78rem", whiteSpace: "nowrap", py: 1.5 }}>Cumpleaños / Edad</TableCell>
                     <TableCell sx={{ fontWeight: 700, backgroundColor: subgerencia.color, color: "white", fontSize: "0.78rem", whiteSpace: "nowrap", py: 1.5 }}>Módulo</TableCell>
-                    <TableCell sx={{ fontWeight: 700, backgroundColor: subgerencia.color, color: "white", fontSize: "0.78rem", whiteSpace: "nowrap", py: 1.5, minWidth: 160 }}>Observación</TableCell>
+                    {canShowObservacion() && <TableCell sx={{ fontWeight: 700, backgroundColor: subgerencia.color, color: "white", fontSize: "0.78rem", whiteSpace: "nowrap", py: 1.5, minWidth: 160 }}>Observación</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -948,6 +950,7 @@ export default function ListaGeneralServiciosSocialesPage() {
                               <Typography variant="body2" color="text.secondary">-</Typography>
                             )}
                           </TableCell>
+                          {canShowObservacion() && (
                           <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
                             <TextField
                               size="small"
@@ -966,6 +969,7 @@ export default function ListaGeneralServiciosSocialesPage() {
                               }}
                             />
                           </TableCell>
+                          )}
                         </TableRow>
                       );
                     })

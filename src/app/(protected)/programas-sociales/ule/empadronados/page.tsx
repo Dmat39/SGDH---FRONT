@@ -62,6 +62,7 @@ import { calcularEdad, formatearFecha, formatearTelefono, MESES_LABELS } from "@
 import { useFilters } from "@/lib/hooks/useFilters";
 import { useBeneficiarioDialog } from "@/lib/hooks/useBeneficiarioDialog";
 import { FilterPanel } from "@/components/filters/FilterPanel";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.PROGRAMAS_SOCIALES];
 
@@ -128,6 +129,8 @@ export default function ULEEmpadronadosPage() {
   const [filtroFormato, setFiltroFormato] = useState<string>("");
   const [observaciones, setObservaciones] = useState<Record<string, string>>({});
   const [isExporting, setIsExporting] = useState(false);
+
+  const { canEdit, canShowObservacion } = usePermissions();
 
   // Hooks de filtros y dialog
   const filters = useFilters({ edadMax: 100 });
@@ -556,7 +559,7 @@ export default function ULEEmpadronadosPage() {
                       <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Miembros</TableCell>
                       <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Edad</TableCell>
                       <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Empadronador</TableCell>
-                      <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>
+                      {canShowObservacion() && <TableCell sx={{ fontWeight: 600, color: "#334155" }}>Observación</TableCell>}
                       <TableCell align="center" sx={{ fontWeight: 600, color: "#334155" }}>Acciones</TableCell>
                     </TableRow>
                   </TableHead>
@@ -661,6 +664,7 @@ export default function ULEEmpadronadosPage() {
                                 : "-"}
                             </Typography>
                           </TableCell>
+                          {canShowObservacion() && (
                           <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
                             <TextField
                               size="small"
@@ -673,6 +677,7 @@ export default function ULEEmpadronadosPage() {
                               sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.78rem", borderRadius: "6px", backgroundColor: "white" } }}
                             />
                           </TableCell>
+                          )}
                           <TableCell align="center">
                             <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
                               <Tooltip title="Ver detalles">
@@ -684,6 +689,7 @@ export default function ULEEmpadronadosPage() {
                                   <Visibility fontSize="small" />
                                 </IconButton>
                               </Tooltip>
+                              {canEdit() && (
                               <Tooltip title="Editar">
                                 <IconButton
                                   size="small"
@@ -693,6 +699,8 @@ export default function ULEEmpadronadosPage() {
                                   <Edit fontSize="small" />
                                 </IconButton>
                               </Tooltip>
+                              )}
+                              {canEdit() && (
                               <Tooltip title="Eliminar">
                                 <IconButton
                                   size="small"
@@ -702,6 +710,7 @@ export default function ULEEmpadronadosPage() {
                                   <Delete fontSize="small" />
                                 </IconButton>
                               </Tooltip>
+                              )}
                             </Box>
                           </TableCell>
                         </TableRow>

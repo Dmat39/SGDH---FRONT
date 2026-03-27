@@ -58,6 +58,7 @@ import { useFetch } from "@/lib/hooks/useFetch";
 import { useFormatTableData } from "@/lib/hooks/useFormatTableData";
 import * as XLSX from "xlsx";
 import { calcularEdad, formatearFecha, formatearTelefono, MESES } from "@/lib/utils/formatters";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 const subgerencia = SUBGERENCIAS[SubgerenciaType.SERVICIOS_SOCIALES];
 const MODULE_COLOR = subgerencia.color; // #00a3a8
@@ -363,6 +364,7 @@ function DetalleDigirente({
 // COMPONENTE PRINCIPAL
 // ============================================
 export default function DirigentesPage() {
+  const { canShowObservacion } = usePermissions();
   const { getData } = useFetch();
 
   // Datos
@@ -1169,7 +1171,7 @@ export default function DirigentesPage() {
                           "Sexo",
                           "Edad / Nacimiento",
                           "Pueblo",
-                          "Observación",
+                          ...(canShowObservacion() ? ["Observación"] : []),
                           "",
                         ].map((col, i) => (
                           <TableCell
@@ -1334,6 +1336,7 @@ export default function DirigentesPage() {
                             </TableCell>
 
                             {/* Observación */}
+                            {canShowObservacion() && (
                             <TableCell sx={{ minWidth: 160 }} onClick={(e) => e.stopPropagation()}>
                               <TextField
                                 size="small"
@@ -1352,6 +1355,7 @@ export default function DirigentesPage() {
                                 }}
                               />
                             </TableCell>
+                            )}
 
                             {/* Acciones */}
                             <TableCell align="center" sx={{ width: 56 }}>
