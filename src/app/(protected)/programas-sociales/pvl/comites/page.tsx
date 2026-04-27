@@ -171,7 +171,7 @@ const COMUNAS = [
 ];
 
 export default function PVLComitesPage() {
-  const { canEdit, canShowObservacion } = usePermissions();
+  const { canUpdate, canDelete, canShowObservacion } = usePermissions();
   const { getData } = useFetch();
 
   // Estados para datos
@@ -796,7 +796,7 @@ export default function PVLComitesPage() {
                                   <Visibility fontSize="small" />
                                 </IconButton>
                               </Tooltip>
-                              {canEdit() && (
+                              {canUpdate("PVL") && (
                               <Tooltip title="Editar">
                                 <IconButton
                                   size="small"
@@ -807,7 +807,7 @@ export default function PVLComitesPage() {
                                 </IconButton>
                               </Tooltip>
                               )}
-                              {canEdit() && (
+                              {canDelete("PVL") && (
                               <Tooltip title="Eliminar">
                                 <IconButton
                                   size="small"

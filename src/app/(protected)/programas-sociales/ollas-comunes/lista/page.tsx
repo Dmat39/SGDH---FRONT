@@ -99,7 +99,7 @@ interface APIResponse {
 }
 
 export default function OllasListaPage() {
-  const { canEdit, canShowObservacion } = usePermissions();
+  const { canUpdate, canDelete, canShowObservacion } = usePermissions();
   const { getData } = useFetch();
 
   // Estados para datos - paginación del servidor
@@ -675,7 +675,7 @@ export default function OllasListaPage() {
                                 <Visibility fontSize="small" />
                               </IconButton>
                             </Tooltip>
-                            {canEdit() && (
+                            {canUpdate("Ollas Comunes") && (
                             <Tooltip title="Editar">
                               <IconButton
                                 size="small"
@@ -693,7 +693,7 @@ export default function OllasListaPage() {
                               </IconButton>
                             </Tooltip>
                             )}
-                            {canEdit() && (
+                            {canDelete("Ollas Comunes") && (
                             <Tooltip title="Eliminar">
                               <IconButton
                                 size="small"

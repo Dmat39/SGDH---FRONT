@@ -99,7 +99,7 @@ interface APIResponse {
 }
 
 export default function ComedoresListaPage() {
-  const { canEdit, canShowObservacion } = usePermissions();
+  const { canUpdate, canDelete, canShowObservacion } = usePermissions();
   const { getData } = useFetch();
 
   // Estados para datos - paginación del servidor
@@ -669,7 +669,7 @@ export default function ComedoresListaPage() {
                                 <Visibility fontSize="small" />
                               </IconButton>
                             </Tooltip>
-                            {canEdit() && (
+                            {canUpdate("Comedores Populares") && (
                             <Tooltip title="Editar">
                               <IconButton
                                 size="small"
@@ -687,7 +687,7 @@ export default function ComedoresListaPage() {
                               </IconButton>
                             </Tooltip>
                             )}
-                            {canEdit() && (
+                            {canDelete("Comedores Populares") && (
                             <Tooltip title="Eliminar">
                               <IconButton
                                 size="small"

@@ -47,6 +47,30 @@ export const usePermissions = () => {
     return !user.permissions.includes("readonly");
   };
 
+  const canCreate = (moduleName: string): boolean => {
+    if (!user) return false;
+    if (user.is_super || user.permissions.includes("all")) return true;
+    return user.moduleAbilities?.[moduleName]?.includes("CREATE") ?? false;
+  };
+
+  const canRead = (moduleName: string): boolean => {
+    if (!user) return false;
+    if (user.is_super || user.permissions.includes("all")) return true;
+    return user.moduleAbilities?.[moduleName]?.includes("READ") ?? false;
+  };
+
+  const canUpdate = (moduleName: string): boolean => {
+    if (!user) return false;
+    if (user.is_super || user.permissions.includes("all")) return true;
+    return user.moduleAbilities?.[moduleName]?.includes("UPDATE") ?? false;
+  };
+
+  const canDelete = (moduleName: string): boolean => {
+    if (!user) return false;
+    if (user.is_super || user.permissions.includes("all")) return true;
+    return user.moduleAbilities?.[moduleName]?.includes("DELETE") ?? false;
+  };
+
   /**
    * Verifica si el usuario puede ver la columna de Observación
    * Los usuarios con permiso "readonly" no ven esta columna
@@ -164,6 +188,10 @@ export const usePermissions = () => {
     getVisibleMapLayers,
     canEdit,
     canShowObservacion,
+    canCreate,
+    canRead,
+    canUpdate,
+    canDelete,
   };
 };
 

@@ -130,7 +130,7 @@ export default function ULEEmpadronadosPage() {
   const [observaciones, setObservaciones] = useState<Record<string, string>>({});
   const [isExporting, setIsExporting] = useState(false);
 
-  const { canEdit, canShowObservacion } = usePermissions();
+  const { canUpdate, canDelete, canShowObservacion } = usePermissions();
 
   // Hooks de filtros y dialog
   const filters = useFilters({ edadMax: 100 });
@@ -689,7 +689,7 @@ export default function ULEEmpadronadosPage() {
                                   <Visibility fontSize="small" />
                                 </IconButton>
                               </Tooltip>
-                              {canEdit() && (
+                              {canUpdate("ULE") && (
                               <Tooltip title="Editar">
                                 <IconButton
                                   size="small"
@@ -700,7 +700,7 @@ export default function ULEEmpadronadosPage() {
                                 </IconButton>
                               </Tooltip>
                               )}
-                              {canEdit() && (
+                              {canDelete("ULE") && (
                               <Tooltip title="Eliminar">
                                 <IconButton
                                   size="small"

@@ -397,7 +397,7 @@ export default function Compromiso1Page() {
   const [detalleOpen, setDetalleOpen] = useState(false);
   const [detalleMadre, setDetalleMadre] = useState<MadreTabla | null>(null);
 
-  const { canEdit, canShowObservacion } = usePermissions();
+  const { canUpdate, canDelete, canShowObservacion } = usePermissions();
   const { getData } = useFetch();
   const dataFormateados = useFormatTableData(rawData);
 
@@ -1192,7 +1192,7 @@ export default function Compromiso1Page() {
                                 <Visibility fontSize="small" />
                               </IconButton>
                             </Tooltip>
-                            {canEdit() && (
+                            {canUpdate("COMPROMISO I") && (
                             <Tooltip title="Editar">
                               <IconButton
                                 size="small"
@@ -1203,7 +1203,7 @@ export default function Compromiso1Page() {
                               </IconButton>
                             </Tooltip>
                             )}
-                            {canEdit() && (
+                            {canDelete("COMPROMISO I") && (
                             <Tooltip title="Eliminar">
                               <IconButton
                                 size="small"
