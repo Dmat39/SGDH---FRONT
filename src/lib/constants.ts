@@ -398,7 +398,7 @@ export const MODULOS_SERVICIOS_SOCIALES: MenuItem[] = [
     ruta: "/servicios-sociales/lista-general",
     icono: "List",
     descripcion: "Lista unificada de personas registradas en todos los módulos",
-    permisos: ["all_servicios_sociales", "all"],
+    permisos: ["participacion_ciudadana", "servicios_deporte", "salud", "apoyo", "all_servicios_sociales", "all"],
   },
   {
     id: "participacion-ciudadana",
@@ -484,12 +484,72 @@ export const MODULOS_SERVICIOS_SOCIALES: MenuItem[] = [
       },
     ],
   },
+  {
+    id: "apoyo",
+    nombre: "Apoyo",
+    icono: "VolunteerActivism",
+    descripcion: "Gestión de beneficiarios del programa de Apoyo",
+    permisos: ["apoyo", "all_servicios_sociales", "all"],
+    children: [
+      {
+        id: "apoyo-beneficiarios",
+        nombre: "Beneficiarios",
+        ruta: "/servicios-sociales/apoyo/beneficiarios",
+        icono: "People",
+        permisos: ["apoyo", "all_servicios_sociales", "all"],
+      },
+    ],
+  },
+];
+
+// ============================================
+// MÓDULOS DE ADMINISTRACIÓN (solo ADMIN)
+// ============================================
+export const MODULOS_ADMIN: MenuItem[] = [
+  {
+    id: "admin-usuarios",
+    nombre: "Gestión de Usuarios",
+    ruta: "/admin/usuarios",
+    icono: "ManageAccounts",
+    descripcion: "Crear, editar y eliminar usuarios del sistema",
+    permisos: ["all"],
+  },
+  {
+    id: "admin-roles",
+    nombre: "Gestión de Roles",
+    ruta: "/admin/roles",
+    icono: "AdminPanelSettings",
+    descripcion: "Crear y gestionar roles del sistema",
+    permisos: ["all"],
+  },
+  {
+    id: "admin-modulos",
+    nombre: "Gestión de Módulos",
+    ruta: "/admin/modulos",
+    icono: "Extension",
+    descripcion: "Crear y gestionar módulos del sistema",
+    permisos: ["all"],
+  },
+  {
+    id: "admin-auditoria",
+    nombre: "Auditoría",
+    ruta: "/admin/auditoria",
+    icono: "History",
+    descripcion: "Registro de acciones del sistema",
+    permisos: ["all"],
+  },
 ];
 
 // ============================================
 // MENÚ COMPLETO
 // ============================================
 export const MENU_ITEMS: MenuItem[] = [
+  {
+    id: "admin",
+    nombre: "Administración",
+    permisos: ["all"],
+    children: MODULOS_ADMIN,
+  },
   {
     id: "programas-sociales",
     nombre: "Programas Sociales",

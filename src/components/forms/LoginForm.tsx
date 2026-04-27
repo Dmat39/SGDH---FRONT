@@ -6,12 +6,13 @@ import { useFormik } from "formik";
 import * as Yup from "yup";
 import { TextField, Button, CircularProgress, InputAdornment, IconButton } from "@mui/material";
 import { Visibility, VisibilityOff, PersonOutline, LockOutlined } from "@mui/icons-material";
+import axios from "axios";
 import { useAppDispatch } from "@/redux/hooks";
 import { loginSuccess, setLoading } from "@/redux/slices/authSlice";
-import { useFetch } from "@/lib/hooks/useFetch";
 import { showError, showSuccess } from "@/lib/utils/swalConfig";
+import { mapMeResponseToPermissions, mapMeResponseToModuleAbilities, determineSubgerencia, getRoleDisplayName } from "@/lib/utils/authUtils";
 import type { SubgerenciaType } from "@/lib/constants";
-import type { LoginResponse } from "@/types/auth";
+import type { ApiResponse, LoginResponse, MeResponse, User } from "@/types/auth";
 
 interface LoginFormProps {
   subgerencia: SubgerenciaType;
@@ -24,10 +25,18 @@ const validationSchema = Yup.object({
   password: Yup.string().required("La contraseña es requerida"),
 });
 
-// Modo demo: Cambiar a false cuando tengas un backend real
-const DEMO_MODE = true;
+// Cambiar a "true" solo en desarrollo local sin backend
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
-// Tipo para usuario demo
+// Quitar trailing slash para construir URLs con /auth/login, /auth/me, etc.
+const API_BASE = (
+  process.env.NEXT_PUBLIC_PVL_API_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:8000/api"
+).replace(/\/$/, "");
+
+// --------------- Demo mode types & helpers ---------------
+
 interface DemoUserData {
   id: number;
   username: string;
@@ -52,7 +61,6 @@ interface DemoUserEnv {
   cargo: string;
 }
 
-// Usuarios demo desde variables de entorno (.env)
 const parseDemoUsers = (): Record<string, { password: string; user: DemoUserData }> => {
   try {
     const raw = process.env.NEXT_PUBLIC_DEMO_USERS;
@@ -84,114 +92,142 @@ const parseDemoUsers = (): Record<string, { password: string; user: DemoUserData
 
 const DEMO_USERS = parseDemoUsers();
 
+// --------------- Shared redirect logic ---------------
+
+function getRedirectRoute(permissions: string[], userSubgerencia: SubgerenciaType): string {
+  const defaultRoute =
+    userSubgerencia === "servicios-sociales"
+      ? `/${userSubgerencia}/servicios-deporte/participantes`
+      : `/${userSubgerencia}/lista-general`;
+
+  if (
+    permissions.includes("all") ||
+    permissions.includes("all_programas_sociales") ||
+    permissions.includes("all_servicios_sociales") ||
+    permissions.includes("ule")
+  ) {
+    return defaultRoute;
+  }
+  if (permissions.includes("pvl")) return `/${userSubgerencia}/pvl`;
+  if (permissions.includes("pantbc")) return `/${userSubgerencia}/pantbc`;
+  if (permissions.includes("comedores_populares")) return `/${userSubgerencia}/comedores-populares`;
+  if (permissions.includes("ollas_comunes")) return `/${userSubgerencia}/ollas-comunes`;
+  if (permissions.includes("omaped")) return `/${userSubgerencia}/omaped`;
+  if (permissions.includes("ciam")) return `/${userSubgerencia}/ciam`;
+  if (permissions.includes("participacion_ciudadana")) {
+    return `/${userSubgerencia}/participacion-ciudadana/dirigentes`;
+  }
+  if (permissions.includes("servicios_deporte")) {
+    return `/${userSubgerencia}/servicios-deporte/participantes`;
+  }
+  if (permissions.includes("salud")) return `/${userSubgerencia}/salud/compromiso-1`;
+
+  return defaultRoute;
+}
+
+// ---------------------------------------------------------
+
 export default function LoginForm({ subgerencia, color, subgerenciaName }: LoginFormProps) {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { postData } = useFetch();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const formik = useFormik({
-    initialValues: {
-      username: "",
-      password: "",
-    },
+    initialValues: { username: "", password: "" },
     validationSchema,
     onSubmit: async (values) => {
       try {
         setIsLoading(true);
         dispatch(setLoading(true));
 
-        // Modo demo: Login sin backend
+        // ── DEMO MODE ──────────────────────────────────────────────
         if (DEMO_MODE) {
-          // Simular delay de red
           await new Promise((resolve) => setTimeout(resolve, 800));
 
-          // Buscar usuario en la lista de demo
           const demoAccount = DEMO_USERS[values.username];
-
-          // Verificar credenciales de demo
-          if (demoAccount && values.password === demoAccount.password) {
-            const demoToken = "demo_token_" + Date.now();
-            const demoUser = demoAccount.user;
-
-            // Guardar en Redux
-            dispatch(
-              loginSuccess({
-                token: demoToken,
-                user: demoUser,
-              })
-            );
-
-            // Guardar token en cookies para el middleware
-            if (typeof document !== "undefined") {
-              document.cookie = `auth_token=${demoToken}; path=/; max-age=86400; SameSite=Strict`;
-            }
-
-            showSuccess("Bienvenido", `Hola ${demoUser.fullName}`);
-
-            // Ruta por defecto según subgerencia
-            const defaultRoute = subgerencia === "servicios-sociales"
-              ? `/${subgerencia}/servicios-deporte/participantes`
-              : `/${subgerencia}/lista-general`;
-
-            // Redirigir según permisos del usuario
-            if (demoUser.permissions.includes("all") || demoUser.permissions.includes("all_programas_sociales")) {
-              router.push(defaultRoute);
-            } else if (demoUser.permissions.includes("all_servicios_sociales") || demoUser.permissions.includes("ule")) {
-              router.push(defaultRoute);
-            } else if (demoUser.permissions.includes("pvl")) {
-              router.push(`/${subgerencia}/pvl`);
-            } else if (demoUser.permissions.includes("pantbc")) {
-              router.push(`/${subgerencia}/pantbc`);
-            } else if (demoUser.permissions.includes("comedores_populares")) {
-              router.push(`/${subgerencia}/comedores-populares`);
-            } else if (demoUser.permissions.includes("ollas_comunes")) {
-              router.push(`/${subgerencia}/ollas-comunes`);
-            } else if (demoUser.permissions.includes("omaped")) {
-              router.push(`/${subgerencia}/omaped`);
-            } else if (demoUser.permissions.includes("ciam")) {
-              router.push(`/${subgerencia}/ciam`);
-            } else {
-              router.push(defaultRoute);
-            }
-            return;
-          } else {
+          if (!demoAccount || values.password !== demoAccount.password) {
             throw new Error("Usuario o contraseña incorrectos");
           }
+
+          const demoToken = "demo_token_" + Date.now();
+          const demoData = demoAccount.user;
+
+          const demoUser: User = {
+            id: String(demoData.id),
+            username: demoData.username,
+            email: demoData.email,
+            firstName: demoData.firstName,
+            lastName: demoData.lastName,
+            fullName: demoData.fullName,
+            permissions: demoData.permissions,
+            subgerencia: demoData.subgerencia,
+            cargo: demoData.cargo,
+          };
+
+          dispatch(loginSuccess({ token: demoToken, user: demoUser }));
+
+          if (typeof document !== "undefined") {
+            document.cookie = `auth_token=${demoToken}; path=/; max-age=86400; SameSite=Strict`;
+          }
+
+          showSuccess("Bienvenido", `Hola ${demoUser.fullName}`);
+          router.push(getRedirectRoute(demoUser.permissions, demoUser.subgerencia));
+          return;
         }
 
-        // Modo producción: Login con backend real
-        const response: LoginResponse = await postData("/auth/login", {
-          ...values,
-          subgerencia,
-        });
-
-        // Guardar en Redux
-        dispatch(
-          loginSuccess({
-            token: response.token,
-            user: response.user,
+        // ── PRODUCCIÓN ─────────────────────────────────────────────
+        // El ResponseInterceptor envuelve la respuesta: { message, data: { access_token } }
+        const loginWrapped: ApiResponse<LoginResponse> = await axios
+          .post(`${API_BASE}/auth/login`, {
+            username: values.username,
+            password: values.password,
           })
-        );
+          .then((r) => r.data);
 
-        // Guardar token en cookies para el middleware
+        const token = loginWrapped.data.access_token;
+
+        // Obtener datos completos del usuario
+        const meWrapped: ApiResponse<MeResponse> = await axios
+          .get(`${API_BASE}/auth/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          .then((r) => r.data);
+
+        const meRes = meWrapped.data;
+
+        const permissions = mapMeResponseToPermissions(meRes);
+        const userSubgerencia = determineSubgerencia(meRes, subgerencia);
+        const cargo = getRoleDisplayName(meRes.role);
+
+        const user: User = {
+          id: meRes.user.id,
+          username: meRes.user.username,
+          email: meRes.user.email,
+          firstName: meRes.user.name,
+          lastName: meRes.user.lastname,
+          fullName: `${meRes.user.name} ${meRes.user.lastname}`.trim(),
+          permissions,
+          subgerencia: userSubgerencia,
+          cargo,
+          is_super: meRes.is_super,
+          role: meRes.role ?? undefined,
+          moduleAbilities: mapMeResponseToModuleAbilities(meRes),
+        };
+
+        dispatch(loginSuccess({ token, user }));
+
         if (typeof document !== "undefined") {
-          document.cookie = `auth_token=${response.token}; path=/; max-age=86400; SameSite=Strict`;
+          document.cookie = `auth_token=${token}; path=/; max-age=86400; SameSite=Strict`;
         }
 
-        showSuccess("Bienvenido", `Hola ${response.user.fullName}`);
-
-        // Redirigir al dashboard de la subgerencia
-        const defaultRoute = subgerencia === "servicios-sociales"
-          ? `/${subgerencia}/servicios-deporte/participantes`
-          : `/${subgerencia}/lista-general`;
-        router.push(defaultRoute);
+        showSuccess("Bienvenido", `Hola ${user.fullName}`);
+        router.push(getRedirectRoute(permissions, userSubgerencia));
       } catch (error: any) {
         console.error("Error en login:", error);
         showError(
           "Error al iniciar sesión",
-          error.message || error.response?.data?.message || "Usuario o contraseña incorrectos"
+          error.response?.data?.message || error.message || "Usuario o contraseña incorrectos"
         );
       } finally {
         setIsLoading(false);
@@ -202,7 +238,6 @@ export default function LoginForm({ subgerencia, color, subgerenciaName }: Login
 
   return (
     <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 md:p-10">
-      {/* Título */}
       <h2
         className="text-xl md:text-2xl font-bold text-center mb-8 leading-tight"
         style={{ color }}
@@ -210,9 +245,7 @@ export default function LoginForm({ subgerencia, color, subgerenciaName }: Login
         {subgerenciaName}
       </h2>
 
-      {/* Formulario */}
       <form onSubmit={formik.handleSubmit}>
-        {/* Campo Usuario */}
         <div className="mb-6">
           <TextField
             fullWidth
@@ -235,15 +268,10 @@ export default function LoginForm({ subgerencia, color, subgerenciaName }: Login
                 ),
               },
             }}
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                borderRadius: "12px",
-              },
-            }}
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: "12px" } }}
           />
         </div>
 
-        {/* Campo Contraseña */}
         <div className="mb-8">
           <TextField
             fullWidth
@@ -278,15 +306,10 @@ export default function LoginForm({ subgerencia, color, subgerenciaName }: Login
                 ),
               },
             }}
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                borderRadius: "12px",
-              },
-            }}
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: "12px" } }}
           />
         </div>
 
-        {/* Botón de submit */}
         <Button
           fullWidth
           type="submit"
@@ -295,10 +318,7 @@ export default function LoginForm({ subgerencia, color, subgerenciaName }: Login
           disabled={isLoading}
           sx={{
             backgroundColor: color,
-            "&:hover": {
-              backgroundColor: color,
-              filter: "brightness(0.9)",
-            },
+            "&:hover": { backgroundColor: color, filter: "brightness(0.9)" },
             textTransform: "none",
             fontSize: "1.1rem",
             fontWeight: "bold",
@@ -311,7 +331,6 @@ export default function LoginForm({ subgerencia, color, subgerenciaName }: Login
         </Button>
       </form>
 
-      {/* Enlaces adicionales */}
       <div className="mt-6 flex justify-center gap-4 text-sm">
         <button
           type="button"

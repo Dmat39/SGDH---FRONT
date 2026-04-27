@@ -117,7 +117,7 @@ type FilterType = "edad" | "cumpleanos" | "telefono" | "genero";
 type CumpleanosModo = "mes" | "dia";
 
 export default function ComedoresPresidentesPage() {
-  const { canEdit, canShowObservacion } = usePermissions();
+  const { canUpdate, canDelete, canShowObservacion } = usePermissions();
   const { getData } = useFetch();
 
   const [data, setData] = useState<PresidenteFrontend[]>([]);
@@ -561,14 +561,14 @@ export default function ComedoresPresidentesPage() {
                               <Visibility fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          {canEdit() && (
+                          {canUpdate("Comedores Populares") && (
                           <Tooltip title="Editar">
                             <IconButton size="small" onClick={(e) => { e.stopPropagation(); }} sx={{ color: "#0891b2", "&:hover": { backgroundColor: "rgba(8, 145, 178, 0.1)" } }}>
                               <Edit fontSize="small" />
                             </IconButton>
                           </Tooltip>
                           )}
-                          {canEdit() && (
+                          {canDelete("Comedores Populares") && (
                           <Tooltip title="Eliminar">
                             <IconButton size="small" onClick={(e) => { e.stopPropagation(); }} sx={{ color: "#dc2626", "&:hover": { backgroundColor: "rgba(220, 38, 38, 0.1)" } }}>
                               <Delete fontSize="small" />

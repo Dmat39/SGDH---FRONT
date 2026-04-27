@@ -49,13 +49,13 @@ import { usePermissions } from "@/lib/hooks/usePermissions";
 const subgerencia = SUBGERENCIAS[SubgerenciaType.SERVICIOS_SOCIALES];
 const PROGRAM_ID = "a343b6c5-9b32-4c2e-bb59-895bce9d55ae";
 
-// Módulos del área de Servicios Sociales
-// apiName = valor exacto que devuelve module.name en la API
-// name    = etiqueta visible en la UI
+// apiName = nombre exacto del módulo en la BD (para filtro server-side)
+// supEndpoint = true → usa endpoint support/sup en vez de general
 const MODULOS_FIJOS = [
   { name: "Participación Vecinal", apiName: "PARTICIPACION VECINAL", color: "#00a3a8" },
   { name: "Cultura y Deporte",     apiName: "CULTURA Y DEPORTE",     color: "#0288d1" },
   { name: "Salud y Sanidad",       apiName: "COMPROMISO I",           color: "#2e7d32" },
+  { name: "Apoyo",                 apiName: "SUP",                    color: "#7b1fa2" },
 ];
 
 // Normaliza a minúsculas sin tildes para comparaciones robustas
@@ -160,100 +160,73 @@ export default function ListaGeneralServiciosSocialesPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Cargar totales por módulo (filtrado en cliente)
+  // Cargar totales por módulo — limit=1 para obtener solo totalCount
   useEffect(() => {
     const fetchTotals = async () => {
-      try {
-        const res = await getData<BackendResponse>(
-          `general?page=1&limit=99999&program_id=${PROGRAM_ID}`
-        );
-        if (!res?.data?.data) return;
-        const totals: Record<string, number> = {};
-        MODULOS_FIJOS.forEach((mod) => { totals[mod.name] = 0; });
-        res.data.data.forEach((item) => {
-          const apiName = normalize(item.module?.name || "");
-          const match = MODULOS_FIJOS.find((m) => normalize(m.apiName) === apiName);
-          if (match) totals[match.name] = (totals[match.name] || 0) + 1;
-        });
-        setModuloTotals(totals);
-      } catch {
-        // silencioso
-      }
+      const counts: Record<string, number> = {};
+      await Promise.allSettled(
+        MODULOS_FIJOS.map(async (mod) => {
+          try {
+            const res = await getData<BackendResponse>(
+              `general?program_id=${PROGRAM_ID}&module_name=${encodeURIComponent(mod.apiName)}&page=1&limit=1`
+            );
+            counts[mod.name] = res?.data?.totalCount ?? 0;
+          } catch {
+            counts[mod.name] = 0;
+          }
+        })
+      );
+      setModuloTotals(counts);
     };
     fetchTotals();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getData]);
 
-  // Cargar datos de la tabla
+  // Cargar datos — server-side paginado, endpoint general para todos los módulos
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
+        const selectedMod = MODULOS_FIJOS.find((m) => m.name === filtroModulo);
         const params = new URLSearchParams();
         params.set("program_id", PROGRAM_ID);
+        params.set("page", String(page + 1));
+        params.set("limit", String(rowsPerPage));
 
-        // Si hay módulo seleccionado, trae todo y filtra en cliente
-        if (filtroModulo) {
-          params.set("page", "1");
-          params.set("limit", "99999");
-        } else {
-          params.set("page", String(page + 1));
-          params.set("limit", String(rowsPerPage));
-        }
-
-        if (debouncedSearch) {
-          params.set("search", debouncedSearch);
-        }
+        if (debouncedSearch) params.set("search", debouncedSearch);
+        if (selectedMod) params.set("module_name", selectedMod.apiName);
 
         if (edadRange[0] > 0 || edadRange[1] < 110) {
           params.set("age_min", String(edadRange[0]));
           params.set("age_max", String(edadRange[1]));
         }
-
         if (filtroMes && filtroDia) {
-          const mm = String(filtroMes).padStart(2, "0");
-          const dd = String(filtroDia).padStart(2, "0");
-          params.set("birthday", `${mm}-${dd}`);
+          params.set("birthday", `${String(filtroMes).padStart(2, "0")}-${String(filtroDia).padStart(2, "0")}`);
         } else if (filtroMes) {
           params.set("month", String(filtroMes));
         }
-
-        if (filtroTelefono === "con") {
-          params.set("phone", "true");
-        } else if (filtroTelefono === "sin") {
-          params.set("phone", "false");
-        }
-
-        if (filtroSexo) {
-          params.set("sex", filtroSexo);
-        }
+        if (filtroTelefono === "con") params.set("phone", "true");
+        else if (filtroTelefono === "sin") params.set("phone", "false");
+        if (filtroSexo) params.set("sex", filtroSexo);
 
         const response = await getData<BackendResponse>(`general?${params.toString()}`);
-
         if (response?.data) {
-          let items = response.data.data.map((item) => ({
-            id: item.id,
-            nombreCompleto: `${item.name} ${item.lastname}`.trim(),
-            nombre: item.name,
-            apellido: item.lastname,
-            dni: item.dni || "-",
-            telefono: item.phone || "",
-            sexo: item.sex ?? null,
-            fechaNacimiento: item.birthday,
-            edad: calcularEdad(item.birthday),
-            moduloId: item.module?.id || item.module_id,
-            moduloNombre: item.module?.name || "-",
-          }));
-
-          // Filtro por módulo en cliente usando el apiName exacto
-          if (filtroModulo) {
-            const selected = MODULOS_FIJOS.find((m) => m.name === filtroModulo);
-            const targetApiName = selected ? normalize(selected.apiName) : normalize(filtroModulo);
-            items = items.filter((item) => normalize(item.moduloNombre) === targetApiName);
-          }
-
-          setData(items);
-          setTotalCount(filtroModulo ? items.length : response.data.totalCount);
+          setData(
+            response.data.data.map((item: GeneralPersonBackend) => ({
+              id: item.id,
+              nombreCompleto: `${item.name} ${item.lastname}`.trim(),
+              nombre: item.name,
+              apellido: item.lastname,
+              dni: item.dni || "-",
+              telefono: item.phone || "",
+              sexo: item.sex ?? null,
+              fechaNacimiento: item.birthday,
+              edad: calcularEdad(item.birthday),
+              moduloId: item.module?.id || item.module_id,
+              moduloNombre: item.module?.name || "-",
+            }))
+          );
+          setTotalCount(response.data.totalCount);
         }
       } catch (error) {
         console.error("Error cargando datos:", error);
@@ -266,64 +239,38 @@ export default function ListaGeneralServiciosSocialesPage() {
 
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, rowsPerPage, fetchKey, debouncedSearch, filtroModulo, getData]);
+  }, [page, rowsPerPage, fetchKey, debouncedSearch, filtroModulo, edadRange, filtroMes, filtroDia, filtroTelefono, filtroSexo, getData]);
 
   const formattedData = useFormatTableData(data);
   const filteredData = formattedData;
 
   const [isExporting, setIsExporting] = useState(false);
 
-  // Exportar Excel
+  // Exportar Excel — mismo endpoint que la tabla
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const params = new URLSearchParams();
-      params.set("page", "1");
-      params.set("limit", "99999");
-      params.set("program_id", PROGRAM_ID);
+      const selectedMod = MODULOS_FIJOS.find((m) => m.name === filtroModulo);
+      const fechaISO = new Date().toISOString().slice(0, 10);
 
-      if (debouncedSearch) {
-        params.set("search", debouncedSearch);
-      }
-
+      const params = new URLSearchParams({ page: "1", limit: "99999", program_id: PROGRAM_ID });
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      if (selectedMod) params.set("module_name", selectedMod.apiName);
       if (edadRange[0] > 0 || edadRange[1] < 110) {
         params.set("age_min", String(edadRange[0]));
         params.set("age_max", String(edadRange[1]));
       }
+      if (filtroMes && filtroDia) params.set("birthday", `${String(filtroMes).padStart(2, "0")}-${String(filtroDia).padStart(2, "0")}`);
+      else if (filtroMes) params.set("month", String(filtroMes));
+      if (filtroTelefono === "con") params.set("phone", "true");
+      else if (filtroTelefono === "sin") params.set("phone", "false");
+      if (filtroSexo) params.set("sex", filtroSexo);
 
-      if (filtroMes && filtroDia) {
-        const mm = String(filtroMes).padStart(2, "0");
-        const dd = String(filtroDia).padStart(2, "0");
-        params.set("birthday", `${mm}-${dd}`);
-      } else if (filtroMes) {
-        params.set("month", String(filtroMes));
-      }
-
-      if (filtroTelefono === "con") {
-        params.set("phone", "true");
-      } else if (filtroTelefono === "sin") {
-        params.set("phone", "false");
-      }
-
-      if (filtroSexo) {
-        params.set("sex", filtroSexo);
-      }
-
-      const response = await getData<BackendResponse>(`general?${params.toString()}`);
+      const response = await getData<BackendResponse>(`general?${params}`);
       if (!response?.data) return;
 
-      let exportItems = response.data.data;
-
-      // Filtro por módulo en cliente usando el apiName exacto
-      if (filtroModulo) {
-        const selected = MODULOS_FIJOS.find((m) => m.name === filtroModulo);
-        const targetApiName = selected ? normalize(selected.apiName) : normalize(filtroModulo);
-        exportItems = exportItems.filter((item) =>
-          normalize(item.module?.name || "") === targetApiName
-        );
-      }
-
-      const exportData = exportItems.map((item) => ({
+      const exportData = response.data.data.map((item: GeneralPersonBackend, i: number) => ({
+        "#": i + 1,
         "Nombre Completo": `${item.name} ${item.lastname}`.trim(),
         DNI: item.dni || "-",
         Teléfono: formatearTelefono(item.phone),
@@ -334,22 +281,11 @@ export default function ListaGeneralServiciosSocialesPage() {
 
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.json_to_sheet(exportData);
-      ws["!cols"] = [
-        { wch: 30 },
-        { wch: 12 },
-        { wch: 15 },
-        { wch: 15 },
-        { wch: 6 },
-        { wch: 25 },
-      ];
+      ws["!cols"] = [{ wch: 5 }, { wch: 30 }, { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 25 }];
       XLSX.utils.book_append_sheet(wb, ws, "Lista General");
-
       let fileName = "lista_general_servicios_sociales";
-      if (filtroModulo) fileName += `_${filtroModulo}`;
-      fileName += `_${new Date().toISOString().split("T")[0]}`;
-      fileName += ".xlsx";
-
-      XLSX.writeFile(wb, fileName);
+      if (filtroModulo) fileName += `_${filtroModulo.toLowerCase().replace(/\s/g, "_")}`;
+      XLSX.writeFile(wb, `${fileName}_${fechaISO}.xlsx`);
     } catch (error) {
       console.error("Error exportando:", error);
     } finally {
@@ -400,6 +336,9 @@ export default function ListaGeneralServiciosSocialesPage() {
   const filterOpen = Boolean(filterAnchor);
   const isEdadFiltered = edadRange[0] > 0 || edadRange[1] < 110;
   const hayFiltrosActivos = searchTerm || filtroModulo || filtroDia || filtroMes || isEdadFiltered || filtroTelefono || filtroSexo;
+
+  const totalModulosSum = Object.values(moduloTotals).reduce((s, n) => s + n, 0);
+  const grandTotal = totalModulosSum > 0 ? totalModulosSum : totalCount;
 
   return (
     <Box>
@@ -815,24 +754,28 @@ export default function ListaGeneralServiciosSocialesPage() {
         <Paper sx={{ px: 2, py: 1, borderRadius: "12px", display: "flex", alignItems: "center", gap: 1 }}>
           <FilterList fontSize="small" color="action" />
           <Typography variant="body2">
-            <strong>{totalCount.toLocaleString()}</strong> registros
+            <strong>{grandTotal.toLocaleString()}</strong> registros en total
           </Typography>
         </Paper>
         {MODULOS_FIJOS.map((mod) => (
           <Paper
             key={mod.name}
+            onClick={() => { setFiltroModulo(mod.name); setPage(0); setFetchKey((k) => k + 1); }}
             sx={{
-              px: 2,
-              py: 1,
-              borderRadius: "12px",
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              borderLeft: `4px solid ${mod.color}`,
+              px: 2, py: 1, borderRadius: "12px", display: "flex", alignItems: "center",
+              gap: 1, borderLeft: `4px solid ${mod.color}`, cursor: "pointer",
+              transition: "box-shadow 0.15s",
+              boxShadow: filtroModulo === mod.name ? `0 0 0 2px ${mod.color}` : undefined,
+              "&:hover": { boxShadow: `0 0 0 2px ${mod.color}` },
             }}
           >
             <Typography variant="body2">
-              {mod.name}: <strong>{(moduloTotals[mod.name] ?? 0).toLocaleString()}</strong>
+              {mod.name}:{" "}
+              <strong>
+                {moduloTotals[mod.name] !== undefined
+                  ? moduloTotals[mod.name].toLocaleString()
+                  : "…"}
+              </strong>
             </Typography>
           </Paper>
         ))}
@@ -979,7 +922,7 @@ export default function ListaGeneralServiciosSocialesPage() {
             </TableContainer>
             <TablePagination
               component="div"
-              count={totalCount}
+              count={grandTotal}
               page={page}
               onPageChange={(_, newPage) => setPage(newPage)}
               rowsPerPage={rowsPerPage}

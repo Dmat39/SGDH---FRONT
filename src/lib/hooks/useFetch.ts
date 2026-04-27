@@ -4,7 +4,9 @@ import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import { logout, setLoading } from "@/redux/slices/authSlice";
 import { showError } from "@/lib/utils/swalConfig";
 
-const API_URL = process.env.NEXT_PUBLIC_PVL_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+const API_BASE = (process.env.NEXT_PUBLIC_PVL_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api").replace(/\/$/, "");
+
+const buildUrl = (path: string) => `${API_BASE}/${path.replace(/^\//, "")}`;
 
 interface FetchOptions extends AxiosRequestConfig {
   showErrorAlert?: boolean;
@@ -57,7 +59,7 @@ export const useFetch = () => {
         setLocalLoading(true);
         dispatch(setLoading(true));
 
-        const response = await axios.get(`${API_URL}${url}`, {
+        const response = await axios.get(buildUrl(url), {
           headers: {
             Authorization: token ? `Bearer ${token}` : "",
             ...axiosConfig.headers,
@@ -88,7 +90,7 @@ export const useFetch = () => {
         setLocalLoading(true);
         dispatch(setLoading(true));
 
-        const response = await axios.post(`${API_URL}${url}`, data, {
+        const response = await axios.post(buildUrl(url), data, {
           headers: {
             Authorization: token ? `Bearer ${token}` : "",
             "Content-Type": "application/json",
@@ -120,7 +122,7 @@ export const useFetch = () => {
         setLocalLoading(true);
         dispatch(setLoading(true));
 
-        const response = await axios.put(`${API_URL}${url}`, data, {
+        const response = await axios.put(buildUrl(url), data, {
           headers: {
             Authorization: token ? `Bearer ${token}` : "",
             "Content-Type": "application/json",
@@ -152,7 +154,7 @@ export const useFetch = () => {
         setLocalLoading(true);
         dispatch(setLoading(true));
 
-        const response = await axios.patch(`${API_URL}${url}`, data, {
+        const response = await axios.patch(buildUrl(url), data, {
           headers: {
             Authorization: token ? `Bearer ${token}` : "",
             "Content-Type": "application/json",
@@ -184,7 +186,7 @@ export const useFetch = () => {
         setLocalLoading(true);
         dispatch(setLoading(true));
 
-        const response = await axios.delete(`${API_URL}${url}`, {
+        const response = await axios.delete(buildUrl(url), {
           headers: {
             Authorization: token ? `Bearer ${token}` : "",
             ...axiosConfig.headers,

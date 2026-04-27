@@ -108,7 +108,7 @@ type FilterType = "edad" | "cumpleanos" | "telefono" | "sexo";
 type CumpleanosModo = "mes" | "dia";
 
 export default function PVLCoordinadorasPage() {
-  const { canEdit, canShowObservacion } = usePermissions();
+  const { canUpdate, canDelete, canShowObservacion } = usePermissions();
   const { getData } = useFetch();
 
   const [data, setData] = useState<CoordinadoraFrontend[]>([]);
@@ -574,14 +574,14 @@ export default function PVLCoordinadorasPage() {
                               <Visibility fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          {canEdit() && (
+                          {canUpdate("PVL") && (
                           <Tooltip title="Editar">
                             <IconButton size="small" onClick={(e) => { e.stopPropagation(); }} sx={{ color: "#0891b2", "&:hover": { backgroundColor: "rgba(8, 145, 178, 0.1)" } }}>
                               <Edit fontSize="small" />
                             </IconButton>
                           </Tooltip>
                           )}
-                          {canEdit() && (
+                          {canDelete("PVL") && (
                           <Tooltip title="Eliminar">
                             <IconButton size="small" onClick={(e) => { e.stopPropagation(); }} sx={{ color: "#dc2626", "&:hover": { backgroundColor: "rgba(220, 38, 38, 0.1)" } }}>
                               <Delete fontSize="small" />

@@ -117,7 +117,7 @@ type FilterType = "edad" | "cumpleanos" | "telefono" | "genero";
 type CumpleanosModo = "mes" | "dia";
 
 export default function OllasPresidentesPage() {
-  const { canEdit, canShowObservacion } = usePermissions();
+  const { canUpdate, canDelete, canShowObservacion } = usePermissions();
   const { getData } = useFetch();
 
   const [data, setData] = useState<PresidenteFrontend[]>([]);
@@ -554,14 +554,14 @@ export default function OllasPresidentesPage() {
                               <Visibility fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          {canEdit() && (
+                          {canUpdate("Ollas Comunes") && (
                           <Tooltip title="Editar">
                             <IconButton size="small" onClick={(e) => { e.stopPropagation(); }} sx={{ color: "#0891b2", "&:hover": { backgroundColor: "rgba(8, 145, 178, 0.1)" } }}>
                               <Edit fontSize="small" />
                             </IconButton>
                           </Tooltip>
                           )}
-                          {canEdit() && (
+                          {canDelete("Ollas Comunes") && (
                           <Tooltip title="Eliminar">
                             <IconButton size="small" onClick={(e) => { e.stopPropagation(); }} sx={{ color: "#dc2626", "&:hover": { backgroundColor: "rgba(220, 38, 38, 0.1)" } }}>
                               <Delete fontSize="small" />
